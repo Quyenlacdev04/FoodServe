@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 107, 0, 0.4);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 107, 0, 0.7);
+  }
+}
+
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .glass-light {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .glass-dark {
+    background: rgba(17, 17, 27, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #ff6b00, #ff9500, #ffb347);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, #ff6b00 0%, #ff9500 50%, #ffb347 100%);
+  }
+
+  .bg-gradient-dark {
+    background: linear-gradient(180deg, #11111b 0%, #1e1e2e 50%, #181825 100%);
+  }
+
+  .btn-primary {
+    @apply bg-gradient-primary text-white font-semibold px-6 py-3 rounded-xl
+           hover:shadow-glow transition-all duration-300 transform hover:scale-105
+           active:scale-95;
+  }
+
+  .btn-outline {
+    @apply border-2 border-primary-500 text-primary-500 font-semibold px-6 py-3 rounded-xl
+           hover:bg-primary-500 hover:text-white transition-all duration-300
+           transform hover:scale-105 active:scale-95;
+  }
+
+  .card-restaurant {
+    @apply bg-white dark:bg-dark-100 rounded-2xl overflow-hidden
+           shadow-card hover:shadow-card-hover transition-all duration-500
+           transform hover:-translate-y-2;
+  }
+
+  .skeleton {
+    @apply animate-shimmer bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200
+           dark:from-dark-100 dark:via-dark-200 dark:to-dark-100;
+    background-size: 200% 100%;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .badge-discount {
+    @apply badge bg-red-500 text-white;
+  }
+
+  .badge-freeship {
+    @apply badge bg-green-500 text-white;
+  }
+
+  .input-search {
+    @apply w-full px-4 py-3 pl-12 rounded-xl border-2 border-gray-200 
+           dark:border-dark-100 dark:bg-dark-200 dark:text-white
+           focus:border-primary-500 focus:outline-none focus:ring-2 
+           focus:ring-primary-500/20 transition-all duration-300;
+  }
+
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-dark-300/90 backdrop-blur-md
+           border-t border-gray-200 dark:border-white/10 px-4 py-2 md:hidden transition-colors duration-500;
+  }
+
+  .category-card {
+    @apply flex flex-col items-center gap-2 p-4 rounded-2xl cursor-pointer
+           transition-all duration-300 hover:bg-primary-50 dark:hover:bg-dark-100
+           hover:shadow-md transform hover:scale-105;
+  }
+}
+
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  .text-shadow-lg {
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
