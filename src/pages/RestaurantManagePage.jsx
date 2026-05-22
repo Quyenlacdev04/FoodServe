@@ -11,6 +11,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatPrice } from '../data/mockData'
 import { updateUser } from '../store/slices/authSlice'
+import ImageUpload from '../components/ui/ImageUpload'
 
 const orderStatusMap = {
   pending: { label: 'Chờ xác nhận', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' },
@@ -56,6 +57,12 @@ export default function RestaurantManagePage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentProcessing, setPaymentProcessing] = useState(false)
   const [qrStep, setQrStep] = useState(0) // 0: chọn, 1: QR, 2: thành công
+  const [customQRCode, setCustomQRCode] = useState('') // QR code tùy chỉnh
+  const [bankInfo, setBankInfo] = useState({
+    bankName: '',
+    accountName: '',
+    accountNumber: ''
+  }) // Thông tin ngân hàng
 
   // Validate Merchant Access
   useEffect(() => {
@@ -64,7 +71,7 @@ export default function RestaurantManagePage() {
       navigate('/')
       return
     }
-    if (user && user.role !== 'merchant' && user.role !== 'admin') {
+    if (user && !user.isMerchant && user.role !== 'merchant' && user.role !== 'admin') {
       toast.error('Bạn không có quyền truy cập trang quản lý đối tác!')
       navigate('/')
       return
@@ -249,6 +256,8 @@ export default function RestaurantManagePage() {
         const updated = await res.json()
         setRestaurant(updated)
         toast.success('Cập nhật thông tin cửa hàng thành công!', { icon: '🏪' })
+        // Trigger refresh để reload toàn bộ dữ liệu
+        triggerRefresh()
       } else {
         toast.error('Lỗi khi cập nhật thông tin cửa hàng')
       }
@@ -265,9 +274,38 @@ export default function RestaurantManagePage() {
       setPaymentProcessing(true)
       if (method === 'mockPayment') {
         setQrStep(1)
-        // Simulate QR scan delay
-        await new Promise(r => setTimeout(r, 2500))
+        // Không tự động chuyển sang bước 2, chờ user click "Đã chuyển khoản"
+        return
       }
+      if (method === 'qr_payment') {
+        // Gửi yêu cầu thanh toán chờ admin duyệt
+        const res = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}/request-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            paymentMethod: 'bank_transfer',
+            amount: monthlyFee,
+            userId: user._id || user.id,
+            restaurantId: restaurant._id,
+            restaurantName: restaurant.name
+          })
+        })
+        const data = await res.json()
+        if (res.ok) {
+          toast.success('Đã gửi yêu cầu thanh toán! Admin sẽ xác nhận trong vòng 24h.', { 
+            icon: '⏳',
+            duration: 5000 
+          })
+          setShowPaymentModal(false)
+          setQrStep(0)
+        } else {
+          toast.error(data.message || 'Lỗi gửi yêu cầu thanh toán')
+        }
+        setPaymentProcessing(false)
+        return
+      }
+      
+      // Xử lý thanh toán bằng xu (tự động)
       const res = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}/renew-subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -305,6 +343,12 @@ export default function RestaurantManagePage() {
   const isSubscriptionExpired = restaurant?.subscriptionExpiry && new Date(restaurant.subscriptionExpiry) < new Date()
   const monthlyFee = systemSettings?.monthlyRestaurantFee || 500000
   const feeInCoins = Math.ceil(monthlyFee / 1000)
+  
+  // Tính số ngày còn lại
+  const daysUntilExpiry = restaurant?.subscriptionExpiry 
+    ? Math.ceil((new Date(restaurant.subscriptionExpiry) - new Date()) / (1000 * 60 * 60 * 24))
+    : 0
+  const isExpiringSoon = daysUntilExpiry > 0 && daysUntilExpiry <= 7
 
   if (loading && !restaurant) {
     return (
@@ -333,6 +377,47 @@ export default function RestaurantManagePage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-300 pt-24 pb-12 px-4 md:px-8">
       <div className="max-w-7xl mx-auto">
+        
+        {/* Cảnh báo hết hạn - hiển thị ở đầu trang */}
+        {(isSubscriptionExpired || isExpiringSoon) && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mb-6 p-4 rounded-2xl border-2 ${
+              isSubscriptionExpired
+                ? 'bg-red-50 dark:bg-red-950/20 border-red-500'
+                : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-500'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{isSubscriptionExpired ? '🔒' : '⏰'}</span>
+              <div className="flex-1">
+                <h3 className={`font-bold ${isSubscriptionExpired ? 'text-red-700 dark:text-red-400' : 'text-yellow-700 dark:text-yellow-400'}`}>
+                  {isSubscriptionExpired 
+                    ? '⚠️ Cửa hàng đã bị tạm khóa do hết hạn phí duy trì!' 
+                    : `⏰ Cảnh báo: Còn ${daysUntilExpiry} ngày nữa hết hạn!`
+                  }
+                </h3>
+                <p className={`text-sm mt-1 ${isSubscriptionExpired ? 'text-red-600 dark:text-red-300' : 'text-yellow-600 dark:text-yellow-300'}`}>
+                  {isSubscriptionExpired
+                    ? 'Khách hàng không thể xem hoặc đặt hàng từ cửa hàng của bạn. Vui lòng gia hạn ngay để mở lại.'
+                    : `Phí duy trì sẽ hết hạn vào ${new Date(restaurant.subscriptionExpiry).toLocaleDateString('vi-VN')}. Gia hạn ngay để tránh gián đoạn kinh doanh.`
+                  }
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveTab('subscription')}
+                className={`px-4 py-2 rounded-xl font-bold text-white ${
+                  isSubscriptionExpired
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-yellow-600 hover:bg-yellow-700'
+                } transition-colors`}
+              >
+                Gia hạn ngay
+              </button>
+            </div>
+          </motion.div>
+        )}
         
         {/* Banner/Header nhà hàng */}
         <div className="relative h-48 sm:h-64 rounded-3xl overflow-hidden shadow-lg mb-8 group">
@@ -411,6 +496,16 @@ export default function RestaurantManagePage() {
                   !
                 </span>
               )}
+            </button>
+            <button 
+              onClick={() => setActiveTab('payment-history')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-bold transition-all ${
+                activeTab === 'payment-history' 
+                  ? 'bg-primary-500 text-white shadow-glow shadow-primary-500/20' 
+                  : 'bg-white dark:bg-dark-200 hover:bg-gray-100 dark:hover:bg-dark-100 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <FiClock className="text-lg" /> Lịch sử thanh toán
             </button>
             <button 
               onClick={() => setActiveTab('orders')} 
@@ -582,6 +677,111 @@ export default function RestaurantManagePage() {
               </div>
             )}
 
+            {/* LỊCH SỬ THANH TOÁN TAB */}
+            {activeTab === 'payment-history' && (
+              <div className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-card border border-gray-100 dark:border-gray-800">
+                <div className="mb-6">
+                  <h3 className="font-bold text-xl dark:text-white">Lịch sử thanh toán phí duy trì</h3>
+                  <p className="text-sm text-gray-400">Xem tất cả các lần đóng phí duy trì cửa hàng</p>
+                </div>
+
+                {/* Thống kê tổng quan */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/20 p-4 rounded-2xl border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider mb-1">Tổng số lần thanh toán</p>
+                    <p className="text-2xl font-black text-blue-700 dark:text-blue-300">{restaurant?.paymentHistory?.length || 0} lần</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/20 dark:to-green-900/20 p-4 rounded-2xl border border-green-200 dark:border-green-800">
+                    <p className="text-xs text-green-600 dark:text-green-400 font-semibold uppercase tracking-wider mb-1">Tổng chi phí</p>
+                    <p className="text-2xl font-black text-green-700 dark:text-green-300">
+                      {formatPrice(restaurant?.paymentHistory?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)}
+                    </p>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/20 dark:to-purple-900/20 p-4 rounded-2xl border border-purple-200 dark:border-purple-800">
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold uppercase tracking-wider mb-1">Lần thanh toán gần nhất</p>
+                    <p className="text-sm font-bold text-purple-700 dark:text-purple-300">
+                      {restaurant?.paymentHistory?.length > 0 
+                        ? new Date(restaurant.paymentHistory[restaurant.paymentHistory.length - 1].paidAt).toLocaleDateString('vi-VN')
+                        : 'Chưa có'
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bảng lịch sử */}
+                <div className="overflow-x-auto">
+                  {!restaurant?.paymentHistory || restaurant.paymentHistory.length === 0 ? (
+                    <div className="py-12 text-center text-gray-400">
+                      <FiClock className="text-5xl mx-auto mb-3 opacity-50" />
+                      <p className="font-semibold">Chưa có lịch sử thanh toán nào</p>
+                      <p className="text-sm mt-1">Các giao dịch thanh toán phí duy trì sẽ hiển thị ở đây</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b-2 border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-500 dark:text-gray-400">
+                          <th className="p-4 pl-0">Ngày thanh toán</th>
+                          <th className="p-4">Số tiền</th>
+                          <th className="p-4">Phương thức</th>
+                          <th className="p-4">Kỳ hạn</th>
+                          <th className="p-4">Ghi chú</th>
+                          <th className="p-4 text-right">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...restaurant.paymentHistory].reverse().map((payment, index) => (
+                          <tr key={payment._id || index} className="border-b border-gray-100 dark:border-gray-800/40 last:border-0 hover:bg-gray-50 dark:hover:bg-dark-100/30 transition-colors">
+                            <td className="p-4 pl-0">
+                              <div>
+                                <p className="font-semibold dark:text-white">{new Date(payment.paidAt).toLocaleDateString('vi-VN')}</p>
+                                <p className="text-xs text-gray-400">{new Date(payment.paidAt).toLocaleTimeString('vi-VN')}</p>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <p className="font-bold text-green-600 dark:text-green-400">
+                                {payment.paymentMethod === 'coins' 
+                                  ? `${payment.amount} Xu` 
+                                  : formatPrice(payment.amount)
+                                }
+                              </p>
+                            </td>
+                            <td className="p-4">
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                                payment.paymentMethod === 'coins'
+                                  ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400'
+                                  : 'bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+                              }`}>
+                                {payment.paymentMethod === 'coins' ? '🪙 Xu thưởng' : '💳 Chuyển khoản'}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <div className="text-xs">
+                                <p className="text-gray-500 dark:text-gray-400">
+                                  {new Date(payment.periodStart).toLocaleDateString('vi-VN')}
+                                </p>
+                                <p className="text-gray-400">→</p>
+                                <p className="text-gray-500 dark:text-gray-400">
+                                  {new Date(payment.periodEnd).toLocaleDateString('vi-VN')}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="p-4 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
+                              {payment.transactionNote || '-'}
+                            </td>
+                            <td className="p-4 text-right">
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 dark:bg-green-950/30 text-green-600 dark:text-green-400">
+                                ✓ Hoàn tất
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* QUẢN LÝ ĐƠN HÀNG TAB */}
             {activeTab === 'orders' && (
               <div className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-card border border-gray-100 dark:border-gray-800">
@@ -664,9 +864,18 @@ export default function RestaurantManagePage() {
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-card border border-gray-100 dark:border-gray-800"
               >
-                <div className="mb-6">
-                  <h3 className="font-bold text-xl dark:text-white flex items-center gap-2"><FiSettings className="text-primary-500" /> Cài đặt cửa hàng</h3>
-                  <p className="text-sm text-gray-400">Chỉnh sửa thông tin, ảnh đại diện và ảnh bìa cửa hàng của bạn</p>
+                <div className="mb-6 flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-xl dark:text-white flex items-center gap-2"><FiSettings className="text-primary-500" /> Cài đặt cửa hàng</h3>
+                    <p className="text-sm text-gray-400">Chỉnh sửa thông tin, ảnh đại diện và ảnh bìa cửa hàng của bạn</p>
+                  </div>
+                  <button
+                    onClick={triggerRefresh}
+                    className="px-4 py-2 bg-gray-100 dark:bg-dark-300 hover:bg-gray-200 dark:hover:bg-dark-100 text-gray-600 dark:text-gray-300 rounded-xl font-medium flex items-center gap-2 transition-colors"
+                    title="Làm mới dữ liệu"
+                  >
+                    <FiRefreshCw className="text-sm" /> Làm mới
+                  </button>
                 </div>
 
                 {/* Preview ảnh */}
@@ -725,25 +934,23 @@ export default function RestaurantManagePage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
-                        <FiImage className="text-blue-500" /> Ảnh đại diện (Logo/Avatar URL)
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
+                        <FiImage className="text-blue-500" /> Ảnh đại diện (Logo/Avatar)
                       </label>
-                      <input 
-                        type="url" value={storeForm.image}
-                        onChange={e => setStoreForm({ ...storeForm, image: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
-                        placeholder="https://example.com/logo.jpg"
+                      <ImageUpload
+                        value={storeForm.image}
+                        onChange={(url) => setStoreForm({ ...storeForm, image: url })}
+                        placeholder="Chọn ảnh đại diện từ máy tính"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
-                        <FiImage className="text-purple-500" /> Ảnh bìa (Cover URL)
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
+                        <FiImage className="text-purple-500" /> Ảnh bìa (Cover)
                       </label>
-                      <input 
-                        type="url" value={storeForm.cover}
-                        onChange={e => setStoreForm({ ...storeForm, cover: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
-                        placeholder="https://example.com/cover.jpg"
+                      <ImageUpload
+                        value={storeForm.cover}
+                        onChange={(url) => setStoreForm({ ...storeForm, cover: url })}
+                        placeholder="Chọn ảnh bìa từ máy tính"
                       />
                     </div>
                   </div>
@@ -917,15 +1124,13 @@ export default function RestaurantManagePage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Đường dẫn hình ảnh (URL)
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    Hình ảnh món ăn
                   </label>
-                  <input 
-                    type="url" 
-                    value={formData.image} 
-                    onChange={e => setFormData({ ...formData, image: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" 
-                    placeholder="Nhập link ảnh món ăn..." 
+                  <ImageUpload
+                    value={formData.image}
+                    onChange={(url) => setFormData({ ...formData, image: url })}
+                    placeholder="Chọn ảnh món ăn từ máy tính"
                   />
                 </div>
 
@@ -1049,10 +1254,12 @@ export default function RestaurantManagePage() {
                         className="w-full p-4 rounded-2xl border border-primary-500/20 bg-primary-500/5 hover:bg-primary-500/10 transition-colors flex items-center justify-between text-left group"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl">📸</span>
+                          <span className="text-2xl">📱</span>
                           <div>
                             <p className="font-bold text-primary-500 text-sm">Chuyển khoản / Quét mã QR</p>
-                            <p className="text-xs text-gray-400 mt-0.5">Gia hạn tức thì qua ngân hàng giả lập</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {customQRCode ? 'Sử dụng QR code của bạn' : 'Thanh toán demo (chưa cấu hình QR)'}
+                            </p>
                           </div>
                         </div>
                         <span className="text-primary-500 font-bold group-hover:translate-x-1 transition-transform">➔</span>
@@ -1063,28 +1270,78 @@ export default function RestaurantManagePage() {
 
                 {qrStep === 1 && (
                   <div className="text-center py-6 space-y-4">
-                    <div className="relative w-48 h-48 mx-auto bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-center shadow-md">
-                      {/* Fake QR code using CSS/SVG */}
-                      <svg className="w-full h-full text-gray-800" viewBox="0 0 100 100">
-                        <path d="M5,5 h30 v30 h-30 z M10,10 h20 v20 h-20 z M15,15 h10 v10 h-10 z" fill="currentColor"/>
-                        <path d="M65,5 h30 v30 h-30 z M70,10 h20 v20 h-20 z M75,15 h10 v10 h-10 z" fill="currentColor"/>
-                        <path d="M5,65 h30 v30 h-30 z M10,70 h20 v20 h-20 z M15,75 h10 v10 h-10 z" fill="currentColor"/>
-                        <path d="M45,15 h10 v10 h-10 z M55,5 h5 v5 h-5 z M45,30 h5 v10 h-5 z M60,30 h5 v5 h-5 z M45,45 h15 v5 h-15 z M5,45 h5 v15 h-5 z M20,45 h10 v5 h-10 z M30,55 h10 v10 h-10 z M45,55 h20 v5 h-20 z M80,45 h15 v5 h-15 z M70,55 h10 v10 h-10 z M85,65 h10 v20 h-10 z M55,75 h25 v5 h-25 z M45,85 h35 v10 h-35 z" fill="currentColor"/>
-                      </svg>
-                      {/* Animated scanning line */}
-                      <motion.div 
-                        animate={{ top: ['10%', '90%', '10%'] }}
-                        transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                        className="absolute left-3 right-3 h-0.5 bg-primary-500 shadow-glow shadow-primary-500/50"
-                      />
+                    <div className="relative w-64 h-64 mx-auto bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-center shadow-md">
+                      {systemSettings?.adminPaymentQR ? (
+                        <img 
+                          src={systemSettings.adminPaymentQR} 
+                          alt="QR Code thanh toán Admin" 
+                          className="w-full h-full object-contain rounded-lg"
+                        />
+                      ) : (
+                        /* Fake QR code nếu admin chưa cấu hình */
+                        <svg className="w-full h-full text-gray-800" viewBox="0 0 100 100">
+                          <path d="M5,5 h30 v30 h-30 z M10,10 h20 v20 h-20 z M15,15 h10 v10 h-10 z" fill="currentColor"/>
+                          <path d="M65,5 h30 v30 h-30 z M70,10 h20 v20 h-20 z M75,15 h10 v10 h-10 z" fill="currentColor"/>
+                          <path d="M5,65 h30 v30 h-30 z M10,70 h20 v20 h-20 z M15,75 h10 v10 h-10 z" fill="currentColor"/>
+                          <path d="M45,15 h10 v10 h-10 z M55,5 h5 v5 h-5 z M45,30 h5 v10 h-5 z M60,30 h5 v5 h-5 z M45,45 h15 v5 h-15 z M5,45 h5 v15 h-5 z M20,45 h10 v5 h-10 z M30,55 h10 v10 h-10 z M45,55 h20 v5 h-20 z M80,45 h15 v5 h-15 z M70,55 h10 v10 h-10 z M85,65 h10 v20 h-10 z M55,75 h25 v5 h-25 z M45,85 h35 v10 h-35 z" fill="currentColor"/>
+                        </svg>
+                      )}
                     </div>
                     <div>
-                      <h4 className="font-bold dark:text-white">Đang chờ quét mã QR...</h4>
-                      <p className="text-xs text-gray-400 mt-1">Hệ thống sẽ tự động xác nhận sau khi quét</p>
+                      <h4 className="font-bold dark:text-white">
+                        {systemSettings?.adminPaymentQR ? 'Quét mã QR để thanh toán phí duy trì' : 'Mã QR demo - Admin chưa cấu hình'}
+                      </h4>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {systemSettings?.adminPaymentQR 
+                          ? 'Chuyển khoản phí duy trì cho FoodServe' 
+                          : 'Admin cần cấu hình QR code trong hệ thống'
+                        }
+                      </p>
                     </div>
-                    <div className="flex items-center justify-center gap-2 text-primary-500 text-xs font-semibold animate-pulse">
-                      <FiRefreshCw className="animate-spin" /> Kết nối với cổng thanh toán...
-                    </div>
+                    
+                    {systemSettings?.adminPaymentQR ? (
+                      <div className="space-y-3">
+                        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-left">
+                          <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-3 text-center">
+                            💳 Chuyển khoản phí duy trì cho FoodServe
+                          </p>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-blue-600 dark:text-blue-300">Ngân hàng:</span>
+                              <strong className="text-blue-700 dark:text-blue-200">{systemSettings.adminBankName}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-blue-600 dark:text-blue-300">Chủ TK:</span>
+                              <strong className="text-blue-700 dark:text-blue-200">{systemSettings.adminAccountName}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-blue-600 dark:text-blue-300">Số TK:</span>
+                              <strong className="text-blue-700 dark:text-blue-200 font-mono">{systemSettings.adminAccountNumber}</strong>
+                            </div>
+                            <div className="flex justify-between border-t border-blue-200 dark:border-blue-700 pt-2">
+                              <span className="text-blue-600 dark:text-blue-300">Phí duy trì:</span>
+                              <strong className="text-blue-700 dark:text-blue-200 text-sm">{formatPrice(monthlyFee)}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-blue-600 dark:text-blue-300">Nội dung:</span>
+                              <strong className="text-blue-700 dark:text-blue-200">Phi {restaurant?.name}</strong>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <button
+                          onClick={() => handleRenewSubscription('qr_payment')}
+                          disabled={paymentProcessing}
+                          className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold rounded-xl transition-colors"
+                        >
+                          {paymentProcessing ? 'Đang gửi yêu cầu...' : '📤 Gửi yêu cầu thanh toán (Chờ Admin duyệt)'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 text-primary-500 text-xs font-semibold animate-pulse">
+                        <FiRefreshCw className="animate-spin" /> Kết nối với cổng thanh toán demo...
+                      </div>
+                    )}
                   </div>
                 )}
 

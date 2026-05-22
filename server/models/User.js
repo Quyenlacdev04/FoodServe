@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema({
   phone: { type: String },
   address: { type: String },
   role: { type: String, enum: ['user', 'admin', 'shipper', 'merchant'], default: 'user' },
+  isMerchant: { type: Boolean, default: false },
+  isShipper: { type: Boolean, default: false },
   avatar: { type: String },
   coins: { type: Number, default: 0 },
   spins: { type: Number, default: 2 },

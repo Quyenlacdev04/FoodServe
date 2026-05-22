@@ -313,20 +313,140 @@ export default function DriverPage() {
 
   // Lưu trữ đơn hàng đang được chọn để xem bản đồ chỉ đường
   const [selectedActiveOrderId, setSelectedActiveOrderId] = useState(null)
+  const [accessState, setAccessState] = useState('checking') // checking | allowed | pending | blocked
+  const [driverStatus, setDriverStatus] = useState(null)
+  const [syncingRole, setSyncingRole] = useState(false)
 
-  // Redirect if not authorized
+  const syncProfileFromServer = async () => {
+    const token = localStorage.getItem('foodserve_token')
+    if (!token) return null
+    const res = await fetch('http://localhost:5000/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return null
+    const profileData = await res.json()
+    dispatch(updateUser(profileData))
+    return profileData
+  }
+
   useEffect(() => {
-    if (!isAuthenticated) {
-      toast.error('Vui lòng đăng nhập để tiếp tục!')
-      navigate('/')
-      return
+    const checkAccess = async () => {
+      if (!isAuthenticated) {
+        toast.error('Vui lòng đăng nhập để tiếp tục!')
+        navigate('/')
+        return
+      }
+
+      if (user?.isShipper || user?.role === 'shipper' || user?.role === 'admin') {
+        setAccessState('allowed')
+        return
+      }
+
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/partner/driver/register/status?userId=${user._id}`
+        )
+        const data = await res.json()
+        if (!res.ok) {
+          setAccessState('blocked')
+          return
+        }
+
+        setDriverStatus(data)
+
+        if (data.reason === 'approved_sync_needed') {
+          const profile = await syncProfileFromServer()
+          if (profile?.isShipper || profile?.role === 'shipper' || profile?.role === 'admin') {
+            setAccessState('allowed')
+            toast.success('Đã kích hoạt quyền tài xế!')
+            return
+          }
+        }
+
+        if (data.reason === 'pending' || data.reason === 'reviewing') {
+          setAccessState('pending')
+          return
+        }
+
+        toast.error(data.message || 'Tài khoản chưa có quyền tài xế')
+        navigate('/')
+      } catch {
+        toast.error('Không kiểm tra được quyền tài xế')
+        navigate('/')
+      }
     }
-    if (user && user.role !== 'shipper' && user.role !== 'admin') {
-      toast.error('Tài khoản của bạn không có vai trò tài xế!')
-      navigate('/')
-      return
+
+    if (user?._id) checkAccess()
+  }, [user?._id, user?.role, isAuthenticated, navigate, dispatch])
+
+  const handleRefreshDriverAccess = async () => {
+    setSyncingRole(true)
+    try {
+      const profile = await syncProfileFromServer()
+      if (profile?.role === 'shipper' || profile?.role === 'admin') {
+        setAccessState('allowed')
+        toast.success('Bạn đã có quyền tài xế — bắt đầu nhận đơn!')
+        return
+      }
+
+      const res = await fetch(
+        `http://localhost:5000/api/partner/driver/register/status?userId=${user._id}`
+      )
+      const data = await res.json()
+      setDriverStatus(data)
+      if (data.reason === 'pending') {
+        toast('Hồ sơ vẫn đang chờ admin duyệt', { icon: '⏳' })
+      } else {
+        toast.error(data.message || 'Chưa được duyệt làm tài xế')
+      }
+    } finally {
+      setSyncingRole(false)
     }
-  }, [user, isAuthenticated, navigate])
+  }
+
+  if (accessState === 'checking') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-300">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-300">Đang kiểm tra quyền tài xế...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (accessState === 'pending') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-[#0a0a14] dark:to-[#1e1e2e] flex items-center justify-center px-4 py-16">
+        <div className="max-w-md w-full bg-white dark:bg-dark-100 rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-white/10 text-center">
+          <div className="text-5xl mb-4">⏳</div>
+          <h1 className="text-2xl font-display font-bold dark:text-white mb-3">Hồ sơ đang chờ duyệt</h1>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
+            {driverStatus?.message ||
+              'Admin cần phê duyệt hồ sơ tài xế trước khi bạn vào trang nhận đơn.'}
+          </p>
+          <ol className="text-left text-sm text-gray-600 dark:text-gray-300 space-y-2 mb-6 bg-gray-50 dark:bg-dark-200/50 rounded-2xl p-4">
+            <li><strong>1.</strong> Admin vào <Link to="/admin" className="text-primary-500 hover:underline">Trang quản trị</Link> → tab <strong>Yêu cầu tài xế</strong> → bấm <strong>Duyệt</strong>.</li>
+            <li><strong>2.</strong> Bấm nút bên dưới để làm mới quyền (hoặc đăng xuất / đăng nhập lại).</li>
+            <li><strong>3.</strong> Vào <strong>Trang tài xế</strong> tại <code className="text-primary-500">/driver</code> để nhận đơn.</li>
+          </ol>
+          <button
+            type="button"
+            onClick={handleRefreshDriverAccess}
+            disabled={syncingRole}
+            className="w-full py-3 rounded-2xl bg-gradient-primary text-white font-bold mb-3 disabled:opacity-60"
+          >
+            {syncingRole ? 'Đang kiểm tra...' : 'Làm mới quyền tài xế'}
+          </button>
+          <Link to="/" className="text-sm text-gray-500 hover:text-primary-500">← Về trang chủ</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (accessState !== 'allowed') {
+    return null
+  }
 
   // Fetch orders and driver profile
   const fetchOrders = async () => {
@@ -364,7 +484,7 @@ export default function DriverPage() {
   }
 
   useEffect(() => {
-    if (user && (user.role === 'shipper' || user.role === 'admin')) {
+    if (user && (user.isShipper || user.role === 'shipper' || user.role === 'admin')) {
       fetchOrders()
       fetchDriverProfile()
     }

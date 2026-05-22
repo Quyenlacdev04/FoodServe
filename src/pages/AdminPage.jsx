@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
-import { FiPackage, FiUsers, FiShoppingBag, FiSettings, FiCheckCircle, FiTruck, FiClock, FiHome, FiLogOut, FiSun, FiMoon, FiClipboard } from 'react-icons/fi'
+import { FiPackage, FiUsers, FiShoppingBag, FiSettings, FiCheckCircle, FiTruck, FiClock, FiHome, FiLogOut, FiSun, FiMoon, FiClipboard, FiDollarSign } from 'react-icons/fi'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../data/mockData'
 import AdminRestaurants from '../components/admin/AdminRestaurants'
 import AdminUsers from '../components/admin/AdminUsers'
 import AdminSettings from '../components/admin/AdminSettings'
+import NotificationBell from '../components/ui/NotificationBell'
 import { logout } from '../store/slices/authSlice'
 import { toggleDarkMode } from '../store/slices/uiSlice'
 
@@ -33,6 +34,8 @@ export default function AdminPage() {
   const [requestsLoading, setRequestsLoading] = useState(false)
   const [driverRequests, setDriverRequests] = useState([])
   const [driverRequestsLoading, setDriverRequestsLoading] = useState(false)
+  const [paymentRequests, setPaymentRequests] = useState([])
+  const [paymentRequestsLoading, setPaymentRequestsLoading] = useState(false)
 
   // Kiểm tra quyền admin
   useEffect(() => {
@@ -126,9 +129,27 @@ export default function AdminPage() {
     }
   }
 
+  const fetchPaymentRequests = async () => {
+    try {
+      setPaymentRequestsLoading(true)
+      const res = await fetch('http://localhost:5000/api/restaurants/payment-requests/all')
+      if (res.ok) {
+        const data = await res.json()
+        setPaymentRequests(data)
+      }
+    } catch (err) {
+      toast.error('Lỗi khi tải danh sách yêu cầu thanh toán')
+    } finally {
+      setPaymentRequestsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'driver-requests') {
       fetchDriverRequests()
+    }
+    if (activeTab === 'payment-requests') {
+      fetchPaymentRequests()
     }
   }, [activeTab])
 
@@ -144,6 +165,29 @@ export default function AdminPage() {
         fetchDriverRequests()
       } else {
         toast.error('Lỗi khi cập nhật trạng thái đăng ký tài xế')
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối')
+    }
+  }
+
+  const handlePaymentRequestStatus = async (requestId, action, reason = '') => {
+    try {
+      const endpoint = action === 'approve' ? 'approve' : 'reject'
+      const res = await fetch(`http://localhost:5000/api/restaurants/payment-requests/${requestId}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          adminId: user?._id || user?.id,
+          reason: reason
+        })
+      })
+      if (res.ok) {
+        toast.success(action === 'approve' ? 'Đã duyệt thanh toán và gia hạn nhà hàng!' : 'Đã từ chối yêu cầu thanh toán')
+        fetchPaymentRequests()
+      } else {
+        const data = await res.json()
+        toast.error(data.message || 'Lỗi khi xử lý yêu cầu thanh toán')
       }
     } catch (err) {
       toast.error('Lỗi kết nối')
@@ -202,6 +246,9 @@ export default function AdminPage() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            {/* Notification Bell */}
+            <NotificationBell />
+            
             <button
               onClick={() => dispatch(toggleDarkMode())}
               className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors"
@@ -255,6 +302,9 @@ export default function AdminPage() {
           </button>
           <button onClick={() => setActiveTab('partner-requests')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'partner-requests' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiClipboard /> Yêu cầu đối tác
+          </button>
+          <button onClick={() => setActiveTab('payment-requests')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'payment-requests' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
+            <FiDollarSign /> Yêu cầu thanh toán
           </button>
           <button onClick={() => setActiveTab('driver-requests')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'driver-requests' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiTruck /> Yêu cầu tài xế
@@ -527,6 +577,110 @@ export default function AdminPage() {
                               className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm shadow-md transition-all hover:scale-[1.02]"
                             >
                               Phê duyệt & Cấp quyền tài xế
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'payment-requests' && (
+            <div className="bg-white dark:bg-dark-100 rounded-2xl shadow-card overflow-hidden">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-lg dark:text-white">Yêu cầu Thanh toán Phí duy trì</h3>
+                  <p className="text-sm text-gray-400">Duyệt các yêu cầu chuyển khoản từ nhà hàng</p>
+                </div>
+                <button onClick={fetchPaymentRequests} className="text-sm text-primary-500 font-semibold hover:underline">Làm mới</button>
+              </div>
+              
+              <div className="p-6">
+                {paymentRequestsLoading ? (
+                  <div className="py-10 text-center text-gray-400">Đang tải yêu cầu thanh toán...</div>
+                ) : paymentRequests.length === 0 ? (
+                  <div className="py-10 text-center text-gray-400">Không có yêu cầu thanh toán nào.</div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-6">
+                    {paymentRequests.map((req) => (
+                      <div key={req._id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-gray-50 dark:bg-dark-200 relative overflow-hidden transition-all hover:shadow-lg">
+                        
+                        {/* Header details */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                          <div>
+                            <span className="text-xs bg-green-100 dark:bg-green-950/40 text-green-500 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
+                              💳 Phí duy trì
+                            </span>
+                            <h4 className="font-bold text-xl dark:text-white mt-1.5">{req.restaurantName}</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">📅 {new Date(req.createdAt).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                              req.status === 'approved' ? 'bg-green-500/10 text-green-500' :
+                              req.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
+                            }`}>
+                              {req.status === 'approved' ? 'Đã duyệt' : req.status === 'rejected' ? 'Từ chối' : 'Chờ duyệt'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Payment details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-gray-200 dark:border-gray-700/50 py-4 my-4">
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium">Thông tin thanh toán</p>
+                            <p className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">Số tiền: <span className="text-green-500">{(req.amount || 0).toLocaleString()}đ</span></p>
+                            <p className="text-sm text-gray-500 mt-0.5">Phương thức: {req.paymentMethod === 'bank_transfer' ? 'Chuyển khoản ngân hàng' : req.paymentMethod}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium">Trạng thái xử lý</p>
+                            {req.status === 'approved' && (
+                              <p className="text-sm text-green-600 mt-0.5">✅ Đã duyệt lúc: {new Date(req.approvedAt).toLocaleString()}</p>
+                            )}
+                            {req.status === 'rejected' && (
+                              <div className="mt-0.5">
+                                <p className="text-sm text-red-600">❌ Từ chối lúc: {new Date(req.rejectedAt).toLocaleString()}</p>
+                                {req.rejectReason && <p className="text-xs text-red-500 mt-1">Lý do: {req.rejectReason}</p>}
+                              </div>
+                            )}
+                            {req.status === 'pending' && (
+                              <p className="text-sm text-yellow-600 mt-0.5">⏳ Đang chờ admin xử lý</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Note */}
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                            <span className="font-semibold text-gray-700 dark:text-gray-400">Ghi chú:</span> {req.note}
+                          </p>
+                        </div>
+
+                        {/* Action buttons */}
+                        {req.status === 'pending' && (
+                          <div className="flex justify-end gap-3 pt-2">
+                            <button
+                              onClick={() => {
+                                const reason = prompt('Lý do từ chối (tùy chọn):')
+                                if (reason !== null) {
+                                  handlePaymentRequestStatus(req._id, 'reject', reason)
+                                }
+                              }}
+                              className="px-4 py-2 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-semibold rounded-xl text-sm transition-colors"
+                            >
+                              Từ chối
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Xác nhận duyệt thanh toán ${(req.amount || 0).toLocaleString()}đ cho ${req.restaurantName}?`)) {
+                                  handlePaymentRequestStatus(req._id, 'approve')
+                                }
+                              }}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm shadow-md transition-all hover:scale-[1.02]"
+                            >
+                              ✅ Duyệt thanh toán & Gia hạn
                             </button>
                           </div>
                         )}

@@ -94,6 +94,19 @@ const authSlice = createSlice({
     },
     updateUser: (state, action) => {
       state.user = { ...state.user, ...action.payload }
+      if (action.payload.capabilities) {
+        state.user.capabilities = action.payload.capabilities
+      }
+      localStorage.setItem('foodserve_user', JSON.stringify(state.user))
+    },
+    setUserCapabilities: (state, action) => {
+      if (!state.user) return
+      state.user = {
+        ...state.user,
+        isMerchant: action.payload.isMerchant,
+        isShipper: action.payload.isShipper,
+        capabilities: action.payload,
+      }
       localStorage.setItem('foodserve_user', JSON.stringify(state.user))
     },
     clearError: (state) => {

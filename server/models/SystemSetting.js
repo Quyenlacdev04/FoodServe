@@ -8,7 +8,13 @@ const systemSettingSchema = new mongoose.Schema({
   maintenanceMode: { type: Boolean, default: false }, // Chế độ bảo trì
   supportPhone: { type: String, default: '19001000' }, // Hotline hỗ trợ
   supportEmail: { type: String, default: 'support@foodserve.vn' }, // Email hỗ trợ
-  monthlyRestaurantFee: { type: Number, default: 500000 } // Phí duy trì nhà hàng hàng tháng (VNĐ)
+  monthlyRestaurantFee: { type: Number, default: 500000 }, // Phí duy trì nhà hàng hàng tháng (VNĐ)
+  
+  // Thông tin thanh toán của admin (nhận phí từ cửa hàng)
+  adminPaymentQR: { type: String, default: '' }, // QR code admin
+  adminBankName: { type: String, default: 'Techcombank' }, // Tên ngân hàng admin
+  adminAccountName: { type: String, default: 'VU VAN QUYEN' }, // Tên chủ tài khoản admin
+  adminAccountNumber: { type: String, default: '509868686868' } // Số tài khoản admin
 }, { timestamps: true });
 
 export default mongoose.model('SystemSetting', systemSettingSchema);

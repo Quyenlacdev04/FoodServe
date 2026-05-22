@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 
 const partnerRequestSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   // Thông tin người đại diện
   ownerName: { type: String, required: true },
-  ownerEmail: { type: String, required: true },
+  ownerEmail: { type: String, required: true, lowercase: true, trim: true },
   ownerPhone: { type: String, required: true },
   
   // Thông tin nhà hàng
@@ -39,5 +40,8 @@ const partnerRequestSchema = new mongoose.Schema({
   reviewedAt: { type: Date },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
+
+partnerRequestSchema.index({ userId: 1 }, { unique: true, sparse: true });
+partnerRequestSchema.index({ ownerEmail: 1 }, { unique: true });
 
 export default mongoose.model('PartnerRequest', partnerRequestSchema);

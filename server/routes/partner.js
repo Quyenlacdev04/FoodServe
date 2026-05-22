@@ -6,19 +6,126 @@ import DriverRequest from '../models/DriverRequest.js';
 
 const router = express.Router();
 
-// Đăng ký làm đối tác
+const statusLabels = {
+  pending: 'đang chờ duyệt',
+  reviewing: 'đang được xem xét',
+  approved: 'đã được phê duyệt',
+  rejected: 'đã bị từ chối',
+};
+
+async function getPartnerRegistrationStatus(user) {
+  if (!user) {
+    return { canRegister: false, reason: 'not_logged_in' };
+  }
+
+  if (user.isMerchant || user.role === 'merchant') {
+    return {
+      canRegister: false,
+      reason: 'already_merchant',
+      message: 'Tài khoản của bạn đã là đối tác nhà hàng.',
+    };
+  }
+
+  const ownedRestaurant = await Restaurant.findOne({ ownerId: user._id });
+  if (ownedRestaurant) {
+    return {
+      canRegister: false,
+      reason: 'already_merchant',
+      message: 'Tài khoản của bạn đã sở hữu nhà hàng trên FoodServe.',
+    };
+  }
+
+  const existing = await PartnerRequest.findOne({
+    $or: [{ userId: user._id }, { ownerEmail: user.email.toLowerCase() }],
+  });
+
+  if (existing) {
+    const statusText = statusLabels[existing.status] || existing.status;
+    return {
+      canRegister: false,
+      reason: 'already_registered',
+      message: `Bạn đã đăng ký đối tác (${statusText}). Mỗi tài khoản chỉ được đăng ký một lần.`,
+      request: {
+        status: existing.status,
+        restaurantName: existing.restaurantName,
+        submittedAt: existing.submittedAt || existing.createdAt,
+      },
+    };
+  }
+
+  return { canRegister: true };
+}
+
+// Kiểm tra trạng thái đăng ký đối tác theo tài khoản
+router.get('/register/status', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ message: 'Thiếu thông tin tài khoản' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
+    }
+
+    const status = await getPartnerRegistrationStatus(user);
+    res.json(status);
+  } catch (error) {
+    console.error('Partner status check error:', error);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
+});
+
+// Đăng ký làm đối tác (mỗi tài khoản một lần)
 router.post('/register', async (req, res) => {
   try {
-    const partnerRequest = new PartnerRequest(req.body);
+    const { userId, ownerEmail, ...rest } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Vui lòng đăng nhập để đăng ký đối tác' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
+    }
+
+    const email = (ownerEmail || '').trim().toLowerCase();
+    if (!email || email !== user.email.toLowerCase()) {
+      return res.status(400).json({
+        message: 'Email đăng ký phải trùng với email tài khoản của bạn',
+      });
+    }
+
+    const registrationStatus = await getPartnerRegistrationStatus(user);
+    if (!registrationStatus.canRegister) {
+      return res.status(409).json({
+        message: registrationStatus.message || 'Tài khoản này đã đăng ký đối tác',
+        reason: registrationStatus.reason,
+        request: registrationStatus.request,
+      });
+    }
+
+    const partnerRequest = new PartnerRequest({
+      ...rest,
+      userId: user._id,
+      ownerEmail: email,
+      ownerName: rest.ownerName || user.name,
+    });
     await partnerRequest.save();
-    
-    // TODO: Gửi email thông báo cho admin
-    
-    res.status(201).json({ 
+
+    res.status(201).json({
       message: 'Đăng ký thành công! Chúng tôi sẽ liên hệ với bạn trong vòng 24-48 giờ.',
-      request: partnerRequest 
+      request: partnerRequest,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: 'Tài khoản này đã đăng ký đối tác. Mỗi tài khoản chỉ được đăng ký một lần.',
+        reason: 'already_registered',
+      });
+    }
     console.error('Partner registration error:', error);
     res.status(500).json({ message: 'Lỗi khi đăng ký. Vui lòng thử lại sau.' });
   }
@@ -72,7 +179,8 @@ router.patch('/requests/:id', async (req, res) => {
       await newRestaurant.save();
       
       if (user) {
-        user.role = 'merchant';
+        user.isMerchant = true;
+        if (!user.isShipper && user.role === 'user') user.role = 'merchant';
         await user.save();
       }
     }
@@ -80,6 +188,78 @@ router.patch('/requests/:id', async (req, res) => {
     res.json(request);
   } catch (error) {
     console.error('Update request error:', error);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
+});
+
+async function getDriverRegistrationStatus(user) {
+  if (!user) {
+    return { canAccessDriver: false, reason: 'not_logged_in' };
+  }
+
+  if (user.isShipper || user.role === 'shipper' || user.role === 'admin') {
+    return {
+      canAccessDriver: true,
+      reason: user.role === 'admin' ? 'admin' : 'already_shipper',
+      message: 'Bạn có thể vào trang tài xế để nhận đơn.',
+    };
+  }
+
+  const existing = await DriverRequest.findOne({
+    email: new RegExp(`^${user.email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+  });
+
+  if (!existing) {
+    return {
+      canAccessDriver: false,
+      reason: 'not_registered',
+      message: 'Bạn chưa đăng ký đối tác tài xế.',
+    };
+  }
+
+  if (existing.status === 'approved') {
+    return {
+      canAccessDriver: false,
+      reason: 'approved_sync_needed',
+      message: 'Hồ sơ đã được duyệt. Hãy bấm "Làm mới quyền" hoặc đăng xuất rồi đăng nhập lại.',
+      request: { status: existing.status, name: existing.name },
+    };
+  }
+
+  if (existing.status === 'rejected') {
+    return {
+      canAccessDriver: false,
+      reason: 'rejected',
+      message: 'Hồ sơ đăng ký tài xế đã bị từ chối.',
+      request: { status: existing.status, name: existing.name },
+    };
+  }
+
+  return {
+    canAccessDriver: false,
+    reason: 'pending',
+    message: 'Hồ sơ đang chờ admin duyệt. Sau khi duyệt bạn mới vào được trang tài xế.',
+    request: { status: existing.status, name: existing.name },
+  };
+}
+
+// Kiểm tra quyền / trạng thái đăng ký tài xế
+router.get('/driver/register/status', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ message: 'Thiếu thông tin tài khoản' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
+    }
+
+    const status = await getDriverRegistrationStatus(user);
+    res.json(status);
+  } catch (error) {
+    console.error('Driver status check error:', error);
     res.status(500).json({ message: 'Lỗi server' });
   }
 });
@@ -131,7 +311,8 @@ router.patch('/driver/requests/:id', async (req, res) => {
     if (status === 'approved') {
       const user = await User.findOne({ email: request.email });
       if (user) {
-        user.role = 'shipper';
+        user.isShipper = true;
+        if (!user.isMerchant && user.role === 'user') user.role = 'shipper';
         await user.save();
       }
     }

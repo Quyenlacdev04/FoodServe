@@ -56,3 +56,7 @@ Thumbs.db
 server/node_modules/
 server/.env
 server/config.env
+
+# Uploaded files
+server/uploads/*
+!server/uploads/.gitignore

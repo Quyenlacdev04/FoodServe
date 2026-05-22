@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
+import useUserCapabilities from '../../hooks/useUserCapabilities'
 
 export default function HeroSection() {
+  const { caps } = useUserCapabilities()
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
@@ -37,7 +39,23 @@ export default function HeroSection() {
         </div>
       </motion.div>
 
-      {/* 2. Đăng ký mở quán (Bottom Right - Restaurant Partner) */}
+      {/* 2. Quán / đăng ký mở quán */}
+      {caps.showRestaurantManage ? (
+        <Link to="/restaurant-manage" className="absolute bottom-28 right-8 md:right-24 lg:right-28 z-10 hidden md:block">
+        <motion.div
+          className="bg-gradient-to-br from-[#2D1B18]/95 to-[#1D0F0C]/95 border border-[#4A3229]/60 rounded-[24px] p-3.5 px-6 shadow-[0_14px_32px_rgba(42,24,19,0.4)] hover:shadow-[0_20px_45px_rgba(255,107,0,0.45)] hover:border-primary-500/50 flex items-center gap-4 transition-all duration-300 cursor-pointer select-none"
+          animate={{ y: [-12, 12, -12], rotate: [-2.5, 2, -2.5] }}
+          transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
+          whileHover={{ scale: 1.08, rotate: [-1, -3, 3, -1], y: 0 }}
+        >
+          <span className="text-3xl filter drop-shadow-sm">🍳</span>
+          <div className="flex flex-col items-start leading-tight">
+            <p className="text-white text-[15px] font-display font-bold tracking-wide">Quán của tôi</p>
+            <p className="text-[#FF7A00] font-sans font-semibold text-[14px] mt-0.5">Quản lý quán</p>
+          </div>
+        </motion.div>
+        </Link>
+      ) : caps.showPartnerRegister ? (
       <Link to="/partner-register" className="absolute bottom-28 right-8 md:right-24 lg:right-28 z-10 hidden md:block">
         <motion.div
           className="bg-gradient-to-br from-[#2D1B18]/95 to-[#1D0F0C]/95 border border-[#4A3229]/60 rounded-[24px] p-3.5 px-6 shadow-[0_14px_32px_rgba(42,24,19,0.4)] hover:shadow-[0_20px_45px_rgba(255,107,0,0.45)] hover:border-primary-500/50 flex items-center gap-4 transition-all duration-300 cursor-pointer select-none"
@@ -54,6 +72,7 @@ export default function HeroSection() {
           </div>
         </motion.div>
       </Link>
+      ) : null}
 
       {/* 3. Trà Sữa (Top Left) */}
       <motion.div
@@ -87,7 +106,23 @@ export default function HeroSection() {
         </div>
       </motion.div>
 
-      {/* 5. Đăng ký đối tác tài xế (Bottom Left - Driver Partner) */}
+      {/* 5. Tài xế / đăng ký tài xế */}
+      {caps.showDriverPanel ? (
+        <Link to="/driver" className="absolute bottom-12 left-8 md:left-20 lg:left-24 z-10 hidden md:block">
+        <motion.div
+          className="bg-gradient-to-br from-[#2D1B18]/95 to-[#1D0F0C]/95 border border-[#4A3229]/60 rounded-[24px] p-3.5 px-6 shadow-[0_14px_32px_rgba(42,24,19,0.4)] hover:shadow-[0_20px_45px_rgba(255,107,0,0.45)] hover:border-primary-500/50 flex items-center gap-4 transition-all duration-300 cursor-pointer select-none"
+          animate={{ y: [-10, 10, -10], rotate: [-2, 2.5, -2] }}
+          transition={{ duration: 6.8, repeat: Infinity, ease: "easeInOut", delay: 1.6 }}
+          whileHover={{ scale: 1.08, rotate: [-1, -3, 3, -1], y: 0 }}
+        >
+          <span className="text-3xl filter drop-shadow-sm">🛵</span>
+          <div className="flex flex-col items-start leading-tight">
+            <p className="text-white text-[15px] font-display font-bold tracking-wide">Tài xế</p>
+            <p className="text-[#FF7A00] font-sans font-semibold text-[14px] mt-0.5">Nhận đơn giao</p>
+          </div>
+        </motion.div>
+        </Link>
+      ) : caps.showDriverRegister ? (
       <Link to="/driver-register" className="absolute bottom-12 left-8 md:left-20 lg:left-24 z-10 hidden md:block">
         <motion.div
           className="bg-gradient-to-br from-[#2D1B18]/95 to-[#1D0F0C]/95 border border-[#4A3229]/60 rounded-[24px] p-3.5 px-6 shadow-[0_14px_32px_rgba(42,24,19,0.4)] hover:shadow-[0_20px_45px_rgba(255,107,0,0.45)] hover:border-primary-500/50 flex items-center gap-4 transition-all duration-300 cursor-pointer select-none"
@@ -104,6 +139,7 @@ export default function HeroSection() {
           </div>
         </motion.div>
       </Link>
+      ) : null}
 
       {/* Content */}
       <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">

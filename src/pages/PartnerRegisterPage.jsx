@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
+import { openAuthModal } from '../store/slices/uiSlice'
+import { updateUser } from '../store/slices/authSlice'
+import AuthModal from '../components/auth/AuthModal'
 import { 
   FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, 
   FiDollarSign, FiFileText, FiCheckCircle, FiChevronLeft, 
@@ -79,10 +83,21 @@ function FloatingFoodCard({ emoji, title, price, delay = 0, duration = 6, yRange
   )
 }
 
+const registrationStatusLabels = {
+  pending: 'Đang chờ duyệt',
+  reviewing: 'Đang xem xét',
+  approved: 'Đã phê duyệt',
+  rejected: 'Đã từ chối',
+}
+
 export default function PartnerRegisterPage() {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const { user, isAuthenticated } = useSelector((s) => s.auth)
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [checkingStatus, setCheckingStatus] = useState(true)
+  const [registrationStatus, setRegistrationStatus] = useState(null)
   const [success, setSuccess] = useState(false)
   const [formData, setFormData] = useState({
     ownerName: '',
@@ -100,8 +115,45 @@ export default function PartnerRegisterPage() {
     specialDishes: ''
   })
 
+  useEffect(() => {
+    if (!isAuthenticated || !user?._id) {
+      setCheckingStatus(false)
+      setRegistrationStatus({ canRegister: false, reason: 'not_logged_in' })
+      return
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      ownerName: prev.ownerName || user.name || '',
+      ownerEmail: user.email || '',
+      ownerPhone: prev.ownerPhone || user.phone || '',
+    }))
+
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/partner/register/status?userId=${user._id}`
+        )
+        const data = await res.json()
+        if (res.ok) {
+          setRegistrationStatus(data)
+          if (!data.canRegister && data.reason === 'already_merchant' && user.role !== 'merchant') {
+            dispatch(updateUser({ role: 'merchant' }))
+          }
+        }
+      } catch (error) {
+        console.error('Status check error:', error)
+      } finally {
+        setCheckingStatus(false)
+      }
+    }
+
+    fetchStatus()
+  }, [isAuthenticated, user?._id, user?.email, user?.name, user?.phone, dispatch])
+
   const handleChange = (e) => {
     const { name, value } = e.target
+    if (name === 'ownerEmail') return
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
@@ -169,6 +221,16 @@ export default function PartnerRegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!isAuthenticated || !user?._id) {
+      toast.error('Vui lòng đăng nhập để đăng ký đối tác!')
+      dispatch(openAuthModal('login'))
+      return
+    }
+
+    if (registrationStatus && !registrationStatus.canRegister) {
+      return toast.error(registrationStatus.message || 'Tài khoản này đã đăng ký đối tác')
+    }
     
     // Step 3 Validation
     if (formData.cuisineTypes.length === 0) {
@@ -184,15 +246,24 @@ export default function PartnerRegisterPage() {
       const res = await fetch('http://localhost:5000/api/partner/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, userId: user._id })
       })
       
       const data = await res.json()
       
       if (res.ok) {
         setSuccess(true)
+        setRegistrationStatus({ canRegister: false, reason: 'already_registered', request: data.request })
         toast.success('🎉 ' + data.message, { duration: 5000 })
       } else {
+        if (res.status === 409 && data.request) {
+          setRegistrationStatus({
+            canRegister: false,
+            reason: data.reason || 'already_registered',
+            message: data.message,
+            request: data.request,
+          })
+        }
         toast.error(data.message || 'Có lỗi xảy ra!')
       }
     } catch (error) {
@@ -201,6 +272,96 @@ export default function PartnerRegisterPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (checkingStatus) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-300">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-300">Đang kiểm tra tài khoản...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-orange-50 to-yellow-50 dark:from-[#0a0a14] dark:via-[#11111b] dark:to-[#1e1e2e] flex items-center justify-center px-4 py-20">
+        <AuthModal />
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-md w-full bg-white dark:bg-dark-100 rounded-3xl p-8 shadow-xl text-center border border-gray-100 dark:border-white/10"
+        >
+          <div className="text-5xl mb-4">🔐</div>
+          <h2 className="text-2xl font-display font-bold dark:text-white mb-3">Đăng nhập để đăng ký đối tác</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm">
+            Mỗi tài khoản FoodServe chỉ được đăng ký đối tác nhà hàng <strong>một lần duy nhất</strong>. Vui lòng đăng nhập bằng tài khoản của bạn trước khi gửi hồ sơ.
+          </p>
+          <button
+            type="button"
+            onClick={() => dispatch(openAuthModal('login'))}
+            className="w-full py-3 rounded-2xl bg-gradient-primary text-white font-bold shadow-glow hover:opacity-90 transition-opacity mb-3"
+          >
+            Đăng nhập ngay
+          </button>
+          <Link to="/" className="text-sm text-gray-500 hover:text-primary-500 transition-colors">
+            ← Quay lại trang chủ
+          </Link>
+        </motion.div>
+      </div>
+    )
+  }
+
+  if (registrationStatus && !registrationStatus.canRegister && !success) {
+    const req = registrationStatus.request
+    const isMerchant = registrationStatus.reason === 'already_merchant'
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-orange-50 to-yellow-50 dark:from-[#0a0a14] dark:via-[#11111b] dark:to-[#1e1e2e] flex items-center justify-center px-4 py-20">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-lg w-full bg-white dark:bg-dark-100 rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-white/10"
+        >
+          <div className="text-5xl mb-4 text-center">{isMerchant ? '✅' : '📋'}</div>
+          <h2 className="text-2xl font-display font-bold dark:text-white mb-3 text-center">
+            {isMerchant ? 'Bạn đã là đối tác' : 'Đã đăng ký đối tác'}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 text-center mb-6 text-sm">
+            {registrationStatus.message ||
+              'Tài khoản này đã có hồ sơ đối tác. Mỗi tài khoản chỉ được đăng ký một lần.'}
+          </p>
+          {req && (
+            <div className="bg-gray-50 dark:bg-dark-200/50 rounded-2xl p-4 mb-6 text-sm space-y-2">
+              <p><span className="text-gray-500">Nhà hàng:</span> <strong className="dark:text-white">{req.restaurantName}</strong></p>
+              <p>
+                <span className="text-gray-500">Trạng thái:</span>{' '}
+                <strong className="dark:text-white">{registrationStatusLabels[req.status] || req.status}</strong>
+              </p>
+            </div>
+          )}
+          <div className="flex flex-col gap-3">
+            {isMerchant && (
+              <button
+                type="button"
+                onClick={() => navigate('/restaurant-manage')}
+                className="w-full py-3 rounded-2xl bg-gradient-primary text-white font-bold shadow-glow hover:opacity-90 transition-opacity"
+              >
+                Vào trang quản lý nhà hàng
+              </button>
+            )}
+            <Link
+              to="/"
+              className="w-full py-3 rounded-2xl border border-gray-200 dark:border-white/10 text-center font-semibold text-gray-700 dark:text-gray-200 hover:border-primary-500 transition-colors"
+            >
+              Quay lại trang chủ
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    )
   }
 
   if (success) {
@@ -253,6 +414,7 @@ export default function PartnerRegisterPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50/40 via-orange-50/20 to-yellow-50/30 dark:from-[#0a0a14] dark:via-[#11111b] dark:to-[#0a0a14] py-12 px-4 relative overflow-hidden transition-colors duration-500">
+      <AuthModal />
       
       {/* Background soft glowing blur orbs */}
       <div className="absolute top-1/4 left-1/10 w-[500px] h-[500px] bg-primary-500/10 rounded-full blur-[120px] -z-10 animate-pulse" />
@@ -298,6 +460,9 @@ export default function PartnerRegisterPage() {
           </h1>
           <p className="text-base md:text-lg text-gray-600 dark:text-gray-300">
             Hợp tác cùng FoodServe để số hóa thực đơn, tiếp cận hàng triệu thực khách mỗi ngày và tối ưu hóa hệ thống giao hàng tốc độ cao.
+          </p>
+          <p className="mt-3 text-sm text-primary-600 dark:text-primary-400 font-medium">
+            Đăng nhập với tài khoản <strong>{user?.email}</strong> — mỗi tài khoản chỉ đăng ký đối tác một lần.
           </p>
         </motion.div>
 
@@ -421,8 +586,8 @@ export default function PartnerRegisterPage() {
                               type="email"
                               name="ownerEmail"
                               value={formData.ownerEmail}
-                              onChange={handleChange}
-                              className="input-search w-full pl-12 rounded-2xl hover:border-primary-500/40 dark:hover:border-primary-500/40 transition-colors"
+                              readOnly
+                              className="input-search w-full pl-12 rounded-2xl bg-gray-100/80 dark:bg-dark-200/80 cursor-not-allowed opacity-90"
                               placeholder="ongchuquan@example.com"
                               required
                             />

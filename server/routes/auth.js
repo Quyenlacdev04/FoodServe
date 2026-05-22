@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { getUserCapabilities, attachCapabilities } from '../utils/userCapabilities.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'foodserve_secret_2026';
@@ -20,7 +21,9 @@ router.post('/register', async (req, res) => {
     await user.save();
     
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    const { password: _, ...userData } = user.toObject();
+    const capabilities = await getUserCapabilities(user);
+    const userData = attachCapabilities(user, capabilities);
+    delete userData.password;
     
     res.status(201).json({ user: userData, token });
   } catch (error) {
@@ -39,7 +42,9 @@ router.post('/login', async (req, res) => {
     }
     
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    const { password: _, ...userData } = user.toObject();
+    const capabilities = await getUserCapabilities(user);
+    const userData = attachCapabilities(user, capabilities);
+    delete userData.password;
     
     res.json({ user: userData, token });
   } catch (error) {
@@ -59,9 +64,47 @@ router.get('/me', async (req, res) => {
     const user = await User.findById(decoded.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
     
-    res.json(user);
+    const capabilities = await getUserCapabilities(user);
+    res.json(attachCapabilities(user, capabilities));
   } catch (error) {
     res.status(401).json({ message: 'Token không hợp lệ' });
+  }
+});
+
+// Verify token (for admin dashboard)
+router.get('/verify', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'Unauthorized' });
+    
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
+    const capabilities = await getUserCapabilities(user);
+    res.json({ user: attachCapabilities(user, capabilities) });
+  } catch (error) {
+    res.status(401).json({ message: 'Token không hợp lệ' });
+  }
+});
+
+// Quyền đối tác (quán / tài xế) — dùng cho menu Header
+router.get('/capabilities', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ message: 'Thiếu userId' });
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
+    }
+    const capabilities = await getUserCapabilities(user);
+    res.json(capabilities);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi server' });
   }
 });
 

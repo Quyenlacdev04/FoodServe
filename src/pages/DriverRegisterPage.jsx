@@ -202,16 +202,29 @@ export default function DriverRegisterPage() {
             Hồ sơ đã được gửi!
           </h2>
           
-          <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm md:text-base leading-relaxed">
-            Hệ thống đang kiểm tra hồ sơ đăng ký tài xế của bạn. Chúng tôi sẽ kiểm tra thông tin đối chiếu và liên hệ hỗ trợ bạn kích hoạt tài khoản trong vòng <strong>24h làm việc</strong>.
+          <p className="text-gray-600 dark:text-gray-300 mb-4 text-sm md:text-base leading-relaxed">
+            Đăng ký chỉ là <strong>bước gửi hồ sơ</strong>. Bạn cần được admin duyệt trước khi vào trang nhận đơn.
           </p>
+
+          <ol className="text-left text-sm text-gray-600 dark:text-gray-300 space-y-2 mb-6 bg-gray-50 dark:bg-dark-200/50 rounded-2xl p-4">
+            <li><strong>1.</strong> Admin đăng nhập → <strong>/admin</strong> → <strong>Yêu cầu tài xế</strong> → <strong>Duyệt</strong>.</li>
+            <li><strong>2.</strong> Bạn đăng xuất và đăng nhập lại (hoặc vào <strong>/driver</strong> bấm &quot;Làm mới quyền&quot;).</li>
+            <li><strong>3.</strong> Header hiện <strong>🛵 Trang tài xế</strong> — nhận đơn tại <strong>/driver</strong>.</li>
+          </ol>
           
           <div className="bg-primary-50/50 dark:bg-primary-950/20 border border-primary-100/50 dark:border-primary-900/20 rounded-2xl p-4 mb-6">
             <p className="text-sm text-primary-800 dark:text-primary-300 font-medium">
-              📧 Email phản hồi sẽ gửi về: <br />
+              📧 Tài khoản đăng ký: <br />
               <strong className="text-gray-800 dark:text-white mt-1 block">{formData.email}</strong>
             </p>
           </div>
+
+          <Link
+            to="/driver"
+            className="w-full py-3.5 mb-3 text-center inline-block text-base font-bold tracking-wide rounded-2xl border-2 border-primary-500 text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
+          >
+            Kiểm tra trang tài xế
+          </Link>
           
           <Link
             to="/"

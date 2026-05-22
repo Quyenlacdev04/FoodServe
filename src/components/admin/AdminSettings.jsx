@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { FiSave, FiTruck, FiAward, FiInfo, FiActivity, FiPhone, FiMail, FiDollarSign } from 'react-icons/fi'
+import { FiSave, FiTruck, FiAward, FiInfo, FiActivity, FiPhone, FiMail, FiDollarSign, FiCreditCard } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import ImageUpload from '../ui/ImageUpload'
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState({
@@ -12,7 +13,11 @@ export default function AdminSettings() {
     maintenanceMode: false,
     supportPhone: '19001000',
     supportEmail: 'support@foodserve.vn',
-    monthlyRestaurantFee: 500000
+    monthlyRestaurantFee: 500000,
+    adminPaymentQR: '',
+    adminBankName: 'Techcombank',
+    adminAccountName: 'VU VAN QUYEN',
+    adminAccountNumber: '509868686868'
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -116,7 +121,7 @@ export default function AdminSettings() {
         </div>
 
         {/* 3 cột Cài đặt */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
           
           {/* Cài đặt Vận chuyển */}
           <div className="space-y-4">
@@ -246,6 +251,64 @@ export default function AdminSettings() {
 
           </div>
 
+        </div>
+
+        {/* Cấu hình thanh toán Admin */}
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-8">
+          <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-6">
+            <FiCreditCard className="text-green-500" /> Cấu hình thanh toán Admin (Nhận phí từ cửa hàng)
+          </h4>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Thông tin ngân hàng */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Tên ngân hàng</label>
+                  <input
+                    type="text"
+                    value={settings.adminBankName}
+                    onChange={(e) => setSettings({...settings, adminBankName: e.target.value})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium"
+                    placeholder="VD: Techcombank"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Chủ tài khoản</label>
+                  <input
+                    type="text"
+                    value={settings.adminAccountName}
+                    onChange={(e) => setSettings({...settings, adminAccountName: e.target.value})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium"
+                    placeholder="VD: VU VAN QUYEN"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Số tài khoản</label>
+                  <input
+                    type="text"
+                    value={settings.adminAccountNumber}
+                    onChange={(e) => setSettings({...settings, adminAccountNumber: e.target.value})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium font-mono"
+                    placeholder="VD: 509868686868"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* QR Code */}
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-3">Mã QR thanh toán Admin</label>
+              <ImageUpload
+                value={settings.adminPaymentQR}
+                onChange={(url) => setSettings({...settings, adminPaymentQR: url})}
+                placeholder="Upload QR Techcombank của bạn"
+              />
+              <p className="text-[10px] text-gray-400 mt-2">
+                💡 Khi cửa hàng đóng phí duy trì, họ sẽ chuyển khoản vào QR này
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Nút lưu cài đặt */}
