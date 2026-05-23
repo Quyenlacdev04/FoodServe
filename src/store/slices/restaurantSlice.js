@@ -6,8 +6,10 @@ export const fetchRestaurants = createAsyncThunk(
     const res = await fetch('http://localhost:5000/api/restaurants')
     if (!res.ok) throw new Error('Lỗi fetch data')
     const data = await res.json()
+    // API trả về { restaurants: [...], pagination: {...} }
+    const restaurantList = data.restaurants || data
     // Map _id to id to prevent frontend components from breaking
-    return data.map(r => ({ ...r, id: r._id }))
+    return restaurantList.map(r => ({ ...r, id: r._id }))
   }
 )
 

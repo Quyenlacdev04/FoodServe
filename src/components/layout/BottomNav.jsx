@@ -1,13 +1,13 @@
 import { useLocation, Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
-import { FiHome, FiSearch, FiShoppingBag, FiFileText, FiUser } from 'react-icons/fi'
+import { FiHome, FiSearch, FiShoppingBag, FiFileText, FiUser, FiHeart } from 'react-icons/fi'
 import { toggleCart, selectCartCount } from '../../store/slices/cartSlice'
 import { openAuthModal } from '../../store/slices/uiSlice'
 
 const navItems = [
   { icon: FiHome, label: 'Trang chủ', path: '/' },
-  { icon: FiSearch, label: 'Tìm kiếm', path: '/', action: 'search' },
+  { icon: FiHeart, label: 'Yêu thích', path: '/favorites' },
   { icon: FiShoppingBag, label: 'Giỏ hàng', path: '/', action: 'cart' },
   { icon: FiFileText, label: 'Đơn hàng', path: '/history' },
   { icon: FiUser, label: 'Tài khoản', path: '/', action: 'account' },

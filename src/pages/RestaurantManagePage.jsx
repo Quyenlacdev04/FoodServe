@@ -6,12 +6,14 @@ import {
   FiHome, FiPlus, FiEdit, FiTrash2, FiShoppingBag, 
   FiLayers, FiDollarSign, FiClock, FiCheckCircle, 
   FiXCircle, FiTrendingUp, FiSave, FiEye, FiSettings,
-  FiCreditCard, FiImage, FiAlertTriangle, FiRefreshCw
+  FiCreditCard, FiImage, FiAlertTriangle, FiRefreshCw, FiMessageCircle
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../data/mockData'
 import { updateUser } from '../store/slices/authSlice'
 import ImageUpload from '../components/ui/ImageUpload'
+import RestaurantAnalytics from '../components/analytics/RestaurantAnalytics'
+import ChatButton from '../components/chat/ChatButton'
 
 const orderStatusMap = {
   pending: { label: 'Chờ xác nhận', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' },
@@ -33,6 +35,7 @@ export default function RestaurantManagePage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [selectedOrderId, setSelectedOrderId] = useState(null)
 
   // Modals / forms state
   const [showItemModal, setShowItemModal] = useState(false)
@@ -72,7 +75,12 @@ export default function RestaurantManagePage() {
       return
     }
     if (user && !user.isMerchant && user.role !== 'merchant' && user.role !== 'admin') {
-      toast.error('Bạn không có quyền truy cập trang quản lý đối tác!')
+      console.log('🔍 Debug - User info:', {
+        isMerchant: user.isMerchant,
+        role: user.role,
+        email: user.email
+      })
+      toast.error('Bạn không có quyền truy cập! Vui lòng đăng xuất và đăng nhập lại để cập nhật quyền.')
       navigate('/')
       return
     }
@@ -463,6 +471,16 @@ export default function RestaurantManagePage() {
               <FiTrendingUp className="text-lg" /> Tổng quan kết quả
             </button>
             <button 
+              onClick={() => setActiveTab('analytics')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-bold transition-all ${
+                activeTab === 'analytics' 
+                  ? 'bg-primary-500 text-white shadow-glow shadow-primary-500/20' 
+                  : 'bg-white dark:bg-dark-200 hover:bg-gray-100 dark:hover:bg-dark-100 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <FiTrendingUp className="text-lg" /> Báo cáo thống kê
+            </button>
+            <button 
               onClick={() => setActiveTab('menu')} 
               className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-bold transition-all ${
                 activeTab === 'menu' 
@@ -609,6 +627,17 @@ export default function RestaurantManagePage() {
                     </table>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* BÁO CÁO THỐNG KÊ TAB */}
+            {activeTab === 'analytics' && (
+              <div className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-card border border-gray-100 dark:border-gray-800">
+                <div className="mb-6">
+                  <h3 className="font-bold text-xl dark:text-white">📊 Báo cáo thống kê nâng cao</h3>
+                  <p className="text-sm text-gray-400">Phân tích doanh thu, món bán chạy và giờ cao điểm</p>
+                </div>
+                <RestaurantAnalytics restaurantId={restaurant._id} />
               </div>
             )}
 
@@ -841,9 +870,17 @@ export default function RestaurantManagePage() {
                           <p><strong>Số điện thoại:</strong> {order.userPhone || 'Không có'}</p>
                           {order.note && <p className="text-yellow-500"><strong>Ghi chú khách:</strong> "{order.note}"</p>}
                         </div>
-                        <div className="flex flex-col justify-end items-end">
+                        <div className="flex flex-col justify-end items-end gap-2">
                           <p className="text-xs text-gray-400">Tổng thu hộ:</p>
-                          <p className="text-xl font-black text-primary-500 mt-1">{formatPrice(order.finalAmount || order.totalAmount)}</p>
+                          <p className="text-xl font-black text-primary-500">{formatPrice(order.finalAmount || order.totalAmount)}</p>
+                          
+                          {/* Nút Chat */}
+                          <button
+                            onClick={() => setSelectedOrderId(order._id)}
+                            className="mt-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:shadow-lg text-white rounded-xl font-bold transition-all flex items-center gap-2"
+                          >
+                            <FiMessageCircle /> Chat với khách
+                          </button>
                         </div>
                       </div>
 
@@ -1366,6 +1403,10 @@ export default function RestaurantManagePage() {
         )}
       </AnimatePresence>
 
+      {/* Chat Button - hiển thị khi đang ở tab orders và có đơn được chọn */}
+      {activeTab === 'orders' && selectedOrderId && (
+        <ChatButton orderId={selectedOrderId} />
+      )}
     </div>
   )
 }

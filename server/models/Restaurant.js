@@ -47,4 +47,12 @@ const restaurantSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
+// Indexes for better query performance
+restaurantSchema.index({ ownerId: 1 });
+restaurantSchema.index({ isActive: 1 });
+restaurantSchema.index({ subscriptionExpiry: 1 });
+restaurantSchema.index({ rating: -1 });
+restaurantSchema.index({ categories: 1 });
+restaurantSchema.index({ name: 'text', description: 'text' }); // Text search
+
 export default mongoose.model('Restaurant', restaurantSchema);

@@ -12,15 +12,17 @@ import HomePage from './pages/HomePage'
 import RestaurantPage from './pages/RestaurantPage'
 import OrderTrackingPage from './pages/OrderTrackingPage'
 import CheckoutPage from './pages/CheckoutPage'
+import PaymentResultPage from './pages/PaymentResultPage'
 import AdminPage from './pages/AdminPage'
 import OrderHistoryPage from './pages/OrderHistoryPage'
 import GamesPage from './pages/GamesPage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import ProfilePage from './pages/ProfilePage'
+import FavoritesPage from './pages/FavoritesPage'
 import PartnerRegisterPage from './pages/PartnerRegisterPage'
 import RestaurantManagePage from './pages/RestaurantManagePage'
-import DriverPage from './pages/DriverPage'
 import DriverRegisterPage from './pages/DriverRegisterPage'
+import ShipperDashboardPage from './pages/ShipperDashboardPage'
 import { fetchRestaurants } from './store/slices/restaurantSlice'
 
 function App() {
@@ -62,15 +64,18 @@ function App() {
                 <Route path="/restaurant/:id" element={<RestaurantPage />} />
                 <Route path="/tracking" element={<OrderTrackingPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/payment/vnpay-return" element={<PaymentResultPage />} />
                 <Route path="/history" element={<OrderHistoryPage />} />
                 <Route path="/games" element={<GamesPage />} />
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/favorites" element={<FavoritesPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="/partner-register" element={<PartnerRegisterPage />} />
                 <Route path="/driver-register" element={<DriverRegisterPage />} />
                 <Route path="/restaurant-manage" element={<RestaurantManagePage />} />
-                <Route path="/driver" element={<DriverPage />} />
+                <Route path="/driver" element={<ShipperDashboardPage />} />
+                <Route path="/shipper" element={<ShipperDashboardPage />} />
               </Routes>
             </main>
             

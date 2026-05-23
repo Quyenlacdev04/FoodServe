@@ -4,6 +4,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { FiCheck, FiPackage, FiTruck, FiHome } from 'react-icons/fi'
 import { io } from 'socket.io-client'
+import ChatButton from '../components/chat/ChatButton'
+import MapView from '../components/tracking/MapView'
+import SimpleMapView from '../components/tracking/SimpleMapView'
+import { useGoogleMaps } from '../hooks/useGoogleMaps'
 
 const steps = [
   { icon: FiCheck, label: 'Đã xác nhận', statusId: 'confirmed' },
@@ -19,6 +23,8 @@ export default function OrderTrackingPage() {
   const [currentStep, setCurrentStep] = useState(0)
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [shipperLocation, setShipperLocation] = useState(null)
+  const { isLoaded: mapsLoaded } = useGoogleMaps()
 
   useEffect(() => {
     let targetOrderId = location.state?.orderId
@@ -76,6 +82,19 @@ export default function OrderTrackingPage() {
           const stepIndex = steps.findIndex(s => s.statusId === data.status)
           if (stepIndex !== -1) {
             setCurrentStep(stepIndex)
+          }
+          // Update order status
+          setOrder(prev => prev ? { ...prev, status: data.status } : null)
+        })
+
+        // Listen for shipper location updates
+        socket.on('shipper-location-updated', (data) => {
+          console.log('Shipper location update:', data)
+          if (data.orderId === targetOrderId && data.location) {
+            setShipperLocation({
+              lat: data.location.lat,
+              lng: data.location.lng
+            })
           }
         })
 
@@ -174,6 +193,46 @@ export default function OrderTrackingPage() {
             </div>
           </div>
 
+          {/* Map View - hiển thị khi đang giao hàng */}
+          {order && (order.status === 'delivering' || order.status === 'ready' || order.status === 'preparing') && (
+            <div className="mt-8">
+              <h3 className="font-bold text-lg dark:text-white mb-4 flex items-center gap-2">
+                <span>📍</span> Theo dõi vị trí giao hàng
+              </h3>
+              {mapsLoaded ? (
+                <MapView
+                  restaurantLocation={
+                    order.restaurant?.location 
+                      ? { lat: order.restaurant.location.lat, lng: order.restaurant.location.lng }
+                      : { lat: 10.762622, lng: 106.660172 } // Default TP.HCM
+                  }
+                  customerLocation={
+                    order.deliveryLocation
+                      ? { lat: order.deliveryLocation.lat, lng: order.deliveryLocation.lng }
+                      : { lat: 10.773996, lng: 106.700981 } // Default customer location
+                  }
+                  shipperLocation={shipperLocation}
+                  orderStatus={order.status}
+                />
+              ) : (
+                <SimpleMapView
+                  restaurantLocation={
+                    order.restaurant?.location 
+                      ? { lat: order.restaurant.location.lat, lng: order.restaurant.location.lng }
+                      : { lat: 10.762622, lng: 106.660172 }
+                  }
+                  customerLocation={
+                    order.deliveryLocation
+                      ? { lat: order.deliveryLocation.lat, lng: order.deliveryLocation.lng }
+                      : { lat: 10.773996, lng: 106.700981 }
+                  }
+                  shipperLocation={shipperLocation}
+                  orderStatus={order.status}
+                />
+              )}
+            </div>
+          )}
+
           {/* Shipper info */}
           <div className="mt-8 p-4 rounded-2xl bg-gray-50 dark:bg-dark-200 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-xl">
@@ -189,6 +248,9 @@ export default function OrderTrackingPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Chat Button - chỉ hiển thị khi có đơn hàng */}
+      {order && <ChatButton orderId={order._id} />}
     </div>
   )
 }

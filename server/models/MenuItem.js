@@ -10,4 +10,9 @@ const menuItemSchema = new mongoose.Schema({
   category: String
 }, { timestamps: true });
 
+// Indexes để tăng hiệu suất truy vấn
+menuItemSchema.index({ restaurantId: 1 });
+menuItemSchema.index({ category: 1 });
+menuItemSchema.index({ popular: -1 });
+
 export default mongoose.model('MenuItem', menuItemSchema);

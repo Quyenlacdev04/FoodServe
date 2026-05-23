@@ -7,6 +7,7 @@ import { updateUser } from '../store/slices/authSlice'
 import { formatPrice } from '../data/mockData'
 import toast from 'react-hot-toast'
 import { FiMapPin, FiCreditCard, FiDollarSign, FiChevronLeft, FiPhone, FiUser, FiTruck } from 'react-icons/fi'
+import PaymentMethodSelector from '../components/payment/PaymentMethodSelector'
 
 export default function CheckoutPage() {
   const navigate = useNavigate()
@@ -70,7 +71,7 @@ export default function CheckoutPage() {
         note: formData.note
       }
 
-      const res = await fetch('/api/orders', {
+      const res = await fetch('http://localhost:5000/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData)
@@ -79,6 +80,51 @@ export default function CheckoutPage() {
       if (!res.ok) throw new Error('Lỗi khi tạo đơn hàng')
       
       const newOrder = await res.json()
+      
+      // Xử lý theo phương thức thanh toán
+      if (paymentMethod === 'vnpay') {
+        // Thanh toán VNPay
+        const paymentRes = await fetch('http://localhost:5000/api/payment/vnpay/create-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: newOrder._id,
+            amount: finalTotal,
+            orderInfo: `Thanh toan don hang #${newOrder._id.slice(-8)}`,
+            bankCode: '' // Để trống để khách chọn ngân hàng
+          })
+        })
+        
+        const paymentData = await paymentRes.json()
+        
+        if (paymentData.paymentUrl) {
+          // Redirect đến VNPay
+          window.location.href = paymentData.paymentUrl
+          return
+        } else {
+          throw new Error('Không thể tạo URL thanh toán VNPay')
+        }
+      } else if (paymentMethod === 'coins') {
+        // Thanh toán bằng Xu
+        const coinsRes = await fetch('http://localhost:5000/api/payment/coins/pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user._id,
+            orderId: newOrder._id,
+            amount: finalTotal
+          })
+        })
+        
+        const coinsData = await coinsRes.json()
+        
+        if (!coinsData.success) {
+          throw new Error(coinsData.message || 'Thanh toán bằng Xu thất bại')
+        }
+        
+        // Cập nhật số Xu trong Redux
+        dispatch(updateUser({ coins: coinsData.coinsRemaining }))
+      }
       
       setLoading(false)
       dispatch(clearCart())
@@ -93,7 +139,7 @@ export default function CheckoutPage() {
       navigate('/tracking', { state: { orderId: newOrder._id } })
     } catch (error) {
       console.error('Checkout Error:', error)
-      toast.error('Có lỗi xảy ra, vui lòng thử lại!')
+      toast.error(error.message || 'Có lỗi xảy ra, vui lòng thử lại!')
       setLoading(false)
     }
   }
@@ -174,53 +220,12 @@ export default function CheckoutPage() {
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
               className="bg-white dark:bg-dark-200 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800"
             >
-              <h2 className="text-lg font-bold flex items-center gap-2 mb-4 dark:text-white">
-                <FiCreditCard className="text-primary-500" /> Phương thức thanh toán
-              </h2>
-              
-              <div className="space-y-3">
-                <label className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10' : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-dark-100'}`}>
-                  <input 
-                    type="radio" name="payment" value="cash" 
-                    checked={paymentMethod === 'cash'} 
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-5 h-5 text-primary-500 focus:ring-primary-500"
-                  />
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 shrink-0"><FiDollarSign /></div>
-                  <div>
-                    <h3 className="font-semibold dark:text-white">Thanh toán tiền mặt</h3>
-                    <p className="text-sm text-gray-500">Thanh toán khi nhận hàng (COD)</p>
-                  </div>
-                </label>
-
-                <label className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === 'momo' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10' : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-dark-100'}`}>
-                  <input 
-                    type="radio" name="payment" value="momo" 
-                    checked={paymentMethod === 'momo'} 
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-5 h-5 text-primary-500 focus:ring-primary-500"
-                  />
-                  <div className="w-10 h-10 rounded-full bg-[#A50064] flex items-center justify-center text-white font-bold shrink-0">M</div>
-                  <div>
-                    <h3 className="font-semibold dark:text-white">Ví MoMo</h3>
-                    <p className="text-sm text-gray-500">Thanh toán an toàn qua ví điện tử</p>
-                  </div>
-                </label>
-
-                <label className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10' : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-dark-100'}`}>
-                  <input 
-                    type="radio" name="payment" value="card" 
-                    checked={paymentMethod === 'card'} 
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-5 h-5 text-primary-500 focus:ring-primary-500"
-                  />
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0"><FiCreditCard /></div>
-                  <div>
-                    <h3 className="font-semibold dark:text-white">Thẻ tín dụng/Ghi nợ</h3>
-                    <p className="text-sm text-gray-500">Visa, Mastercard, JCB</p>
-                  </div>
-                </label>
-              </div>
+              <PaymentMethodSelector
+                onSelect={setPaymentMethod}
+                selectedMethod={paymentMethod}
+                userCoins={user?.coins || 0}
+                totalAmount={finalTotal}
+              />
             </motion.div>
           </div>
 

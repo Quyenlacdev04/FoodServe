@@ -13,7 +13,18 @@ const userSchema = new mongoose.Schema({
   coins: { type: Number, default: 0 },
   spins: { type: Number, default: 2 },
   totalSpent: { type: Number, default: 0 },
-  vouchers: { type: [String], default: [] }
+  vouchers: { type: [String], default: [] },
+  // Thông tin shipper
+  shipperRating: { type: Number, default: 0 },
+  totalDeliveries: { type: Number, default: 0 },
+  vehicleType: { type: String }, // 'bike', 'motorbike', 'car'
+  vehicleNumber: { type: String },
+  isOnline: { type: Boolean, default: false }
 }, { timestamps: true });
+
+// Indexes để tăng hiệu suất truy vấn
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1 });
+userSchema.index({ createdAt: -1 });
 
 export default mongoose.model('User', userSchema);

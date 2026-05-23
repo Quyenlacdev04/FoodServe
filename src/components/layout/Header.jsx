@@ -114,25 +114,30 @@ export default function Header() {
             </Link>
           </div>
 
-          {(caps.showRestaurantManage || caps.showDriverPanel || showPartnerDropdown) && (
+          {/* Phần Đối tác - luôn hiển thị nếu user đã đăng nhập */}
+          {isAuthenticated && (
             <div className="py-1 border-t border-gray-100 dark:border-gray-800">
               <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Đối tác</p>
-              {caps.showRestaurantManage && (
+              
+              {/* Nếu đã là merchant → hiển thị "Quán của tôi" */}
+              {caps.showRestaurantManage ? (
                 <Link to="/restaurant-manage" onClick={closeMenu} className={`${menuLinkClass} font-semibold text-primary-500`}>
                   🍳 Quán của tôi
                 </Link>
+              ) : (
+                /* Nếu chưa là merchant → hiển thị "Đăng ký thành đối tác nhà hàng" */
+                <Link to="/partner-register" onClick={closeMenu} className={`${menuLinkClass} font-semibold text-primary-500`}>
+                  🍳 Đăng ký thành đối tác nhà hàng
+                </Link>
               )}
-              {caps.showDriverPanel && (
+              
+              {/* Nếu đã là shipper → hiển thị "Tài xế" */}
+              {caps.showDriverPanel ? (
                 <Link to="/driver" onClick={closeMenu} className={`${menuLinkClass} font-semibold text-primary-500`}>
                   🛵 Tài xế
                 </Link>
-              )}
-              {caps.showPartnerRegister && (
-                <Link to="/partner-register" onClick={closeMenu} className={menuLinkClass}>
-                  🍳 Đăng ký mở quán
-                </Link>
-              )}
-              {caps.showDriverRegister && (
+              ) : (
+                /* Nếu chưa là shipper → hiển thị "Đăng ký tài xế" */
                 <Link to="/driver-register" onClick={closeMenu} className={menuLinkClass}>
                   🛵 Đăng ký tài xế
                 </Link>
@@ -145,6 +150,9 @@ export default function Header() {
               <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tài khoản</p>
               <Link to="/profile" onClick={closeMenu} className={menuLinkClass}>
                 👤 Hồ sơ của tôi
+              </Link>
+              <Link to="/favorites" onClick={closeMenu} className={menuLinkClass}>
+                ❤️ Yêu thích
               </Link>
               <Link to="/history" onClick={closeMenu} className={menuLinkClass}>
                 📜 Lịch sử đơn hàng
@@ -348,11 +356,7 @@ export default function Header() {
             >
               <nav className="flex flex-col gap-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-1 mb-1">Khám phá</p>
-                {caps.showRestaurantManage ? (
-                  <Link to="/restaurant-manage" onClick={() => dispatch(closeMobileMenu())} className="px-2 py-2.5 text-base font-bold text-primary-500">
-                    🍳 Quán của tôi
-                  </Link>
-                ) : (
+                {!caps.showRestaurantManage && !caps.showDriverPanel && (
                   <a
                     href="#restaurants"
                     onClick={(e) => { dispatch(closeMobileMenu()); handleRestaurantsClick(e) }}
@@ -361,24 +365,34 @@ export default function Header() {
                     🍔 Nhà hàng
                   </a>
                 )}
-                {caps.showDriverPanel && (
-                  <Link to="/driver" onClick={() => dispatch(closeMobileMenu())} className="px-2 py-2.5 text-base font-bold text-primary-500">
-                    🛵 Tài xế
-                  </Link>
-                )}
                 <Link to="/games" onClick={() => dispatch(closeMobileMenu())} className="px-2 py-2.5 text-base font-bold text-yellow-500">
                   🎁 Săn Xu
                 </Link>
 
-                {(showPartnerDropdown || caps.showRestaurantManage || caps.showDriverPanel) && (
+                {/* Phần Đối tác - luôn hiển thị nếu user đã đăng nhập */}
+                {isAuthenticated && (
                   <>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-1 mt-3 mb-1">Đối tác</p>
-                    {caps.showPartnerRegister && (
+                    
+                    {/* Nếu đã là merchant → hiển thị "Quán của tôi" */}
+                    {caps.showRestaurantManage ? (
+                      <Link to="/restaurant-manage" onClick={() => dispatch(closeMobileMenu())} className="px-2 py-2.5 text-base font-bold text-primary-500">
+                        🍳 Quán của tôi
+                      </Link>
+                    ) : (
+                      /* Nếu chưa là merchant → hiển thị "Đăng ký thành đối tác nhà hàng" */
                       <Link to="/partner-register" onClick={() => dispatch(closeMobileMenu())} className="px-2 py-2.5 text-base text-primary-500 font-semibold">
-                        🍳 Đăng ký mở quán
+                        🍳 Đăng ký thành đối tác nhà hàng
                       </Link>
                     )}
-                    {caps.showDriverRegister && (
+                    
+                    {/* Nếu đã là shipper → hiển thị "Tài xế" */}
+                    {caps.showDriverPanel ? (
+                      <Link to="/driver" onClick={() => dispatch(closeMobileMenu())} className="px-2 py-2.5 text-base font-bold text-primary-500">
+                        🛵 Tài xế
+                      </Link>
+                    ) : (
+                      /* Nếu chưa là shipper → hiển thị "Đăng ký tài xế" */
                       <Link to="/driver-register" onClick={() => dispatch(closeMobileMenu())} className="px-2 py-2.5 text-base text-primary-500 font-semibold">
                         🛵 Đăng ký tài xế
                       </Link>

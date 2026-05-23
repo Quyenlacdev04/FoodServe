@@ -29,7 +29,8 @@ export default function AdminRestaurants() {
       const res = await fetch('http://localhost:5000/api/restaurants')
       if (res.ok) {
         const data = await res.json()
-        setRestaurants(data)
+        // API trả về { restaurants: [...], pagination: {...} }
+        setRestaurants(data.restaurants || data)
       }
     } catch (err) {
       toast.error('Lỗi khi tải danh sách nhà hàng')

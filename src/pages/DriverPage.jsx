@@ -304,14 +304,13 @@ export default function DriverPage() {
   const dispatch = useDispatch()
   const { user, isAuthenticated } = useSelector((s) => s.auth)
   
+  // ✅ QUAN TRỌNG: Tất cả hooks phải được gọi TRƯỚC bất kỳ return nào
   const [activeTab, setActiveTab] = useState('available')
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [isOnline, setIsOnline] = useState(true)
   const [processingId, setProcessingId] = useState(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
-
-  // Lưu trữ đơn hàng đang được chọn để xem bản đồ chỉ đường
   const [selectedActiveOrderId, setSelectedActiveOrderId] = useState(null)
   const [accessState, setAccessState] = useState('checking') // checking | allowed | pending | blocked
   const [driverStatus, setDriverStatus] = useState(null)
@@ -329,6 +328,172 @@ export default function DriverPage() {
     return profileData
   }
 
+  const handleRefreshDriverAccess = async () => {
+    setSyncingRole(true)
+    try {
+      const profile = await syncProfileFromServer()
+      if (profile?.role === 'shipper' || profile?.role === 'admin') {
+        setAccessState('allowed')
+        toast.success('Bạn đã có quyền tài xế — bắt đầu nhận đơn!')
+        return
+      }
+
+      const res = await fetch(
+        `http://localhost:5000/api/partner/driver/register/status?userId=${user._id}`
+      )
+      const data = await res.json()
+      setDriverStatus(data)
+      if (data.reason === 'pending') {
+        toast('Hồ sơ vẫn đang chờ admin duyệt', { icon: '⏳' })
+      } else {
+        toast.error(data.message || 'Chưa được duyệt làm tài xế')
+      }
+    } finally {
+      setSyncingRole(false)
+    }
+  }
+
+  // Fetch orders and driver profile
+  const fetchOrders = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch('http://localhost:5000/api/orders')
+      if (res.ok) {
+        const data = await res.json()
+        setOrders(data)
+      } else {
+        toast.error('Lỗi khi tải danh sách đơn hàng')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Không thể kết nối đến máy chủ')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchDriverProfile = async () => {
+    try {
+      const token = localStorage.getItem('foodserve_token')
+      if (!token) return
+      const res = await fetch('http://localhost:5000/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const profileData = await res.json()
+        dispatch(updateUser(profileData))
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const triggerRefresh = () => {
+    setRefreshTrigger(prev => prev + 1)
+  }
+
+  // Accept Order
+  const handleAcceptOrder = async (orderId) => {
+    if (!isOnline) {
+      toast.error('Bạn cần chuyển sang trạng thái HOẠT ĐỘNG để nhận đơn!')
+      return
+    }
+    try {
+      setProcessingId(orderId)
+      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/accept`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipperId: user._id || user.id })
+      })
+      
+      if (res.ok) {
+        toast.success('Nhận đơn giao thành công! Bắt đầu chuẩn bị.')
+        setActiveTab('active')
+        triggerRefresh()
+      } else {
+        const data = await res.json()
+        toast.error(data.message || 'Lỗi khi nhận đơn')
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối mạng')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  // Update Status
+  const handleUpdateStatus = async (orderId, newStatus) => {
+    try {
+      setProcessingId(orderId)
+      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          status: newStatus,
+          shipperId: user._id || user.id
+        })
+      })
+
+      if (res.ok) {
+        if (newStatus === 'completed') {
+          toast.success('Giao hàng thành công! Thu nhập đã được cộng vào ví.')
+          setActiveTab('history')
+        } else {
+          toast.success('Cập nhật trạng thái đơn hàng thành công!')
+        }
+        triggerRefresh()
+      } else {
+        toast.error('Lỗi cập nhật trạng thái')
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  // Generate Mock Order for Testing
+  const handleCreateMockOrder = async () => {
+    try {
+      // 1. Get restaurants
+      const restRes = await fetch('http://localhost:5000/api/restaurants')
+      const restaurants = await restRes.json()
+      const restaurant = restaurants.length > 0 ? restaurants[0] : null
+      
+      const mockOrder = {
+        userId: 'demo_user',
+        restaurantId: restaurant ? restaurant._id : '65ef1234567890abcdef1234',
+        items: [
+          { menuItemId: 'mock_item_1', name: 'Gà Rán Giòn Cay (Cái)', price: 35000, quantity: 2 },
+          { menuItemId: 'mock_item_2', name: 'Nước Ngọt Coca Cola', price: 15000, quantity: 1 }
+        ],
+        totalAmount: 85000,
+        discount: 10000,
+        deliveryFee: 20000, // 20k ship
+        finalAmount: 95000,
+        deliveryAddress: 'Lầu 12, Tòa nhà Bitexco, Quận 1, TP. Hồ Chí Minh',
+        contactPhone: '0909888999'
+      }
+
+      const res = await fetch('http://localhost:5000/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mockOrder)
+      })
+
+      if (res.ok) {
+        toast.success('Đã tạo 1 đơn hàng giả lập mới trên hệ thống!')
+        triggerRefresh()
+      } else {
+        toast.error('Không thể tạo đơn hàng giả lập')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Lỗi kết nối giả lập đơn')
+    }
+  }
+
+  // ✅ useEffect phải đặt SAU tất cả function definitions
   useEffect(() => {
     const checkAccess = async () => {
       if (!isAuthenticated) {
@@ -377,32 +542,31 @@ export default function DriverPage() {
     }
 
     if (user?._id) checkAccess()
-  }, [user?._id, user?.role, isAuthenticated, navigate, dispatch])
+  }, [user?._id, user?.role, user?.isShipper, isAuthenticated, navigate])
 
-  const handleRefreshDriverAccess = async () => {
-    setSyncingRole(true)
-    try {
-      const profile = await syncProfileFromServer()
-      if (profile?.role === 'shipper' || profile?.role === 'admin') {
-        setAccessState('allowed')
-        toast.success('Bạn đã có quyền tài xế — bắt đầu nhận đơn!')
-        return
-      }
-
-      const res = await fetch(
-        `http://localhost:5000/api/partner/driver/register/status?userId=${user._id}`
-      )
-      const data = await res.json()
-      setDriverStatus(data)
-      if (data.reason === 'pending') {
-        toast('Hồ sơ vẫn đang chờ admin duyệt', { icon: '⏳' })
-      } else {
-        toast.error(data.message || 'Chưa được duyệt làm tài xế')
-      }
-    } finally {
-      setSyncingRole(false)
+  useEffect(() => {
+    if (user && (user.isShipper || user.role === 'shipper' || user.role === 'admin')) {
+      fetchOrders()
+      fetchDriverProfile()
     }
-  }
+  }, [user, refreshTrigger])
+
+  // Cập nhật đơn hàng được chọn xem trên bản đồ
+  useEffect(() => {
+    const currentUserId = user ? (user._id || user.id) : ''
+    const activeOrders = orders.filter(o => o.shipperId === currentUserId && ['preparing', 'delivering'].includes(o.status))
+    
+    if (activeOrders.length > 0) {
+      const exists = activeOrders.some(o => o._id === selectedActiveOrderId)
+      if (!exists) {
+        setSelectedActiveOrderId(activeOrders[0]._id)
+      }
+    } else {
+      setSelectedActiveOrderId(null)
+    }
+  }, [orders, selectedActiveOrderId, user])
+
+  // ✅ Tất cả early returns phải đặt SAU tất cả hooks và function definitions
 
   if (accessState === 'checking') {
     return (

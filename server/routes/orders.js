@@ -1,6 +1,7 @@
 import express from 'express';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
+import Notification from '../models/Notification.js';
 
 const router = express.Router();
 
@@ -90,6 +91,30 @@ router.patch('/:id/status', async (req, res) => {
       }
     }
     
+    // ✅ Tạo thông báo cho khách hàng khi trạng thái thay đổi
+    const statusMessages = {
+      confirmed: '✅ Đơn hàng đã được xác nhận',
+      preparing: '👨‍🍳 Nhà hàng đang chuẩn bị món ăn',
+      delivering: '🛵 Tài xế đang giao hàng đến bạn',
+      completed: '🎉 Đơn hàng đã được giao thành công',
+      cancelled: '❌ Đơn hàng đã bị hủy'
+    };
+    
+    if (statusMessages[newStatus] && order.userId) {
+      const notification = new Notification({
+        userId: order.userId,
+        title: 'Cập nhật đơn hàng',
+        message: statusMessages[newStatus],
+        type: 'order',
+        relatedId: order._id,
+        read: false
+      });
+      await notification.save();
+      
+      // Gửi thông báo real-time qua Socket.io
+      req.app.get('io').to(`user-${order.userId}`).emit('new-notification', notification);
+    }
+    
     // Phát sự kiện Socket.io đến client đang theo dõi đơn hàng này
     req.app.get('io').to(`order-${order._id}`).emit('order-status-updated', { 
       orderId: order._id, 
@@ -98,6 +123,7 @@ router.patch('/:id/status', async (req, res) => {
     
     res.json(order);
   } catch (error) {
+    console.error('Update order status error:', error);
     res.status(500).json({ message: 'Lỗi server' });
   }
 });
@@ -128,6 +154,164 @@ router.patch('/:id/accept', async (req, res) => {
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server khi nhận đơn' });
+  }
+});
+
+// Lấy đơn hàng có sẵn cho shipper (chưa có người nhận)
+router.get('/shipper/available', async (req, res) => {
+  try {
+    const orders = await Order.find({
+      status: { $in: ['confirmed', 'preparing'] },
+      shipperId: { $exists: false }
+    })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean();
+    
+    res.json(orders);
+  } catch (error) {
+    console.error('Get available orders error:', error);
+    res.status(500).json({ message: 'Lỗi khi lấy đơn hàng có sẵn' });
+  }
+});
+
+// Shipper nhận đơn
+router.post('/:id/accept-shipper', async (req, res) => {
+  try {
+    const { shipperId } = req.body;
+    
+    if (!shipperId) {
+      return res.status(400).json({ message: 'Thiếu thông tin shipperId' });
+    }
+    
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    }
+    
+    if (order.shipperId) {
+      return res.status(400).json({ message: 'Đơn hàng đã có shipper nhận' });
+    }
+    
+    // Gán shipper
+    order.shipperId = shipperId;
+    order.status = 'preparing';
+    order.steps.push({ status: 'preparing', time: new Date() });
+    order.estimatedDeliveryTime = new Date(Date.now() + 30 * 60 * 1000); // 30 phút
+    
+    await order.save();
+    
+    // Thông báo real-time
+    const io = req.app.get('io');
+    io.to(`order-${order._id}`).emit('order-status-updated', {
+      orderId: order._id,
+      status: order.status,
+      shipperId: order.shipperId
+    });
+    
+    res.json({
+      message: 'Đã nhận đơn hàng thành công',
+      order
+    });
+  } catch (error) {
+    console.error('Accept order error:', error);
+    res.status(500).json({ message: 'Lỗi khi nhận đơn hàng' });
+  }
+});
+
+// Cập nhật vị trí shipper
+router.patch('/:id/update-location', async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+    
+    if (!lat || !lng) {
+      return res.status(400).json({ message: 'Thiếu thông tin vị trí' });
+    }
+    
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      {
+        shipperLocation: {
+          lat,
+          lng,
+          lastUpdated: new Date()
+        }
+      },
+      { new: true }
+    );
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    }
+    
+    // Gửi vị trí real-time cho khách hàng
+    const io = req.app.get('io');
+    io.to(`order-${order._id}`).emit('shipper-location-updated', {
+      orderId: order._id,
+      location: { lat, lng }
+    });
+    
+    res.json({
+      message: 'Đã cập nhật vị trí',
+      location: order.shipperLocation
+    });
+  } catch (error) {
+    console.error('Update location error:', error);
+    res.status(500).json({ message: 'Lỗi khi cập nhật vị trí' });
+  }
+});
+
+// Đánh giá shipper
+router.post('/:id/rate-shipper', async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Đánh giá phải từ 1 đến 5 sao' });
+    }
+    
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    }
+    
+    if (order.status !== 'completed') {
+      return res.status(400).json({ message: 'Chỉ có thể đánh giá đơn hàng đã hoàn thành' });
+    }
+    
+    if (order.shipperRating) {
+      return res.status(400).json({ message: 'Đã đánh giá shipper rồi' });
+    }
+    
+    // Lưu đánh giá
+    order.shipperRating = rating;
+    order.shipperComment = comment || '';
+    await order.save();
+    
+    // Cập nhật rating trung bình cho shipper
+    if (order.shipperId) {
+      const allOrders = await Order.find({
+        shipperId: order.shipperId,
+        shipperRating: { $exists: true, $ne: null }
+      });
+      
+      const avgRating = allOrders.reduce((sum, o) => sum + o.shipperRating, 0) / allOrders.length;
+      
+      await User.findByIdAndUpdate(order.shipperId, {
+        shipperRating: Math.round(avgRating * 10) / 10,
+        totalDeliveries: allOrders.length
+      });
+    }
+    
+    res.json({
+      message: 'Đã đánh giá shipper thành công',
+      order
+    });
+  } catch (error) {
+    console.error('Rate shipper error:', error);
+    res.status(500).json({ message: 'Lỗi khi đánh giá shipper' });
   }
 });
 

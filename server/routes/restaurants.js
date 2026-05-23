@@ -7,14 +7,127 @@ import Notification from '../models/Notification.js';
 
 const router = express.Router();
 
-// Lấy tất cả nhà hàng
+// Lấy tất cả nhà hàng với tìm kiếm, lọc, sắp xếp
 router.get('/', async (req, res) => {
   try {
-    // Chỉ lấy nhà hàng đang hoạt động (không hết hạn)
-    const restaurants = await Restaurant.find({ isActive: { $ne: false } });
-    res.json(restaurants);
+    const { 
+      search,           // Tìm kiếm theo tên, địa chỉ
+      category,         // Lọc theo danh mục
+      minRating,        // Lọc rating tối thiểu
+      maxPrice,         // Lọc giá tối đa
+      freeship,         // Chỉ lấy nhà hàng freeship
+      sortBy,           // Sắp xếp: rating, orders, distance, name
+      page = 1,
+      limit = 20
+    } = req.query;
+
+    // Build query
+    const query = { isActive: { $ne: false } };
+
+    // Tìm kiếm theo tên hoặc địa chỉ
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { address: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Lọc theo danh mục
+    if (category) {
+      query.categories = category;
+    }
+
+    // Lọc theo rating
+    if (minRating) {
+      query.rating = { $gte: parseFloat(minRating) };
+    }
+
+    // Lọc freeship
+    if (freeship === 'true') {
+      query.freeship = true;
+    }
+
+    // Sắp xếp
+    let sort = { createdAt: -1 }; // Mặc định: mới nhất
+    if (sortBy === 'rating') sort = { rating: -1, reviews: -1 };
+    if (sortBy === 'orders') sort = { orders: -1 };
+    if (sortBy === 'distance') sort = { distance: 1 };
+    if (sortBy === 'name') sort = { name: 1 };
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const restaurants = await Restaurant.find(query)
+      .sort(sort)
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
+
+    const total = await Restaurant.countDocuments(query);
+
+    res.json({
+      restaurants,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit))
+      }
+    });
   } catch (error) {
+    console.error('Get restaurants error:', error);
     res.status(500).json({ message: 'Lỗi server' });
+  }
+});
+
+// Tìm kiếm món ăn theo tên
+router.get('/search/menu', async (req, res) => {
+  try {
+    const { query, limit = 20 } = req.query;
+    
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({ message: 'Từ khóa tìm kiếm phải có ít nhất 2 ký tự' });
+    }
+
+    // Tìm món ăn
+    const menuItems = await MenuItem.find({
+      $or: [
+        { name: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } },
+        { category: { $regex: query, $options: 'i' } }
+      ]
+    })
+    .limit(parseInt(limit))
+    .lean();
+
+    // Lấy thông tin nhà hàng cho mỗi món
+    const restaurantIds = [...new Set(menuItems.map(item => item.restaurantId))];
+    const restaurants = await Restaurant.find({ 
+      _id: { $in: restaurantIds },
+      isActive: { $ne: false }
+    }).lean();
+
+    const restaurantMap = {};
+    restaurants.forEach(r => {
+      restaurantMap[r._id.toString()] = r;
+    });
+
+    // Kết hợp dữ liệu
+    const results = menuItems
+      .filter(item => restaurantMap[item.restaurantId.toString()])
+      .map(item => ({
+        ...item,
+        restaurant: restaurantMap[item.restaurantId.toString()]
+      }));
+
+    res.json({
+      results,
+      total: results.length
+    });
+  } catch (error) {
+    console.error('Search menu error:', error);
+    res.status(500).json({ message: 'Lỗi khi tìm kiếm món ăn' });
   }
 });
 

@@ -6,6 +6,7 @@ import { FiArrowLeft, FiStar, FiClock, FiMapPin, FiPlus, FiMinus, FiShoppingCart
 import { fetchRestaurantDetails } from '../store/slices/restaurantSlice'
 import { addToCart, openCart, selectCartCount } from '../store/slices/cartSlice'
 import { formatPrice } from '../data/mockData'
+import ReviewList from '../components/reviews/ReviewList'
 
 export default function RestaurantPage() {
   const { id } = useParams()
@@ -204,6 +205,11 @@ export default function RestaurantPage() {
               </motion.div>
             ))}
           </AnimatePresence>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="mt-12 bg-white dark:bg-dark-100 rounded-2xl p-6 shadow-card">
+          <ReviewList restaurantId={id} />
         </div>
       </div>
 
