@@ -1,14 +1,25 @@
 import { useState, useEffect } from 'react'
-import { FiStar, FiThumbsUp, FiFlag, FiMessageCircle } from 'react-icons/fi'
-import { motion } from 'framer-motion'
+import { useSelector } from 'react-redux'
+import { FiStar, FiThumbsUp, FiFlag, FiMessageCircle, FiEdit3 } from 'react-icons/fi'
+import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 
 export default function ReviewList({ restaurantId }) {
+  const { user, isAuthenticated } = useSelector((s) => s.auth)
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('newest')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+
+  // Form đánh giá
+  const [showForm, setShowForm] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [hoverStar, setHoverStar] = useState(0)
+  const [form, setForm] = useState({
+    restaurantRating: 0,
+    restaurantComment: ''
+  })
 
   useEffect(() => {
     if (!restaurantId) return
@@ -63,6 +74,63 @@ export default function ReviewList({ restaurantId }) {
     }
   }
 
+  const handleSubmitReview = async (e) => {
+    e.preventDefault()
+    if (!isAuthenticated) { toast.error('Vui lòng đăng nhập để đánh giá!'); return }
+    if (form.restaurantRating === 0) { toast.error('Vui lòng chọn số sao!'); return }
+    if (!form.restaurantComment.trim()) { toast.error('Vui lòng nhập nội dung đánh giá!'); return }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch('http://localhost:5000/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user._id || user.id,
+          restaurantId,
+          restaurantRating: form.restaurantRating,
+          restaurantComment: form.restaurantComment
+        })
+      })
+      if (res.ok) {
+        toast.success('🎉 Đã gửi đánh giá thành công!')
+        setForm({ restaurantRating: 0, restaurantComment: '' })
+        setShowForm(false)
+        fetchReviews()
+      } else {
+        const data = await res.json()
+        toast.error(data.message || 'Lỗi khi gửi đánh giá')
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const StarPicker = ({ value, hover, onHover, onClick }) => (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map(star => (
+        <button
+          key={star}
+          type="button"
+          onMouseEnter={() => onHover(star)}
+          onMouseLeave={() => onHover(0)}
+          onClick={() => onClick(star)}
+          className="transition-transform hover:scale-125"
+        >
+          <FiStar className={`text-3xl transition-colors ${
+            star <= (hover || value)
+              ? 'fill-yellow-400 text-yellow-400'
+              : 'text-gray-300 dark:text-gray-600'
+          }`} />
+        </button>
+      ))}
+    </div>
+  )
+
+  const starLabels = ['', 'Rất tệ', 'Tệ', 'Bình thường', 'Tốt', 'Xuất sắc']
+
   const StarDisplay = ({ rating }) => (
     <div className="flex gap-1">
       {[1, 2, 3, 4, 5].map(star => (
@@ -93,17 +161,101 @@ export default function ReviewList({ restaurantId }) {
         <h3 className="font-bold text-xl dark:text-white">
           ⭐ Đánh giá từ khách hàng ({reviews.length})
         </h3>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-200 text-gray-800 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-primary-500"
-        >
-          <option value="newest">Mới nhất</option>
-          <option value="highest">Đánh giá cao nhất</option>
-          <option value="lowest">Đánh giá thấp nhất</option>
-          <option value="helpful">Hữu ích nhất</option>
-        </select>
+        <div className="flex items-center gap-3">
+          {isAuthenticated && (
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-bold rounded-xl hover:opacity-90 transition-all shadow-md"
+            >
+              <FiEdit3 /> {showForm ? 'Hủy' : 'Viết đánh giá'}
+            </button>
+          )}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-200 text-gray-800 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="newest">Mới nhất</option>
+            <option value="highest">Đánh giá cao nhất</option>
+            <option value="lowest">Đánh giá thấp nhất</option>
+            <option value="helpful">Hữu ích nhất</option>
+          </select>
+        </div>
       </div>
+
+      {/* Form đánh giá */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <form onSubmit={handleSubmitReview}
+              className="bg-gradient-to-br from-orange-50 to-pink-50 dark:from-dark-200 dark:to-dark-200 rounded-2xl p-6 border border-orange-100 dark:border-gray-700"
+            >
+              <h4 className="font-bold text-lg dark:text-white mb-4">✍️ Viết đánh giá của bạn</h4>
+
+              {/* Chọn sao */}
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Chất lượng nhà hàng</p>
+                <div className="flex items-center gap-3">
+                  <StarPicker
+                    value={form.restaurantRating}
+                    hover={hoverStar}
+                    onHover={setHoverStar}
+                    onClick={(star) => setForm(p => ({ ...p, restaurantRating: star }))}
+                  />
+                  {(hoverStar || form.restaurantRating) > 0 && (
+                    <span className="text-sm font-bold text-orange-500">
+                      {starLabels[hoverStar || form.restaurantRating]}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Nội dung */}
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Nội dung đánh giá</p>
+                <textarea
+                  rows={4}
+                  value={form.restaurantComment}
+                  onChange={e => setForm(p => ({ ...p, restaurantComment: e.target.value }))}
+                  placeholder="Chia sẻ trải nghiệm của bạn về nhà hàng này... (chất lượng món ăn, dịch vụ, thời gian giao hàng...)"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-100 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none resize-none text-sm"
+                />
+                <p className="text-xs text-gray-400 mt-1 text-right">{form.restaurantComment.length}/500</p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowForm(false)}
+                  className="px-5 py-2.5 rounded-xl font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors">
+                  Hủy
+                </button>
+                <button type="submit" disabled={submitting}
+                  className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 shadow-md">
+                  {submitting ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Đang gửi...
+                    </span>
+                  ) : '🚀 Gửi đánh giá'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Nếu chưa đăng nhập */}
+      {!isAuthenticated && (
+        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 text-center">
+          <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
+            🔐 Vui lòng <strong>đăng nhập</strong> để viết đánh giá nhà hàng này
+          </p>
+        </div>
+      )}
 
       {/* Reviews List */}
       {reviews.length === 0 ? (

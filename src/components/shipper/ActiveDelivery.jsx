@@ -81,18 +81,25 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
       const response = await fetch(`http://localhost:5000/api/orders/${activeOrder._id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus, shipperId })
       });
 
       if (response.ok) {
+        const statusToasts = {
+          ready: '📦 Đã lấy hàng! Khách hàng đã được thông báo',
+          delivering: '🛵 Bắt đầu giao hàng! Khách hàng đã được thông báo',
+          completed: '🎉 Hoàn thành giao hàng! Khách hàng đã được thông báo'
+        };
+        toast.success(statusToasts[newStatus] || '✅ Đã cập nhật trạng thái!');
+
         if (newStatus === 'completed') {
-          toast.success('🎉 Đã hoàn thành giao hàng!');
           setActiveOrder(null);
           if (onDeliveryCompleted) onDeliveryCompleted();
         } else {
-          toast.success('✅ Đã cập nhật trạng thái!');
           fetchActiveOrder();
         }
+      } else {
+        toast.error('Có lỗi xảy ra khi cập nhật!');
       }
     } catch (error) {
       console.error('Update status error:', error);

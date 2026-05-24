@@ -10,24 +10,35 @@ router.post('/', async (req, res) => {
   try {
     const { orderId, userId, restaurantId, restaurantRating, restaurantComment, itemReviews, driverRating, driverComment, images } = req.body;
     
-    // Kiểm tra đơn hàng đã hoàn thành chưa
-    const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
-    }
-    if (order.status !== 'completed') {
-      return res.status(400).json({ message: 'Chỉ có thể đánh giá đơn hàng đã hoàn thành' });
-    }
-    
-    // Kiểm tra đã review chưa
-    const existingReview = await Review.findOne({ orderId });
-    if (existingReview) {
-      return res.status(400).json({ message: 'Bạn đã đánh giá đơn hàng này rồi' });
+    // Nếu có orderId thì kiểm tra đơn hàng
+    if (orderId) {
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+      }
+      if (order.status !== 'completed') {
+        return res.status(400).json({ message: 'Chỉ có thể đánh giá đơn hàng đã hoàn thành' });
+      }
+      // Kiểm tra đã review chưa
+      const existingReview = await Review.findOne({ orderId });
+      if (existingReview) {
+        return res.status(400).json({ message: 'Bạn đã đánh giá đơn hàng này rồi' });
+      }
+    } else {
+      // Không có orderId: kiểm tra user đã review nhà hàng này chưa (trong 7 ngày)
+      const recentReview = await Review.findOne({
+        userId,
+        restaurantId,
+        createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+      });
+      if (recentReview) {
+        return res.status(400).json({ message: 'Bạn đã đánh giá nhà hàng này trong 7 ngày qua' });
+      }
     }
     
     // Tạo review
     const review = await Review.create({
-      orderId,
+      orderId: orderId || null,
       userId,
       restaurantId,
       restaurantRating,

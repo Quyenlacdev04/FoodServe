@@ -94,25 +94,34 @@ router.patch('/:id/status', async (req, res) => {
     // ✅ Tạo thông báo cho khách hàng khi trạng thái thay đổi
     const statusMessages = {
       confirmed: '✅ Đơn hàng đã được xác nhận',
-      preparing: '👨‍🍳 Nhà hàng đang chuẩn bị món ăn',
-      delivering: '🛵 Tài xế đang giao hàng đến bạn',
-      completed: '🎉 Đơn hàng đã được giao thành công',
+      preparing: '👨‍🍳 Nhà hàng đang chuẩn bị món ăn của bạn',
+      ready: '📦 Món ăn đã sẵn sàng, tài xế đang đến lấy',
+      delivering: '🛵 Tài xế đang trên đường giao hàng đến bạn',
+      completed: '🎉 Đơn hàng đã được giao thành công! Cảm ơn bạn',
       cancelled: '❌ Đơn hàng đã bị hủy'
     };
     
     if (statusMessages[newStatus] && order.userId) {
-      const notification = new Notification({
-        userId: order.userId,
-        title: 'Cập nhật đơn hàng',
-        message: statusMessages[newStatus],
-        type: 'order',
-        relatedId: order._id,
-        read: false
-      });
-      await notification.save();
-      
-      // Gửi thông báo real-time qua Socket.io
-      req.app.get('io').to(`user-${order.userId}`).emit('new-notification', notification);
+      try {
+        const notification = new Notification({
+          userId: order.userId,
+          title: 'Cập nhật đơn hàng',
+          message: statusMessages[newStatus],
+          type: 'order',
+          relatedId: order._id,
+          read: false
+        });
+        await notification.save();
+        
+        // Gửi thông báo real-time qua Socket.io
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`user-${order.userId}`).emit('new-notification', notification);
+        }
+      } catch (notifError) {
+        console.error('Error creating notification:', notifError);
+        // Không throw error, chỉ log để không ảnh hưởng đến việc cập nhật đơn hàng
+      }
     }
     
     // Phát sự kiện Socket.io đến client đang theo dõi đơn hàng này
@@ -209,6 +218,24 @@ router.post('/:id/accept-shipper', async (req, res) => {
       status: order.status,
       shipperId: order.shipperId
     });
+
+    // ✅ Gửi thông báo cho khách hàng
+    if (order.userId) {
+      try {
+        const notification = new Notification({
+          userId: order.userId,
+          title: 'Tài xế đã nhận đơn',
+          message: '🛵 Tài xế đã nhận đơn hàng của bạn và đang đến lấy món',
+          type: 'order',
+          relatedId: order._id,
+          read: false
+        });
+        await notification.save();
+        io.to(`user-${order.userId}`).emit('new-notification', notification);
+      } catch (e) {
+        console.error('Notification error:', e);
+      }
+    }
     
     res.json({
       message: 'Đã nhận đơn hàng thành công',

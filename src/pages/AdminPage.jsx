@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
-import { motion } from 'framer-motion'
-import { FiPackage, FiUsers, FiShoppingBag, FiSettings, FiCheckCircle, FiTruck, FiClock, FiHome, FiLogOut, FiSun, FiMoon, FiClipboard, FiDollarSign } from 'react-icons/fi'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FiPackage, FiUsers, FiShoppingBag, FiSettings, FiCheckCircle, FiTruck, FiClock, FiHome, FiLogOut, FiSun, FiMoon, FiClipboard, FiDollarSign, FiBell, FiX } from 'react-icons/fi'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../data/mockData'
@@ -36,12 +36,15 @@ export default function AdminPage() {
   const [driverRequestsLoading, setDriverRequestsLoading] = useState(false)
   const [paymentRequests, setPaymentRequests] = useState([])
   const [paymentRequestsLoading, setPaymentRequestsLoading] = useState(false)
+  const [newOrderAlert, setNewOrderAlert] = useState(null) // popup thông báo đơn mới
+  const [unreadOrders, setUnreadOrders] = useState(0) // số đơn chưa xem
+  const audioRef = useRef(null)
 
   // Kiểm tra quyền admin
   useEffect(() => {
     if (!user || user.role !== 'admin') {
       toast.error('Bạn không có quyền truy cập trang này!')
-      navigate('/')
+      window.location.href = '/admin-login.html'
     }
   }, [user, navigate])
 
@@ -53,9 +56,21 @@ export default function AdminPage() {
     socket.on('order-status-updated', () => {
       fetchOrders()
     })
-    socket.on('new-order', () => {
-      toast.success('Có đơn hàng mới!', { icon: '🔔' })
+    socket.on('new-order', (order) => {
+      // Phát âm thanh thông báo
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq4FINjRXjMPgspVbMzNPgLzduZxhMzNKdLTYtqFmMzNGaKzTsqZqMzNDXqXOraprMzNBVZ/JqKxuMzM/TZnEo65yMzM9RZO/n7B2MzM7PY26mrJ6MzM5NomzmrR+MzM3L4Wum7aAMzM1KIGqnLiCMzMzIX2nnbqEMzMxGnmknryGMzMvE3Whn76IMzMtDXGeoMCKMzMrB22boMKMMzMpAWmYocSOMzMnAGWVosaPMzMlAGGSo8iRMzMjAF2PpMqTMzMhAFmMpc2VMzMfAFWJps+XMzMdAFGGp9GZMzMbAE2DqNObMzMZAEmAqdWdMzMXAEV9qt+fMzMVAEF6q+GhMzMTAD13rOOjMzMRADl0reWlMzMPADVxruenMzMNADFusPmpMzMLAC1rsfurMzMJAClosvWtMzMHACVls/evMzMFACFis/mxMzMDACBgs/uzMzMBACBgs/uzMzM=')
+        audio.volume = 0.5
+        audio.play().catch(() => {})
+      } catch (e) {}
+
+      // Hiển thị popup thông báo
+      setNewOrderAlert(order)
+      setUnreadOrders(prev => prev + 1)
       fetchOrders()
+
+      // Tự động ẩn sau 8 giây
+      setTimeout(() => setNewOrderAlert(null), 8000)
     })
     
     return () => socket.disconnect()
@@ -197,7 +212,8 @@ export default function AdminPage() {
   const handleLogout = () => {
     dispatch(logout())
     toast.success('Đã đăng xuất!')
-    navigate('/')
+    // Chuyển về trang đăng nhập admin
+    window.location.href = '/admin-login.html'
   }
 
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -222,6 +238,98 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-300">
+
+      {/* ===== POPUP THÔNG BÁO ĐƠN HÀNG MỚI ===== */}
+      <AnimatePresence>
+        {newOrderAlert && (
+          <motion.div
+            initial={{ opacity: 0, x: 400 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 400 }}
+            transition={{ type: 'spring', damping: 20 }}
+            className="fixed top-20 right-4 z-[100] w-80 bg-white dark:bg-dark-200 rounded-2xl shadow-2xl border-l-4 border-orange-500 overflow-hidden"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <motion.div
+                  animate={{ rotate: [0, -15, 15, -15, 15, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                >
+                  <FiBell className="text-white text-xl" />
+                </motion.div>
+                <span className="text-white font-bold text-sm">🛒 Đơn hàng mới!</span>
+              </div>
+              <button
+                onClick={() => setNewOrderAlert(null)}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <FiX />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Mã đơn</span>
+                <span className="font-mono font-bold text-sm text-gray-800 dark:text-white">
+                  #{String(newOrderAlert._id || '').slice(-6).toUpperCase()}
+                </span>
+              </div>
+              {newOrderAlert.deliveryAddress && (
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-xs text-gray-400 flex-shrink-0">Địa chỉ</span>
+                  <span className="text-xs text-gray-700 dark:text-gray-300 text-right line-clamp-2">
+                    📍 {newOrderAlert.deliveryAddress}
+                  </span>
+                </div>
+              )}
+              {newOrderAlert.items && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">Số món</span>
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    {newOrderAlert.items.length} món
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
+                <span className="text-xs text-gray-400">Tổng tiền</span>
+                <span className="font-bold text-orange-500 text-base">
+                  {formatPrice(newOrderAlert.finalAmount || newOrderAlert.totalAmount || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Thanh toán</span>
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  {newOrderAlert.paymentMethod === 'cash' ? '💵 Tiền mặt' : '💳 VNPay'}
+                </span>
+              </div>
+            </div>
+
+            {/* Action */}
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => {
+                  setActiveTab('orders')
+                  setUnreadOrders(0)
+                  setNewOrderAlert(null)
+                }}
+                className="w-full py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-bold rounded-xl hover:opacity-90 transition-opacity"
+              >
+                Xem đơn hàng →
+              </button>
+            </div>
+
+            {/* Progress bar tự động đóng */}
+            <motion.div
+              initial={{ width: '100%' }}
+              animate={{ width: '0%' }}
+              transition={{ duration: 8, ease: 'linear' }}
+              className="h-1 bg-orange-500"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Admin Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-dark-200 border-b border-gray-200 dark:border-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
@@ -294,8 +402,17 @@ export default function AdminPage() {
             <p className="text-xs text-gray-400">{user?.email || 'admin@foodserve.vn'}</p>
           </div>
 
-          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'orders' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
+          <button onClick={() => { setActiveTab('orders'); setUnreadOrders(0) }} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'orders' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiPackage /> Quản lý Đơn hàng
+            {unreadOrders > 0 && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="ml-auto bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center"
+              >
+                {unreadOrders}
+              </motion.span>
+            )}
           </button>
           <button onClick={() => setActiveTab('restaurants')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'restaurants' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiShoppingBag /> Quản lý Nhà hàng
