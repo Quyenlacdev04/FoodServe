@@ -131,6 +131,52 @@ router.get('/search/menu', async (req, res) => {
   }
 });
 
+// Lấy tất cả món ăn (mới thêm)
+router.get('/menu/all', async (req, res) => {
+  try {
+    const { limit = 20, page = 1 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Lấy tất cả món ăn
+    const menuItems = await MenuItem.find()
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
+
+    // Lấy thông tin nhà hàng cho mỗi món
+    const restaurantIds = [...new Set(menuItems.map(item => item.restaurantId))];
+    const restaurants = await Restaurant.find({ 
+      _id: { $in: restaurantIds },
+      isActive: { $ne: false }
+    }).lean();
+
+    const restaurantMap = {};
+    restaurants.forEach(r => {
+      restaurantMap[r._id.toString()] = r;
+    });
+
+    // Kết hợp dữ liệu
+    const results = menuItems
+      .filter(item => restaurantMap[item.restaurantId.toString()])
+      .map(item => ({
+        ...item,
+        restaurant: restaurantMap[item.restaurantId.toString()]
+      }));
+
+    const total = await MenuItem.countDocuments();
+
+    res.json({
+      results,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('Get all menu items error:', error);
+    res.status(500).json({ message: 'Lỗi khi lấy danh sách món ăn' });
+  }
+});
+
 // Lấy chi tiết nhà hàng và menu của nó
 router.get('/:id', async (req, res) => {
   try {

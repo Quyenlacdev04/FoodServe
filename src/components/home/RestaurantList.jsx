@@ -51,13 +51,109 @@ export default function RestaurantList() {
   }
 
   return (
-    <section id="restaurants" className="py-12 md:py-16">
-      <div className="max-w-7xl mx-auto px-4">
+    <section id="restaurants" className="py-12 md:py-16 relative overflow-hidden">
+      {/* Floating Food Icons - Left Side */}
+      <div className="hidden xl:block absolute -left-20 top-1/4 pointer-events-none">
+        <motion.div
+          className="text-5xl opacity-30"
+          animate={{ 
+            y: [0, -20, 0],
+            rotate: [-5, 5, -5]
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          🍕
+        </motion.div>
+        <motion.div
+          className="text-4xl opacity-30 mt-20"
+          animate={{ 
+            y: [0, 20, 0],
+            rotate: [5, -5, 5]
+          }}
+          transition={{
+            duration: 4,
+            delay: 0.5,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          🍔
+        </motion.div>
+        <motion.div
+          className="text-3xl opacity-30 mt-20"
+          animate={{ 
+            y: [0, -15, 0],
+            rotate: [-3, 3, -3]
+          }}
+          transition={{
+            duration: 3.5,
+            delay: 1,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          🍜
+        </motion.div>
+      </div>
+
+      {/* Floating Food Icons - Right Side */}
+      <div className="hidden xl:block absolute -right-20 top-1/3 pointer-events-none">
+        <motion.div
+          className="text-4xl opacity-30"
+          animate={{ 
+            y: [0, 15, 0],
+            rotate: [3, -3, 3]
+          }}
+          transition={{
+            duration: 3.5,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          🍱
+        </motion.div>
+        <motion.div
+          className="text-5xl opacity-30 mt-20"
+          animate={{ 
+            y: [0, -25, 0],
+            rotate: [-5, 5, -5]
+          }}
+          transition={{
+            duration: 4,
+            delay: 0.7,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          🍰
+        </motion.div>
+        <motion.div
+          className="text-4xl opacity-30 mt-20"
+          animate={{ 
+            y: [0, 20, 0],
+            rotate: [4, -4, 4]
+          }}
+          transition={{
+            duration: 3.8,
+            delay: 1.2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          🍣
+        </motion.div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="flex flex-col md:flex-row md:items-end justify-between mb-8"
+          className="mb-8 text-center"
         >
           <div>
             <h2 className="text-3xl md:text-4xl font-display font-bold dark:text-white">
