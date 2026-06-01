@@ -59,7 +59,8 @@ export default function CheckoutPage() {
           menuItemId: item.id,
           name: item.name,
           price: item.price,
-          quantity: item.quantity
+          quantity: item.quantity,
+          image: item.image
         })),
         totalAmount: total,
         discount: discount,
@@ -82,27 +83,25 @@ export default function CheckoutPage() {
       const newOrder = await res.json()
       
       // Xử lý theo phương thức thanh toán
-      if (paymentMethod === 'vnpay') {
-        // Thanh toán VNPay
-        const paymentRes = await fetch('http://localhost:5000/api/payment/vnpay/create-payment', {
+      if (paymentMethod === 'momo') {
+        // Thanh toán MoMo
+        const paymentRes = await fetch('http://localhost:5000/api/payment/momo/create-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             orderId: newOrder._id,
-            amount: finalTotal,
-            orderInfo: `Thanh toan don hang #${newOrder._id.slice(-8)}`,
-            bankCode: '' // Để trống để khách chọn ngân hàng
+            amount: finalTotal
           })
         })
         
         const paymentData = await paymentRes.json()
         
         if (paymentData.paymentUrl) {
-          // Redirect đến VNPay
+          // Redirect đến MoMo
           window.location.href = paymentData.paymentUrl
           return
         } else {
-          throw new Error('Không thể tạo URL thanh toán VNPay')
+          throw new Error(paymentData.message || 'Không thể tạo URL thanh toán MoMo')
         }
       } else if (paymentMethod === 'coins') {
         // Thanh toán bằng Xu
@@ -180,7 +179,7 @@ export default function CheckoutPage() {
                     type="text" name="name"
                     value={formData.name} onChange={handleInputChange}
                     placeholder="Tên người nhận"
-                    className="input-search pl-11 w-full bg-gray-50"
+                    className="input-search pl-11 w-full bg-dark-200"
                     required
                   />
                 </div>
@@ -190,7 +189,7 @@ export default function CheckoutPage() {
                     type="tel" name="phone"
                     value={formData.phone} onChange={handleInputChange}
                     placeholder="Số điện thoại"
-                    className="input-search pl-11 w-full bg-gray-50"
+                    className="input-search pl-11 w-full bg-dark-200"
                     required
                   />
                 </div>
@@ -200,7 +199,7 @@ export default function CheckoutPage() {
                     name="address"
                     value={formData.address} onChange={handleInputChange}
                     placeholder="Địa chỉ giao hàng chi tiết (Số nhà, tên đường, phường/xã...)"
-                    className="input-search pl-11 w-full min-h-[100px] resize-none bg-gray-50 py-3"
+                    className="input-search pl-11 w-full min-h-[100px] resize-none bg-dark-200 py-3"
                     required
                   ></textarea>
                 </div>
@@ -209,7 +208,7 @@ export default function CheckoutPage() {
                     type="text" name="note"
                     value={formData.note} onChange={handleInputChange}
                     placeholder="Ghi chú cho tài xế (Tùy chọn)"
-                    className="input-search px-4 w-full bg-gray-50"
+                    className="input-search px-4 w-full bg-dark-200"
                   />
                 </div>
               </div>
