@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FiCreditCard, FiDollarSign } from 'react-icons/fi';
 import { FaCoins } from 'react-icons/fa';
@@ -13,17 +14,15 @@ export default function PaymentMethodSelector({ onSelect, selectedMethod, userCo
       icon: FiDollarSign,
       description: 'Thanh toán khi nhận hàng',
       color: 'green',
-      available: true,
-      badge: null
+      available: true
     },
     {
-      id: 'momo',
-      name: 'MoMo',
+      id: 'vnpay',
+      name: 'VNPay',
       icon: FiCreditCard,
-      description: 'Ví điện tử MoMo',
-      color: 'pink',
-      available: true,
-      badge: '🔒 An toàn'
+      description: 'Thanh toán qua VNPay (ATM, Visa, MasterCard)',
+      color: 'blue',
+      available: true
     },
     {
       id: 'coins',
@@ -33,41 +32,13 @@ export default function PaymentMethodSelector({ onSelect, selectedMethod, userCo
         ? `Cần ${coinsRequired} Xu (Bạn có ${userCoins} Xu)` 
         : `Không đủ Xu. Cần ${coinsRequired} Xu (Bạn có ${userCoins} Xu)`,
       color: 'yellow',
-      available: hasEnoughCoins,
-      badge: hasEnoughCoins ? '✨ Đủ Xu' : null
+      available: hasEnoughCoins
     }
   ];
 
-  const colorMap = {
-    green: {
-      bg: 'bg-green-100 dark:bg-green-900/30',
-      text: 'text-green-600 dark:text-green-400',
-      border: 'border-green-500',
-      selectedBg: 'bg-green-50 dark:bg-green-900/20'
-    },
-    pink: {
-      bg: 'bg-pink-100 dark:bg-pink-900/30',
-      text: 'text-pink-600 dark:text-pink-400',
-      border: 'border-pink-500',
-      selectedBg: 'bg-pink-50 dark:bg-pink-900/20'
-    },
-    blue: {
-      bg: 'bg-blue-100 dark:bg-blue-900/30',
-      text: 'text-blue-600 dark:text-blue-400',
-      border: 'border-blue-500',
-      selectedBg: 'bg-blue-50 dark:bg-blue-900/20'
-    },
-    yellow: {
-      bg: 'bg-yellow-100 dark:bg-yellow-900/30',
-      text: 'text-yellow-600 dark:text-yellow-400',
-      border: 'border-yellow-500',
-      selectedBg: 'bg-yellow-50 dark:bg-yellow-900/20'
-    }
-  };
-
   return (
     <div className="space-y-3">
-      <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-bold text-gray-800 mb-4">
         💳 Phương thức thanh toán
       </h3>
 
@@ -75,7 +46,6 @@ export default function PaymentMethodSelector({ onSelect, selectedMethod, userCo
         const Icon = method.icon;
         const isSelected = selectedMethod === method.id;
         const isDisabled = !method.available;
-        const colors = colorMap[method.color];
 
         return (
           <motion.button
@@ -84,54 +54,47 @@ export default function PaymentMethodSelector({ onSelect, selectedMethod, userCo
             disabled={isDisabled}
             whileHover={method.available ? { scale: 1.02 } : {}}
             whileTap={method.available ? { scale: 0.98 } : {}}
-            className={`w-full p-4 rounded-xl border-2 transition-all text-left relative ${
+            className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
               isSelected
-                ? `${colors.border} ${colors.selectedBg}`
+                ? 'border-orange-500 bg-orange-50'
                 : isDisabled
-                ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 opacity-50 cursor-not-allowed'
-                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-dark-100'
+                ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                : 'border-gray-200 hover:border-gray-300 bg-white'
             }`}
           >
-            {/* Badge */}
-            {method.badge && !isDisabled && (
-              <span className={`absolute top-2 right-2 text-xs px-2 py-0.5 rounded-full font-medium ${
-                method.color === 'blue' 
-                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400' 
-                  : 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-600 dark:text-yellow-400'
-              }`}>
-                {method.badge}
-              </span>
-            )}
-
             <div className="flex items-start gap-4">
               {/* Radio */}
               <div className="mt-1">
                 <div
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                     isSelected
                       ? 'border-orange-500 bg-orange-500'
-                      : 'border-gray-300 dark:border-gray-600'
+                      : 'border-gray-300'
                   }`}
                 >
                   {isSelected && (
-                    <motion.div 
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="w-2 h-2 bg-white rounded-full"
-                    />
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
                   )}
                 </div>
               </div>
 
               {/* Icon */}
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${colors.bg}`}>
-                <Icon className={`text-2xl ${colors.text}`} />
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  method.color === 'green'
+                    ? 'bg-green-100 text-green-600'
+                    : method.color === 'blue'
+                    ? 'bg-blue-100 text-blue-600'
+                    : 'bg-yellow-100 text-yellow-600'
+                }`}
+              >
+                <Icon className="text-2xl" />
               </div>
 
               {/* Info */}
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-gray-800 dark:text-white mb-0.5">{method.name}</h4>
-                <p className={`text-sm ${isDisabled ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+              <div className="flex-1">
+                <h4 className="font-bold text-gray-800 mb-1">{method.name}</h4>
+                <p className={`text-sm ${isDisabled ? 'text-red-500' : 'text-gray-500'}`}>
                   {method.description}
                 </p>
               </div>
@@ -140,37 +103,12 @@ export default function PaymentMethodSelector({ onSelect, selectedMethod, userCo
         );
       })}
 
-      {/* MoMo Note */}
-      {selectedMethod === 'momo' && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-xl border border-pink-100 dark:border-pink-800"
-        >
-          <p className="text-sm text-pink-700 dark:text-pink-300 mb-2">
-            💜 <strong>Thanh toán qua MoMo:</strong>
-          </p>
-          <ul className="text-xs text-pink-600 dark:text-pink-400 space-y-1 ml-5 list-disc">
-            <li>Bạn sẽ được chuyển đến trang thanh toán MoMo</li>
-            <li>Hỗ trợ ví MoMo, ATM, Visa, MasterCard, QR Code</li>
-            <li>Giao dịch được bảo mật</li>
-          </ul>
-        </motion.div>
-      )}
-
-      {/* Coins Note */}
-      {selectedMethod === 'coins' && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-100 dark:border-yellow-800"
-        >
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
-            🪙 <strong>Thanh toán bằng Xu:</strong> Xu sẽ được trừ ngay khi đặt hàng.
-            Bạn có thể kiếm thêm Xu qua Mini Games!
-          </p>
-        </motion.div>
-      )}
+      {/* Note */}
+      <div className="mt-4 p-3 bg-blue-50 rounded-xl">
+        <p className="text-sm text-blue-700">
+          💡 <strong>Lưu ý:</strong> Thanh toán VNPay sẽ chuyển đến trang thanh toán an toàn của VNPay
+        </p>
+      </div>
     </div>
   );
 }
