@@ -109,7 +109,7 @@ export default function PaymentMethodSelector({ onSelect, selectedMethod, userCo
                 <div
                   className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                     isSelected
-                      ? 'border-orange-500 bg-orange-500'
+                      ? 'border-primary-500 bg-primary-500'
                       : 'border-gray-300 dark:border-gray-600'
                   }`}
                 >

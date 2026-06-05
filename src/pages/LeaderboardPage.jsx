@@ -69,7 +69,7 @@ export default function LeaderboardPage() {
         <Link to="/" className="text-primary-500 hover:underline text-sm mb-6 inline-block">← Về trang chủ</Link>
         
         {/* Banner */}
-        <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-3xl p-6 sm:p-10 text-white shadow-lg mb-8 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-3xl p-6 sm:p-10 text-white shadow-lg mb-8 flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <h1 className="text-3xl font-display font-bold flex items-center gap-2 mb-2">
               <FiTrendingUp /> Bảng Phong Thần

@@ -87,7 +87,7 @@ export default function ChatBox({ orderId, onClose }) {
       className="fixed bottom-4 right-4 w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border border-gray-200"
     >
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-500 to-pink-500 text-white p-4 flex items-center justify-between">
+      <div className="bg-gradient-primary text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <FiMessageCircle className="text-2xl" />
           <div>
@@ -107,7 +107,7 @@ export default function ChatBox({ orderId, onClose }) {
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-4 border-orange-500 border-t-transparent"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent"></div>
           </div>
         ) : (
           <>

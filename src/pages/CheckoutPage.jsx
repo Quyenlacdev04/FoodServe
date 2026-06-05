@@ -18,6 +18,9 @@ export default function CheckoutPage() {
   
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [deliveryFee, setDeliveryFee] = useState(15000)
+  const [deliveryDistance, setDeliveryDistance] = useState(null)
+  const [feeLoading, setFeeLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -33,12 +36,37 @@ export default function CheckoutPage() {
     }
   }, [items, navigate, loading])
 
-  const deliveryFee = total > 100000 ? 0 : 15000
   const finalTotal = Math.max(0, total + deliveryFee - discount)
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
+
+  // Tính phí giao hàng theo km khi địa chỉ thay đổi
+  useEffect(() => {
+    const restaurantId = items[0]?.restaurantId
+    if (!formData.address || formData.address.length < 10 || !restaurantId) return
+
+    const timer = setTimeout(async () => {
+      setFeeLoading(true)
+      try {
+        const res = await fetch('http://localhost:5000/api/restaurants/calculate-fee', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurantId, deliveryAddress: formData.address })
+        })
+        const data = await res.json()
+        setDeliveryFee(data.deliveryFee || 15000)
+        setDeliveryDistance(data.distance || null)
+      } catch {
+        setDeliveryFee(15000)
+      } finally {
+        setFeeLoading(false)
+      }
+    }, 1000) // Debounce 1 giây
+
+    return () => clearTimeout(timer)
+  }, [formData.address, items])
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault()
@@ -202,6 +230,18 @@ export default function CheckoutPage() {
                     className="input-search pl-11 w-full min-h-[100px] resize-none bg-dark-200 py-3"
                     required
                   ></textarea>
+                  {formData.address.length >= 10 && (
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+                      {feeLoading ? (
+                        <span className="text-gray-400 animate-pulse">🔄 Đang tính phí giao hàng...</span>
+                      ) : deliveryDistance ? (
+                        <span className="text-primary-500 font-medium">
+                          📍 Khoảng cách: <b>{deliveryDistance} km</b> — Phí ship: <b>{formatPrice(deliveryFee)}</b>
+                          <span className="text-gray-400 ml-1">(5.000đ/km)</span>
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
                 <div className="relative md:col-span-2">
                   <input
@@ -254,8 +294,20 @@ export default function CheckoutPage() {
                   <span>{formatPrice(total)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500 dark:text-gray-400">
-                  <span className="flex items-center gap-1"><FiTruck /> Phí giao hàng</span>
-                  <span>{deliveryFee === 0 ? <span className="text-green-500">Miễn phí</span> : formatPrice(deliveryFee)}</span>
+                  <span className="flex items-center gap-1">
+                    <FiTruck />
+                    Phí giao hàng
+                    {deliveryDistance && (
+                      <span className="text-xs text-primary-400">({deliveryDistance}km)</span>
+                    )}
+                  </span>
+                  <span>
+                    {feeLoading ? (
+                      <span className="text-xs text-gray-400 animate-pulse">Đang tính...</span>
+                    ) : (
+                      formatPrice(deliveryFee)
+                    )}
+                  </span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-green-500">

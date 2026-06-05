@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FiStar, FiClock, FiMapPin } from 'react-icons/fi'
+import { FiStar, FiClock, FiMapPin, FiPercent } from 'react-icons/fi'
 import { formatPrice } from '../../data/mockData'
 
 export default function MenuItemList() {
@@ -15,23 +15,17 @@ export default function MenuItemList() {
   const loadDiscountMenuItems = async () => {
     try {
       setLoading(true)
-      
-      // Lấy tất cả nhà hàng có ưu đãi
       const response = await fetch(`http://localhost:5000/api/restaurants?limit=100`)
       const restaurantsData = await response.json()
       const restaurants = restaurantsData.restaurants || []
-      
-      // Lọc nhà hàng có discount > 0
       const discountRestaurants = restaurants.filter(r => r.discount > 0)
       
-      // Lấy menu items từ các nhà hàng có ưu đãi
       const discountMenuItems = []
       for (const restaurant of discountRestaurants) {
         try {
           const menuResponse = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}`)
           const menuData = await menuResponse.json()
           if (menuData.menuItems && menuData.menuItems.length > 0) {
-            // Lấy tối đa 2 món từ mỗi nhà hàng
             const items = menuData.menuItems.slice(0, 2)
             items.forEach(item => {
               discountMenuItems.push({
@@ -45,7 +39,6 @@ export default function MenuItemList() {
         }
       }
       
-      // Giới hạn hiển thị 8 món
       setMenuItems(discountMenuItems.slice(0, 8))
     } catch (error) {
       console.error('Error loading discount menu items:', error)
@@ -56,11 +49,11 @@ export default function MenuItemList() {
 
   if (loading) {
     return (
-      <section className="py-8 md:py-12">
+      <section className="py-12">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center py-10">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Đang tải món ăn ưu đãi...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent mx-auto mb-4"></div>
+            <p className="text-gray-500 dark:text-gray-400 font-medium">Đang tải món ăn ưu đãi...</p>
           </div>
         </div>
       </section>
@@ -68,28 +61,31 @@ export default function MenuItemList() {
   }
 
   if (menuItems.length === 0) {
-    return null // Không hiển thị gì nếu không có món ưu đãi
+    return null
   }
 
   return (
-    <section className="py-8 md:py-12 bg-gradient-to-b from-orange-50 to-white dark:from-dark-200 dark:to-dark-100">
-      <div className="max-w-7xl mx-auto px-4">
+    <section className="py-12 bg-gradient-to-b from-gray-50/50 to-white dark:from-dark-400 dark:to-dark-300 relative">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-accent-500/5 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-4 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mb-6 text-center"
+          className="mb-10 text-center"
         >
-          <h2 className="text-2xl md:text-3xl font-display font-bold dark:text-white">
-            Món ăn <span className="text-gradient">ưu đãi</span> 🎁
+          <h2 className="text-3xl md:text-4xl font-display font-black text-gray-900 dark:text-white flex items-center justify-center gap-2">
+            Món ăn <span className="text-gradient-premium">ưu đãi</span> <FiPercent className="text-primary-500" />
           </h2>
-          <p className="text-gray-500 dark:text-gray-400 mt-2">
-            Tiết kiệm ngay với {menuItems.length} món ăn đang giảm giá
+          <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">
+            Tiết kiệm ngay với các món ăn đang giảm giá cực khủng
           </p>
         </motion.div>
 
         {/* Menu Items Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {menuItems.map((item, i) => (
             <motion.div
               key={`${item._id || item.id}-${i}`}
@@ -103,67 +99,70 @@ export default function MenuItemList() {
                 className="block card-restaurant group"
               >
                 {/* Image */}
-                <div className="relative overflow-hidden h-44">
+                <div className="relative overflow-hidden h-48 rounded-t-3xl">
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                   
-                  {/* Discount Badge - Nổi bật */}
-                  <div className="absolute top-3 left-3">
-                    <span className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm font-bold shadow-lg animate-pulse">
+                  {/* Discount Badge */}
+                  <div className="absolute top-4 left-4">
+                    <span className="badge-discount py-1.5 px-3 rounded-2xl text-xs font-black tracking-wide flex items-center gap-1 shadow-lg bg-gradient-to-r from-red-600 to-amber-500">
+                      <FiPercent className="text-sm animate-bounce" />
                       {item.restaurant.discount > 100 
-                        ? `🎁 Giảm ${Math.floor(item.restaurant.discount/1000)}k` 
-                        : `🎁 Giảm ${item.restaurant.discount}%`}
+                        ? `GIẢM ${Math.floor(item.restaurant.discount/1000)}K` 
+                        : `GIẢM ${item.restaurant.discount}%`}
                     </span>
                   </div>
 
-                  {/* Price */}
-                  <div className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg glass text-white text-sm font-bold">
+                  {/* Price Glass Badge */}
+                  <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-2xl glass text-white text-sm font-black shadow-inner-glow">
                     {item.price > 0 ? formatPrice(item.price) : 'Giá 0'}
                   </div>
                 </div>
 
                 {/* Content */}
-                <div className="p-4">
-                  {/* Restaurant name with icon */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
+                <div className="p-5">
+                  {/* Restaurant detail */}
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <div className="w-5 h-5 rounded-lg bg-primary-500/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[10px]">🍳</span>
                     </div>
-                    <h3 className="font-display font-bold text-gray-800 dark:text-white line-clamp-1 group-hover:text-primary-500 transition-colors text-sm">
+                    <span className="font-bold text-gray-500 dark:text-gray-400 hover:text-primary-500 transition-colors text-xs truncate">
                       {item.restaurant.name}
-                    </h3>
+                    </span>
                   </div>
 
-                  {/* Menu item name */}
-                  <p className="text-base font-semibold text-gray-900 dark:text-gray-100 line-clamp-1 mb-2">
+                  {/* Item Name */}
+                  <h3 className="text-base font-black text-gray-800 dark:text-white line-clamp-1 group-hover:text-primary-500 transition-colors mb-2">
                     {item.name}
-                  </p>
+                  </h3>
 
-                  {/* Restaurant info */}
-                  <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <FiStar className="fill-yellow-500 text-yellow-500" /> 
+                  {/* Info Row */}
+                  <div className="flex items-center gap-3 text-xs font-bold text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-white/5 pt-3">
+                    <span className="flex items-center gap-1 text-yellow-500">
+                      <FiStar className="fill-yellow-500" /> 
                       {item.restaurant.rating || '4.5'}
                     </span>
+                    <span>•</span>
                     <span className="flex items-center gap-1">
-                      <FiClock className="text-xs" /> 
+                      <FiClock /> 
                       {item.restaurant.deliveryTime || '30'} phút
                     </span>
+                    <span>•</span>
                     <span className="flex items-center gap-1">
-                      <FiMapPin className="text-xs" /> 
-                      {item.restaurant.distance || '2'}km
+                      <FiMapPin /> 
+                      {item.restaurant.distance || '2'} km
                     </span>
                   </div>
 
-                  {/* Promo */}
+                  {/* Promo Banner if present */}
                   {item.restaurant.promo && (
-                    <div className="mt-3 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 text-xs font-medium line-clamp-1">
-                      🏷️ {item.restaurant.promo}
+                    <div className="mt-3.5 px-3 py-2 rounded-xl bg-gradient-to-r from-red-500/10 to-amber-500/10 dark:from-red-500/5 dark:to-amber-500/5 text-red-500 dark:text-amber-400 text-xs font-bold border border-red-500/20 truncate">
+                      🎁 {item.restaurant.promo}
                     </div>
                   )}
                 </div>

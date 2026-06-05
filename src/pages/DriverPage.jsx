@@ -581,7 +581,7 @@ export default function DriverPage() {
 
   if (accessState === 'pending') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-[#0a0a14] dark:to-[#1e1e2e] flex items-center justify-center px-4 py-16">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-primary-50 dark:from-[#0a0a14] dark:to-[#1e1e2e] flex items-center justify-center px-4 py-16">
         <div className="max-w-md w-full bg-white dark:bg-dark-100 rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-white/10 text-center">
           <div className="text-5xl mb-4">⏳</div>
           <h1 className="text-2xl font-display font-bold dark:text-white mb-3">Hồ sơ đang chờ duyệt</h1>
@@ -831,7 +831,7 @@ export default function DriverPage() {
 
           {/* Wallet and Stats */}
           <div className="space-y-3">
-            <div className="p-4 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl text-white shadow-lg shadow-orange-500/10">
+            <div className="p-4 bg-gradient-to-br from-amber-500 to-primary-600 rounded-3xl text-white shadow-lg shadow-primary-500/10">
               <p className="text-xs font-semibold text-white/80 uppercase">Ví Thu Nhập</p>
               <h3 className="text-3xl font-black mt-1 flex items-baseline gap-1">
                 {user?.coins || 0} <span className="text-sm font-bold text-white/90">Xu</span>
@@ -876,7 +876,7 @@ export default function DriverPage() {
           <div className="flex gap-2">
             {[
               { id: 'available', label: 'Đơn mới nhận', badge: availableOrders.length, color: 'bg-primary-500 text-white' },
-              { id: 'active', label: 'Đơn đang giao', badge: activeOrders.length, color: 'bg-orange-500 text-white' },
+              { id: 'active', label: 'Đơn đang giao', badge: activeOrders.length, color: 'bg-primary-500 text-white' },
               { id: 'history', label: 'Lịch sử giao', badge: historyOrders.length, color: 'bg-gray-500 text-white' },
             ].map(tab => (
               <button

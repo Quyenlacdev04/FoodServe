@@ -40,7 +40,7 @@ export default function MessageList({ messages, currentUserId }) {
               <div
                 className={`px-4 py-2 rounded-2xl ${
                   isOwn
-                    ? 'bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-br-sm'
+                    ? 'bg-gradient-primary text-white rounded-br-sm'
                     : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
                 }`}
               >

@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Leaflet map CSS */
+@import 'leaflet/dist/leaflet.css';
+
 @layer base {
   * {
     margin: 0;
@@ -18,10 +21,17 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    background: #f8f7f4;
   }
 
+  .dark body,
+  .dark {
+    background: #0a0c1a;
+  }
+
+  /* Ultra Premium Scrollbar — Gold Trace */
   ::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
   }
 
   ::-webkit-scrollbar-track {
@@ -29,104 +39,316 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 107, 0, 0.4);
-    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(212, 149, 42, 0.35), rgba(16, 185, 129, 0.2));
+    border-radius: 10px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 107, 0, 0.7);
+    background: linear-gradient(180deg, rgba(212, 149, 42, 0.6), rgba(16, 185, 129, 0.4));
+  }
+
+  /* Selection Color — Gold */
+  ::selection {
+    background: rgba(212, 149, 42, 0.15);
+    color: #b87a20;
   }
 }
 
 @layer components {
+  /* ═══════════════════════════════════════════ */
+  /* GLASSMORPHISM SYSTEM                        */
+  /* ═══════════════════════════════════════════ */
   .glass {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-  }
-
-  .glass-light {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-  }
-
-  .glass-dark {
-    background: rgba(17, 17, 27, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
+  .glass-light {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  }
+
+  .glass-dark {
+    background: rgba(10, 12, 26, 0.85);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* GRADIENT TEXT SYSTEM — Gold Edition          */
+  /* ═══════════════════════════════════════════ */
   .text-gradient {
-    background: linear-gradient(135deg, #ff6b00, #ff9500, #ffb347);
+    background: linear-gradient(135deg, #d4952a, #ecc472, #b87a20);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
+  .text-gradient-premium {
+    background: linear-gradient(135deg, #d4952a 0%, #ecc472 35%, #10b981 70%, #34d399 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-aurora {
+    background: linear-gradient(135deg, #d4952a, #ecc472, #f4dda8, #b87a20);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradient-x 3s ease infinite;
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* GRADIENT BACKGROUNDS — Gold + Navy           */
+  /* ═══════════════════════════════════════════ */
   .bg-gradient-primary {
-    background: linear-gradient(135deg, #ff6b00 0%, #ff9500 50%, #ffb347 100%);
+    background: linear-gradient(135deg, #d4952a 0%, #b87a20 50%, #965d1c 100%);
+  }
+
+  .bg-gradient-premium {
+    background: linear-gradient(135deg, #d4952a 0%, #b87a20 25%, #10b981 75%, #059669 100%);
   }
 
   .bg-gradient-dark {
-    background: linear-gradient(180deg, #11111b 0%, #1e1e2e 50%, #181825 100%);
+    background: linear-gradient(180deg, #0a0c1a 0%, #0f1225 30%, #1e2036 60%, #0f1225 100%);
   }
 
+  .bg-gradient-aurora {
+    background: linear-gradient(135deg,
+      rgba(212, 149, 42, 0.06) 0%,
+      rgba(16, 185, 129, 0.04) 35%,
+      rgba(236, 196, 114, 0.03) 65%,
+      transparent 100%
+    );
+  }
+
+  .bg-gradient-mesh {
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(212, 149, 42, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(16, 185, 129, 0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 40% 80%, rgba(236, 196, 114, 0.04) 0%, transparent 50%);
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* BUTTON SYSTEM — Champagne Gold               */
+  /* ═══════════════════════════════════════════ */
   .btn-primary {
-    @apply bg-gradient-primary text-white font-semibold px-6 py-3 rounded-xl
-           hover:shadow-glow transition-all duration-300 transform hover:scale-105
-           active:scale-95;
+    @apply bg-gradient-primary text-white font-semibold px-6 py-3 rounded-2xl
+           transition-all duration-300 transform hover:scale-[1.02]
+           active:scale-[0.98] relative overflow-hidden;
+    box-shadow: 0 4px 20px rgba(212, 149, 42, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 8px 32px rgba(212, 149, 42, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
 
   .btn-outline {
-    @apply border-2 border-primary-500 text-primary-500 font-semibold px-6 py-3 rounded-xl
-           hover:bg-primary-500 hover:text-white transition-all duration-300
-           transform hover:scale-105 active:scale-95;
+    @apply border-2 border-primary-500/30 text-primary-500 font-semibold px-6 py-3 rounded-2xl
+           hover:bg-primary-500/10 hover:border-primary-500/60 transition-all duration-300
+           transform hover:scale-[1.02] active:scale-[0.98] backdrop-blur-sm;
   }
 
+  .btn-glass {
+    @apply font-semibold px-6 py-3 rounded-2xl transition-all duration-300
+           transform hover:scale-[1.02] active:scale-[0.98];
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .btn-glass:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* CARD SYSTEM — Refined Elegance               */
+  /* ═══════════════════════════════════════════ */
   .card-restaurant {
-    @apply bg-white dark:bg-dark-100 rounded-2xl overflow-hidden
-           shadow-card hover:shadow-card-hover transition-all duration-500
-           transform hover:-translate-y-2;
+    @apply bg-white dark:bg-dark-100/80 rounded-3xl overflow-hidden
+           transition-all duration-500 transform hover:-translate-y-1;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.04);
   }
 
+  .dark .card-restaurant {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  .card-restaurant:hover {
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08);
+    border-color: rgba(212, 149, 42, 0.12);
+  }
+
+  .dark .card-restaurant:hover {
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(212, 149, 42, 0.15);
+    border-color: rgba(212, 149, 42, 0.15);
+  }
+
+  .card-glass {
+    @apply rounded-3xl overflow-hidden transition-all duration-500;
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  }
+
+  .card-glass:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(212, 149, 42, 0.2);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* LOADING & SKELETON SYSTEM                    */
+  /* ═══════════════════════════════════════════ */
   .skeleton {
     @apply animate-shimmer bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200
-           dark:from-dark-100 dark:via-dark-200 dark:to-dark-100;
+           dark:from-dark-100 dark:via-dark-50 dark:to-dark-100;
     background-size: 200% 100%;
   }
 
+  /* ═══════════════════════════════════════════ */
+  /* BADGE SYSTEM                                 */
+  /* ═══════════════════════════════════════════ */
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    @apply inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold tracking-wide;
   }
 
   .badge-discount {
-    @apply badge bg-red-500 text-white;
+    @apply badge text-white;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
   }
 
   .badge-freeship {
-    @apply badge bg-green-500 text-white;
+    @apply badge text-white;
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
   }
 
+  .badge-hot {
+    @apply badge text-white;
+    background: linear-gradient(135deg, #d4952a, #b87a20);
+    box-shadow: 0 2px 8px rgba(212, 149, 42, 0.3);
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* INPUT SYSTEM — Gold Focus                    */
+  /* ═══════════════════════════════════════════ */
   .input-search {
-    @apply w-full px-4 py-3 pl-12 rounded-xl border-2 border-gray-200 
-           dark:border-dark-100 dark:bg-dark-200 dark:text-white
-           focus:border-primary-500 focus:outline-none focus:ring-2 
-           focus:ring-primary-500/20 transition-all duration-300;
+    @apply w-full px-4 py-3 pl-12 rounded-2xl transition-all duration-300;
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
   }
 
+  .input-search:focus {
+    border-color: #d4952a;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(212, 149, 42, 0.08), 0 2px 12px rgba(0, 0, 0, 0.04);
+  }
+
+  .dark .input-search {
+    background: rgba(30, 32, 54, 0.8);
+    border-color: rgba(255, 255, 255, 0.06);
+    color: white;
+  }
+
+  .dark .input-search:focus {
+    border-color: #d4952a;
+    box-shadow: 0 0 0 4px rgba(212, 149, 42, 0.1), 0 2px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* NAVIGATION SYSTEM                            */
+  /* ═══════════════════════════════════════════ */
   .bottom-nav {
-    @apply fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-dark-300/90 backdrop-blur-md
-           border-t border-gray-200 dark:border-white/10 px-4 py-2 md:hidden transition-colors duration-500;
+    @apply fixed bottom-0 left-0 right-0 z-50 px-4 py-2 md:hidden transition-all duration-500;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.04);
   }
 
+  .dark .bottom-nav {
+    background: rgba(10, 12, 26, 0.9);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* CATEGORY CARD                                */
+  /* ═══════════════════════════════════════════ */
   .category-card {
-    @apply flex flex-col items-center gap-2 p-4 rounded-2xl cursor-pointer
-           transition-all duration-300 hover:bg-primary-50 dark:hover:bg-dark-100
-           hover:shadow-md transform hover:scale-105;
+    @apply flex flex-col items-center gap-2.5 p-4 rounded-3xl cursor-pointer
+           transition-all duration-300 hover:shadow-lg transform hover:scale-105
+           hover:-translate-y-1;
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* AURORA ORB DECORATION — Gold & Emerald       */
+  /* ═══════════════════════════════════════════ */
+  .aurora-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: glow-pulse 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .aurora-orb-orange {
+    background: radial-gradient(circle, rgba(212, 149, 42, 0.10) 0%, transparent 70%);
+  }
+
+  .aurora-orb-purple {
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, transparent 70%);
+  }
+
+  .aurora-orb-gold {
+    background: radial-gradient(circle, rgba(236, 196, 114, 0.06) 0%, transparent 70%);
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /* NOISE TEXTURE OVERLAY                        */
+  /* ═══════════════════════════════════════════ */
+  .noise-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1;
   }
 }
 
@@ -137,6 +359,10 @@
 
   .text-shadow-lg {
     text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .text-shadow-glow {
+    text-shadow: 0 0 20px rgba(212, 149, 42, 0.4), 0 0 40px rgba(212, 149, 42, 0.15);
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -160,5 +386,42 @@
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  /* Gradient border utility — Gold trace */
+  .border-gradient {
+    border: none !important;
+  }
+
+  .border-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(212, 149, 42, 0.25), rgba(16, 185, 129, 0.15));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Frosted effect */
+  .frosted {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+  }
+
+  .dark .frosted {
+    background: rgba(10, 12, 26, 0.7);
   }
 }

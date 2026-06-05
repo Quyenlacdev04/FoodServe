@@ -5,9 +5,7 @@ import { motion } from 'framer-motion'
 import { FiCheck, FiPackage, FiTruck, FiHome } from 'react-icons/fi'
 import { io } from 'socket.io-client'
 import ChatButton from '../components/chat/ChatButton'
-import MapView from '../components/tracking/MapView'
 import SimpleMapView from '../components/tracking/SimpleMapView'
-import { useGoogleMaps } from '../hooks/useGoogleMaps'
 
 const steps = [
   { icon: FiCheck, label: 'Đã xác nhận', statusId: 'confirmed' },
@@ -24,7 +22,6 @@ export default function OrderTrackingPage() {
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [shipperLocation, setShipperLocation] = useState(null)
-  const { isLoaded: mapsLoaded } = useGoogleMaps()
 
   useEffect(() => {
     let targetOrderId = location.state?.orderId
@@ -83,8 +80,8 @@ export default function OrderTrackingPage() {
           if (stepIndex !== -1) {
             setCurrentStep(stepIndex)
           }
-          // Update order status
-          setOrder(prev => prev ? { ...prev, status: data.status } : null)
+          // Re-fetch entire order to sync steps timeline and other status fields
+          fetchOrder(targetOrderId)
         })
 
         // Listen for shipper location updates
@@ -199,53 +196,113 @@ export default function OrderTrackingPage() {
               <h3 className="font-bold text-lg dark:text-white mb-4 flex items-center gap-2">
                 <span>📍</span> Theo dõi vị trí giao hàng
               </h3>
-              {mapsLoaded ? (
-                <MapView
-                  restaurantLocation={
-                    order.restaurant?.location 
-                      ? { lat: order.restaurant.location.lat, lng: order.restaurant.location.lng }
-                      : { lat: 10.762622, lng: 106.660172 } // Default TP.HCM
-                  }
-                  customerLocation={
-                    order.deliveryLocation
-                      ? { lat: order.deliveryLocation.lat, lng: order.deliveryLocation.lng }
-                      : { lat: 10.773996, lng: 106.700981 } // Default customer location
-                  }
-                  shipperLocation={shipperLocation}
-                  orderStatus={order.status}
-                />
-              ) : (
-                <SimpleMapView
-                  restaurantLocation={
-                    order.restaurant?.location 
-                      ? { lat: order.restaurant.location.lat, lng: order.restaurant.location.lng }
-                      : { lat: 10.762622, lng: 106.660172 }
-                  }
-                  customerLocation={
-                    order.deliveryLocation
-                      ? { lat: order.deliveryLocation.lat, lng: order.deliveryLocation.lng }
-                      : { lat: 10.773996, lng: 106.700981 }
-                  }
-                  shipperLocation={shipperLocation}
-                  orderStatus={order.status}
-                />
-              )}
+              <SimpleMapView
+                restaurantLocation={
+                  order.restaurant?.location
+                    ? { lat: order.restaurant.location.lat, lng: order.restaurant.location.lng }
+                    : { lat: 10.762622, lng: 106.660172 }
+                }
+                customerLocation={
+                  order.deliveryLocation
+                    ? { lat: order.deliveryLocation.lat, lng: order.deliveryLocation.lng }
+                    : { lat: 10.773996, lng: 106.700981 }
+                }
+                shipperLocation={shipperLocation}
+                orderStatus={order.status}
+              />
             </div>
           )}
 
           {/* Shipper info */}
-          <div className="mt-8 p-4 rounded-2xl bg-gray-50 dark:bg-dark-200 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-xl">
-              🏍️
+          {order?.shipper ? (
+            <div className="mt-8 rounded-2xl bg-gray-50 dark:bg-dark-200 overflow-hidden border border-gray-100 dark:border-gray-700">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-primary-500 to-orange-400 px-4 py-2.5 flex items-center gap-2">
+                <span className="text-white text-sm font-bold">🛵 Tài xế đã nhận đơn</span>
+                <span className="ml-auto w-2 h-2 bg-green-300 rounded-full animate-pulse" />
+              </div>
+
+              <div className="p-4">
+                <div className="flex items-center gap-4">
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center text-2xl text-white overflow-hidden shadow-md">
+                      {order.shipper.avatar
+                        ? <img src={order.shipper.avatar} alt="" className="w-full h-full object-cover" />
+                        : '🏍️'
+                      }
+                    </div>
+                    <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white dark:border-dark-200 flex items-center justify-center">
+                      <span className="w-2 h-2 bg-white rounded-full" />
+                    </span>
+                  </div>
+
+                  {/* Thông tin */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-base dark:text-white truncate">
+                      {order.shipper.name || 'Tài xế giao hàng'}
+                    </p>
+                    {/* Rating + đơn đã giao */}
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="flex items-center gap-1 text-sm text-yellow-500 font-semibold">
+                        ⭐ {order.shipper.shipperRating || '5.0'}
+                      </span>
+                      <span className="text-gray-400 text-xs">•</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {order.shipper.totalDeliveries || 0} đơn đã giao
+                      </span>
+                    </div>
+                    {/* SĐT hiện rõ */}
+                    {order.shipper.phone && (
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 flex items-center gap-1.5">
+                        📞 <span className="font-medium">{order.shipper.phone}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Nút Gọi */}
+                  {order.shipper.phone && (
+                    <a
+                      href={`tel:${order.shipper.phone}`}
+                      className="flex-shrink-0 flex flex-col items-center gap-1 px-4 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl transition-colors shadow-md shadow-primary-500/25 active:scale-95"
+                    >
+                      <span className="text-xl">📞</span>
+                      <span className="text-xs font-bold">Gọi</span>
+                    </a>
+                  )}
+                </div>
+
+                {/* Thông tin xe (nếu có) */}
+                {(order.shipper.vehicleType || order.shipper.vehicleNumber) && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                    {order.shipper.vehicleType && (
+                      <span className="flex items-center gap-1.5">
+                        🏍️ {order.shipper.vehicleType === 'motorbike' ? 'Xe máy'
+                          : order.shipper.vehicleType === 'bike' ? 'Xe đạp'
+                          : order.shipper.vehicleType === 'car' ? 'Ô tô'
+                          : order.shipper.vehicleType}
+                      </span>
+                    )}
+                    {order.shipper.vehicleNumber && (
+                      <span className="flex items-center gap-1.5 font-mono font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-dark-300 px-2 py-0.5 rounded-lg">
+                        🔢 {order.shipper.vehicleNumber}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="font-semibold dark:text-white">Nguyễn Văn Shipper</p>
-              <p className="text-sm text-gray-400">⭐ 4.9 • 1,200 đơn đã giao</p>
+          ) : (
+            <div className="mt-8 p-4 rounded-2xl bg-gray-50 dark:bg-dark-200 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-primary-500/10 flex items-center justify-center text-xl animate-pulse">
+                🔍
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold dark:text-white animate-pulse">Đang tìm tài xế giao hàng...</p>
+                <p className="text-xs text-gray-400">Hệ thống đang điều phối tài xế gần nhất</p>
+              </div>
             </div>
-            <button className="px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors">
-              📞 Gọi
-            </button>
-          </div>
+          )}
         </motion.div>
       </div>
 

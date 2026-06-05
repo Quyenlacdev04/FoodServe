@@ -9,6 +9,7 @@ import { formatPrice } from '../data/mockData'
 import AdminRestaurants from '../components/admin/AdminRestaurants'
 import AdminUsers from '../components/admin/AdminUsers'
 import AdminSettings from '../components/admin/AdminSettings'
+import AdminDrivers from '../components/admin/AdminDrivers'
 import NotificationBell from '../components/ui/NotificationBell'
 import { logout } from '../store/slices/authSlice'
 import { toggleDarkMode } from '../store/slices/uiSlice'
@@ -64,14 +65,20 @@ export default function AdminPage() {
         audio.play().catch(() => {})
       } catch (e) {}
 
-      // Hiển thị popup thông báo
       setNewOrderAlert(order)
       setUnreadOrders(prev => prev + 1)
       fetchOrders()
-
-      // Tự động ẩn sau 8 giây
       setTimeout(() => setNewOrderAlert(null), 8000)
     })
+
+    // Lắng nghe xác nhận thanh toán online
+    socket.on('payment-confirmed', (data) => {
+      toast.success(`💳 ${data.message || 'Khách hàng đã thanh toán online!'}`, {
+        duration: 5000,
+        style: { fontWeight: 'bold' }
+      });
+      fetchOrders(); // Refresh bảng đơn hàng
+    });
     
     return () => socket.disconnect()
   }, [])
@@ -247,10 +254,10 @@ export default function AdminPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 400 }}
             transition={{ type: 'spring', damping: 20 }}
-            className="fixed top-20 right-4 z-[100] w-80 bg-white dark:bg-dark-200 rounded-2xl shadow-2xl border-l-4 border-orange-500 overflow-hidden"
+            className="fixed top-20 right-4 z-[100] w-80 bg-white dark:bg-dark-200 rounded-2xl shadow-2xl border-l-4 border-primary-500 overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-3 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-primary-600 to-primary-500 px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <motion.div
                   animate={{ rotate: [0, -15, 15, -15, 15, 0] }}
@@ -294,7 +301,7 @@ export default function AdminPage() {
               )}
               <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
                 <span className="text-xs text-gray-400">Tổng tiền</span>
-                <span className="font-bold text-orange-500 text-base">
+                <span className="font-bold text-primary-500 text-base">
                   {formatPrice(newOrderAlert.finalAmount || newOrderAlert.totalAmount || 0)}
                 </span>
               </div>
@@ -314,7 +321,7 @@ export default function AdminPage() {
                   setUnreadOrders(0)
                   setNewOrderAlert(null)
                 }}
-                className="w-full py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-bold rounded-xl hover:opacity-90 transition-opacity"
+                className="w-full py-2 bg-gradient-to-r from-primary-600 to-primary-500 text-white text-sm font-bold rounded-xl hover:opacity-90 transition-opacity"
               >
                 Xem đơn hàng →
               </button>
@@ -325,7 +332,7 @@ export default function AdminPage() {
               initial={{ width: '100%' }}
               animate={{ width: '0%' }}
               transition={{ duration: 8, ease: 'linear' }}
-              className="h-1 bg-orange-500"
+              className="h-1 bg-primary-500"
             />
           </motion.div>
         )}
@@ -426,6 +433,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('driver-requests')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'driver-requests' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiTruck /> Yêu cầu tài xế
           </button>
+          <button onClick={() => setActiveTab('drivers')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'drivers' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
+            🛵 Quản lý Tài xế
+          </button>
           <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'users' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiUsers /> Quản lý Users
           </button>
@@ -487,7 +497,23 @@ export default function AdminPage() {
                       <tr key={order._id} className="border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-dark-200 transition-colors">
                         <td className="p-4 font-mono text-sm dark:text-gray-300">#{order._id.substring(0,6).toUpperCase()}</td>
                         <td className="p-4 text-sm text-gray-500">{new Date(order.createdAt).toLocaleString()}</td>
-                        <td className="p-4 font-semibold text-primary-500">{formatPrice(order.finalAmount || order.totalAmount)}</td>
+                        <td className="p-4 font-semibold text-primary-500">
+                          <div>{formatPrice(order.finalAmount || order.totalAmount)}</div>
+                          {order.paymentMethod !== 'cash' && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              order.paymentStatus === 'paid'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {order.paymentStatus === 'paid'
+                                ? `✅ TT ${order.paymentMethod === 'momo' ? 'MoMo' : order.paymentMethod === 'coins' ? 'Xu' : order.paymentMethod}`
+                                : '⏳ Chưa TT'}
+                            </span>
+                          )}
+                          {order.paymentMethod === 'cash' && (
+                            <span className="text-xs text-gray-400">💵 COD</span>
+                          )}
+                        </td>
                         <td className="p-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusMap[order.status]?.color}`}>
                             {statusMap[order.status]?.label}
@@ -519,6 +545,8 @@ export default function AdminPage() {
           )}
           
           {activeTab === 'restaurants' && <AdminRestaurants />}
+          
+          {activeTab === 'drivers' && <AdminDrivers />}
           
           {activeTab === 'partner-requests' && (
             <div className="bg-white dark:bg-dark-100 rounded-2xl shadow-card overflow-hidden">

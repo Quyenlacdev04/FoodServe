@@ -111,14 +111,14 @@ export default function RestaurantAnalytics({ restaurantId }) {
           <p className="text-3xl font-black text-purple-700 dark:text-purple-300">{overview?.completedOrders || 0}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/20 dark:to-orange-900/20 p-6 rounded-2xl border border-orange-200 dark:border-orange-800">
+        <div className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-950/20 dark:to-primary-900/20 p-6 rounded-2xl border border-primary-200 dark:border-primary-800">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center">
               <FiDollarSign className="text-xl" />
             </div>
-            <p className="text-xs text-orange-600 dark:text-orange-400 font-semibold uppercase">Đơn TB</p>
+            <p className="text-xs text-primary-600 dark:text-primary-400 font-semibold uppercase">Đơn TB</p>
           </div>
-          <p className="text-2xl font-black text-orange-700 dark:text-orange-300">{formatPrice(overview?.avgOrderValue || 0)}</p>
+          <p className="text-2xl font-black text-primary-700 dark:text-primary-300">{formatPrice(overview?.avgOrderValue || 0)}</p>
         </div>
       </div>
 

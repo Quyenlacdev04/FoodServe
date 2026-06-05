@@ -1,16 +1,27 @@
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { useNavigate, Link } from 'react-router-dom'
-import { FiUser, FiPhone, FiMapPin, FiCamera, FiSave, FiAward, FiGift, FiTag } from 'react-icons/fi'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { FiUser, FiPhone, FiMapPin, FiCamera, FiSave, FiAward, FiGift, FiTag, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { updateProfile } from '../store/slices/authSlice'
 import { getUserRank } from '../utils/rankUtils'
 import { formatPrice } from '../data/mockData'
+import FoodBot from '../components/chatbot/FoodBot'
 
 export default function ProfilePage() {
   const { user, isAuthenticated, loading } = useSelector(s => s.auth)
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Scroll đến FoodBot nếu URL có #foodbot
+  useEffect(() => {
+    if (location.hash === '#foodbot') {
+      setTimeout(() => {
+        document.getElementById('foodbot')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 300)
+    }
+  }, [location.hash])
 
   const [formData, setFormData] = useState({
     name: '',
@@ -18,6 +29,11 @@ export default function ProfilePage() {
     address: '',
     avatar: ''
   })
+
+  // State đổi mật khẩu
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [pwLoading, setPwLoading] = useState(false)
+  const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false })
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -54,6 +70,38 @@ export default function ProfilePage() {
     }
     reader.onerror = () => {
       toast.error('Có lỗi xảy ra khi đọc file ảnh')
+    }
+  }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (!pwForm.currentPassword) return toast.error('Vui lòng nhập mật khẩu hiện tại')
+    if (pwForm.newPassword.length < 6) return toast.error('Mật khẩu mới phải có ít nhất 6 ký tự')
+    if (pwForm.newPassword !== pwForm.confirmPassword) return toast.error('Mật khẩu xác nhận không khớp')
+    if (pwForm.currentPassword === pwForm.newPassword) return toast.error('Mật khẩu mới phải khác mật khẩu cũ')
+
+    setPwLoading(true)
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user._id || user.id,
+          currentPassword: pwForm.currentPassword,
+          newPassword: pwForm.newPassword
+        })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('Đổi mật khẩu thành công! 🎉')
+        setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      } else {
+        toast.error(data.message || 'Đổi mật khẩu thất bại')
+      }
+    } catch {
+      toast.error('Lỗi kết nối server')
+    } finally {
+      setPwLoading(false)
     }
   }
 
@@ -210,6 +258,106 @@ export default function ProfilePage() {
 
         </div>
 
+        {/* Đổi mật khẩu */}
+        <div className="mt-8 bg-white dark:bg-dark-200 rounded-3xl shadow-card overflow-hidden p-8">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+            <FiLock className="text-primary-500" /> Đổi mật khẩu
+          </h3>
+          <form onSubmit={handleChangePassword} className="space-y-5 max-w-md">
+            {/* Mật khẩu hiện tại */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mật khẩu hiện tại</label>
+              <div className="relative">
+                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type={showPw.current ? 'text' : 'password'}
+                  value={pwForm.currentPassword}
+                  onChange={e => setPwForm({ ...pwForm, currentPassword: e.target.value })}
+                  placeholder="Nhập mật khẩu hiện tại"
+                  className="w-full pl-11 pr-11 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 transition-shadow"
+                />
+                <button type="button" onClick={() => setShowPw(p => ({ ...p, current: !p.current }))}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw.current ? <FiEyeOff /> : <FiEye />}
+                </button>
+              </div>
+            </div>
+
+            {/* Mật khẩu mới */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mật khẩu mới</label>
+              <div className="relative">
+                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type={showPw.new ? 'text' : 'password'}
+                  value={pwForm.newPassword}
+                  onChange={e => setPwForm({ ...pwForm, newPassword: e.target.value })}
+                  placeholder="Tối thiểu 6 ký tự"
+                  className="w-full pl-11 pr-11 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 transition-shadow"
+                />
+                <button type="button" onClick={() => setShowPw(p => ({ ...p, new: !p.new }))}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw.new ? <FiEyeOff /> : <FiEye />}
+                </button>
+              </div>
+              {/* Thanh độ mạnh */}
+              {pwForm.newPassword && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex gap-1">
+                    {[1,2,3,4].map(i => (
+                      <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${
+                        pwForm.newPassword.length >= i * 3
+                          ? i <= 2 ? 'bg-red-400' : i === 3 ? 'bg-yellow-400' : 'bg-green-400'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                      }`} />
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    {pwForm.newPassword.length < 6 ? '⚠️ Quá ngắn' : pwForm.newPassword.length < 9 ? '🟡 Trung bình' : '🟢 Mạnh'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Xác nhận mật khẩu */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Xác nhận mật khẩu mới</label>
+              <div className="relative">
+                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type={showPw.confirm ? 'text' : 'password'}
+                  value={pwForm.confirmPassword}
+                  onChange={e => setPwForm({ ...pwForm, confirmPassword: e.target.value })}
+                  placeholder="Nhập lại mật khẩu mới"
+                  className={`w-full pl-11 pr-11 py-3 rounded-xl border bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 transition-shadow ${
+                    pwForm.confirmPassword && pwForm.confirmPassword !== pwForm.newPassword
+                      ? 'border-red-400 focus:ring-red-400'
+                      : 'border-gray-200 dark:border-gray-700'
+                  }`}
+                />
+                <button type="button" onClick={() => setShowPw(p => ({ ...p, confirm: !p.confirm }))}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw.confirm ? <FiEyeOff /> : <FiEye />}
+                </button>
+              </div>
+              {pwForm.confirmPassword && pwForm.confirmPassword !== pwForm.newPassword && (
+                <p className="text-xs text-red-500 mt-1">❌ Mật khẩu không khớp</p>
+              )}
+              {pwForm.confirmPassword && pwForm.confirmPassword === pwForm.newPassword && (
+                <p className="text-xs text-green-500 mt-1">✅ Mật khẩu khớp</p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={pwLoading}
+              className="px-8 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-70 shadow-lg shadow-primary-500/30"
+            >
+              <FiLock /> {pwLoading ? 'Đang đổi...' : 'Đổi mật khẩu'}
+            </button>
+          </form>
+        </div>
+
         {/* Kho Voucher */}
         <div className="mt-8 bg-white dark:bg-dark-200 rounded-3xl shadow-card overflow-hidden p-8">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
@@ -242,6 +390,16 @@ export default function ProfilePage() {
               ))}
             </div>
           )}
+        </div>
+        {/* FoodBot AI */}
+        <div id="foodbot" className="mt-8 bg-white dark:bg-dark-200 rounded-3xl shadow-card overflow-hidden p-8">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            🤖 FoodBot AI
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            Hỏi FoodBot để được gợi ý món ăn phù hợp với tâm trạng và thời tiết của bạn!
+          </p>
+          <FoodBot />
         </div>
       </div>
     </div>

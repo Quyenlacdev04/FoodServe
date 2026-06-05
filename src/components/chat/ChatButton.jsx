@@ -40,7 +40,7 @@ export default function ChatButton({ orderId }) {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={handleOpen}
-          className="fixed bottom-4 right-4 w-14 h-14 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full shadow-2xl flex items-center justify-center z-40 hover:shadow-orange-500/50 transition-all"
+          className="fixed bottom-4 right-4 w-14 h-14 bg-gradient-primary text-white rounded-full shadow-2xl flex items-center justify-center z-40 hover:shadow-primary-500/50 transition-all"
         >
           <FiMessageCircle className="text-2xl" />
           

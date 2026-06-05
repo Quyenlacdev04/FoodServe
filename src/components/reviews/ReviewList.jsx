@@ -165,7 +165,7 @@ export default function ReviewList({ restaurantId }) {
           {isAuthenticated && (
             <button
               onClick={() => setShowForm(!showForm)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-bold rounded-xl hover:opacity-90 transition-all shadow-md"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-primary text-white text-sm font-bold rounded-xl hover:opacity-90 transition-all shadow-md"
             >
               <FiEdit3 /> {showForm ? 'Hủy' : 'Viết đánh giá'}
             </button>
@@ -193,7 +193,7 @@ export default function ReviewList({ restaurantId }) {
             className="overflow-hidden"
           >
             <form onSubmit={handleSubmitReview}
-              className="bg-gradient-to-br from-orange-50 to-pink-50 dark:from-dark-200 dark:to-dark-200 rounded-2xl p-6 border border-orange-100 dark:border-gray-700"
+              className="bg-gradient-to-br from-primary-50 to-amber-50 dark:from-dark-200 dark:to-dark-200 rounded-2xl p-6 border border-primary-100 dark:border-gray-700"
             >
               <h4 className="font-bold text-lg dark:text-white mb-4">✍️ Viết đánh giá của bạn</h4>
 
@@ -208,7 +208,7 @@ export default function ReviewList({ restaurantId }) {
                     onClick={(star) => setForm(p => ({ ...p, restaurantRating: star }))}
                   />
                   {(hoverStar || form.restaurantRating) > 0 && (
-                    <span className="text-sm font-bold text-orange-500">
+                    <span className="text-sm font-bold text-primary-500">
                       {starLabels[hoverStar || form.restaurantRating]}
                     </span>
                   )}
@@ -234,7 +234,7 @@ export default function ReviewList({ restaurantId }) {
                   Hủy
                 </button>
                 <button type="submit" disabled={submitting}
-                  className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 shadow-md">
+                  className="px-6 py-2.5 bg-gradient-primary text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 shadow-md">
                   {submitting ? (
                     <span className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -250,8 +250,8 @@ export default function ReviewList({ restaurantId }) {
 
       {/* Nếu chưa đăng nhập */}
       {!isAuthenticated && (
-        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 text-center">
-          <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
+        <div className="bg-primary-50 dark:bg-primary-900/10 border border-primary-200 dark:border-primary-800 rounded-2xl p-4 text-center">
+          <p className="text-sm text-primary-600 dark:text-primary-400 font-medium">
             🔐 Vui lòng <strong>đăng nhập</strong> để viết đánh giá nhà hàng này
           </p>
         </div>

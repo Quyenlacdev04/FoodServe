@@ -23,6 +23,7 @@ import PartnerRegisterPage from './pages/PartnerRegisterPage'
 import RestaurantManagePage from './pages/RestaurantManagePage'
 import DriverRegisterPage from './pages/DriverRegisterPage'
 import ShipperDashboardPage from './pages/ShipperDashboardPage'
+import NotFoundPage from './pages/NotFoundPage'
 import { fetchRestaurants } from './store/slices/restaurantSlice'
 
 function App() {
@@ -65,6 +66,7 @@ function App() {
                 <Route path="/tracking" element={<OrderTrackingPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/payment/vnpay-return" element={<PaymentResultPage />} />
+                <Route path="/payment-result" element={<PaymentResultPage />} />
                 <Route path="/history" element={<OrderHistoryPage />} />
                 <Route path="/games" element={<GamesPage />} />
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
@@ -76,6 +78,7 @@ function App() {
                 <Route path="/restaurant-manage" element={<RestaurantManagePage />} />
                 <Route path="/driver" element={<ShipperDashboardPage />} />
                 <Route path="/shipper" element={<ShipperDashboardPage />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>
             

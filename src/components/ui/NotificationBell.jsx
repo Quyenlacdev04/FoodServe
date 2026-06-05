@@ -1,16 +1,48 @@
 import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiBell, FiCheck, FiX, FiTrash2 } from 'react-icons/fi'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
 
 export default function NotificationBell() {
+  const navigate = useNavigate()
   const { user } = useSelector((s) => s.auth)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [showDropdown, setShowDropdown] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  const handleNotificationClick = async (notif) => {
+    // Đánh dấu đã đọc trước
+    if (!notif.read) {
+      await markAsRead(notif._id)
+    }
+    
+    // Đóng dropdown
+    setShowDropdown(false)
+
+    // Điều hướng dựa trên loại và dữ liệu
+    const orderId = notif.data?.orderId
+    const restaurantId = notif.data?.restaurantId
+
+    if (orderId) {
+      if (user?.role === 'admin') {
+        navigate('/admin')
+      } else if (user?.role === 'shipper' || user?.role === 'driver') {
+        navigate('/shipper-dashboard')
+      } else {
+        navigate('/tracking', { state: { orderId } })
+      }
+    } else if (restaurantId) {
+      if (user?.role === 'partner') {
+        navigate('/restaurant-manage')
+      } else {
+        navigate(`/restaurant/${restaurantId}`)
+      }
+    }
+  }
 
   // Tạo âm thanh thông báo
   const playNotificationSound = () => {
@@ -231,7 +263,8 @@ export default function NotificationBell() {
                   notifications.map((notif) => (
                     <div
                       key={notif._id}
-                      className={`p-4 border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-dark-100 transition-colors ${
+                      onClick={() => handleNotificationClick(notif)}
+                      className={`p-4 border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-dark-100 transition-colors cursor-pointer ${
                         !notif.read ? 'bg-primary-50/30 dark:bg-primary-950/10' : ''
                       }`}
                     >
@@ -250,16 +283,22 @@ export default function NotificationBell() {
                             <div className="flex gap-2">
                               {!notif.read && (
                                 <button
-                                  onClick={() => markAsRead(notif._id)}
-                                  className="text-xs text-primary-500 hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markAsRead(notif._id);
+                                  }}
+                                  className="text-xs text-primary-500 hover:underline p-1"
                                   title="Đánh dấu đã đọc"
                                 >
                                   <FiCheck />
                                 </button>
                               )}
                               <button
-                                onClick={() => deleteNotification(notif._id)}
-                                className="text-xs text-red-500 hover:underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteNotification(notif._id);
+                                }}
+                                className="text-xs text-red-500 hover:underline p-1"
                                 title="Xóa"
                               >
                                 <FiTrash2 />

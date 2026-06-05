@@ -20,6 +20,7 @@ import reviewRoutes from './routes/reviews.js'
 import favoriteRoutes from './routes/favorites.js'
 import messageRoutes from './routes/messages.js'
 import paymentRoutes from './routes/payment.js'
+import chatbotRoutes from './routes/chatbot.js'
 import { checkExpiringSubscriptions, checkOnStartup } from './utils/subscriptionChecker.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 import { requestLogger, cleanOldLogs } from './middleware/logger.js'
@@ -145,6 +146,7 @@ app.use('/api/reviews', reviewRoutes)
 app.use('/api/favorites', favoriteRoutes)
 app.use('/api/messages', messageRoutes)
 app.use('/api/payment', paymentRoutes)
+app.use('/api/chatbot', chatbotRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

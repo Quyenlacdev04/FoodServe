@@ -64,7 +64,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm nhà hàng, món ăn..."
-            className="w-full pl-12 pr-24 py-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="w-full pl-12 pr-24 py-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
             <button
@@ -72,7 +72,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
               onClick={() => setShowFilters(!showFilters)}
               className={`p-2 rounded-xl transition-all ${
                 showFilters
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-primary-500 text-white'
                   : 'bg-white/10 text-gray-300 hover:bg-white/20'
               }`}
             >
@@ -80,7 +80,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-xl text-white font-medium hover:shadow-lg transition-all"
+              className="px-4 py-2 bg-gradient-primary rounded-xl text-white font-medium hover:shadow-lg transition-all"
             >
               Tìm
             </button>
@@ -113,7 +113,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
                       className={`px-4 py-2 rounded-xl transition-all ${
                         (cat === 'Tất cả' && !filters.category) ||
                         filters.category === cat
-                          ? 'bg-orange-500 text-white'
+                          ? 'bg-primary-500 text-white'
                           : 'bg-white/10 text-gray-300 hover:bg-white/20'
                       }`}
                     >
@@ -135,7 +135,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
                       onClick={() => handleFilterChange('minRating', rating)}
                       className={`px-4 py-2 rounded-xl transition-all ${
                         filters.minRating === rating
-                          ? 'bg-orange-500 text-white'
+                          ? 'bg-primary-500 text-white'
                           : 'bg-white/10 text-gray-300 hover:bg-white/20'
                       }`}
                     >
@@ -157,7 +157,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
                       onClick={() => handleFilterChange('sortBy', option.value)}
                       className={`px-4 py-2 rounded-xl transition-all ${
                         filters.sortBy === option.value
-                          ? 'bg-orange-500 text-white'
+                          ? 'bg-primary-500 text-white'
                           : 'bg-white/10 text-gray-300 hover:bg-white/20'
                       }`}
                     >
@@ -176,7 +176,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
                     onChange={(e) =>
                       handleFilterChange('freeship', e.target.checked)
                     }
-                    className="w-5 h-5 rounded accent-orange-500"
+                    className="w-5 h-5 rounded accent-primary-500"
                   />
                   <span className="text-white font-medium">
                     🚚 Chỉ hiển thị nhà hàng Freeship

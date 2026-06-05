@@ -45,7 +45,7 @@ function FloatingDriverCard({ emoji, title, subtitle, delay = 0, duration = 6, y
         y: 0,
         transition: { duration: 0.3 },
       }}
-      className={`flex items-center gap-4 bg-gradient-to-br from-[#2D1B18]/95 to-[#1D0F0C]/95 border border-[#4A3229]/60 dark:border-[#4A3229]/80 rounded-[24px] p-3.5 px-6 shadow-[0_12px_32px_rgba(42,24,19,0.35)] hover:shadow-[0_20px_45px_rgba(255,107,0,0.4)] hover:border-primary-500/50 transition-all cursor-pointer select-none ${className}`}
+      className={`flex items-center gap-4 bg-gradient-to-br from-[#2D1B18]/95 to-[#1D0F0C]/95 border border-[#4A3229]/60 dark:border-[#4A3229]/80 rounded-[24px] p-3.5 px-6 shadow-[0_12px_32px_rgba(42,24,19,0.35)] hover:shadow-[0_20px_45px_rgba(212,149,42,0.4)] hover:border-primary-500/50 transition-all cursor-pointer select-none ${className}`}
     >
       <div className="text-3xl filter drop-shadow-sm transform hover:scale-110 transition-transform duration-300">
         {emoji}
@@ -54,7 +54,7 @@ function FloatingDriverCard({ emoji, title, subtitle, delay = 0, duration = 6, y
         <span className="text-white font-display font-bold text-[15px] tracking-wide">
           {title}
         </span>
-        <span className="text-[#FF7A00] font-sans font-semibold text-[13px] mt-0.5">
+        <span className="text-primary-500 font-sans font-semibold text-[13px] mt-0.5">
           {subtitle}
         </span>
       </div>
@@ -179,7 +179,7 @@ export default function DriverRegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-orange-50 to-yellow-50 dark:from-[#0a0a14] dark:via-[#11111b] dark:to-[#1e1e2e] flex items-center justify-center px-4 py-20 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-amber-50 to-emerald-50 dark:from-[#0a0a14] dark:via-[#11111b] dark:to-[#1e1e2e] flex items-center justify-center px-4 py-20 relative overflow-hidden">
         {/* Glow BG blobs */}
         <div className="absolute w-[400px] h-[400px] bg-green-500/10 rounded-full blur-3xl -top-20 -left-20 animate-pulse" />
         <div className="absolute w-[400px] h-[400px] bg-primary-500/10 rounded-full blur-3xl -bottom-20 -right-20 animate-pulse delay-1000" />
@@ -238,7 +238,7 @@ export default function DriverRegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50/40 via-orange-50/20 to-yellow-50/30 dark:from-[#0a0a14] dark:via-[#11111b] dark:to-[#0a0a14] py-12 px-4 relative overflow-hidden transition-colors duration-500">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50/40 via-amber-50/20 to-emerald-50/30 dark:from-[#0a0a14] dark:via-[#11111b] dark:to-[#0a0a14] py-12 px-4 relative overflow-hidden transition-colors duration-500">
       
       {/* Background soft glowing blur orbs */}
       <div className="absolute top-1/4 left-1/10 w-[500px] h-[500px] bg-primary-500/10 rounded-full blur-[120px] -z-10 animate-pulse" />

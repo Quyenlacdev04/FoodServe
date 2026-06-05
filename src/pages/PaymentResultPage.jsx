@@ -8,7 +8,7 @@ import { formatPrice } from '../data/mockData';
 
 // Simple confetti effect without external dependency
 function createConfetti() {
-  const colors = ['#ff6b35', '#f7c948', '#22c55e', '#3b82f6', '#ec4899', '#8b5cf6'];
+  const colors = ['#d4952a', '#ecc472', '#10b981', '#3b82f6', '#34d399', '#8b5cf6'];
   const container = document.createElement('div');
   container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;overflow:hidden;';
   document.body.appendChild(container);
@@ -74,33 +74,51 @@ export default function PaymentResultPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [showDetails, setShowDetails] = useState(false);
+  const [resolving, setResolving] = useState(false);
 
-  // Đọc params trực tiếp từ URL (đã được backend redirect về)
-  const isSuccess = searchParams.get('success') === 'true';
+  // Hỗ trợ cả 2 trường hợp:
+  // 1. Backend đã xử lý: ?success=true&orderId=...&amount=...
+  // 2. MoMo redirect thẳng về frontend: ?partnerCode=MOMO&resultCode=0&orderId=...
+  const hasMomoRaw = searchParams.get('partnerCode') === 'MOMO';
+  const momoResultCode = searchParams.get('resultCode');
+
+  const isSuccess = hasMomoRaw
+    ? String(momoResultCode) === '0'
+    : searchParams.get('success') === 'true';
+
   const orderId = searchParams.get('orderId') || '';
   const amount = searchParams.get('amount') ? Number(searchParams.get('amount')) : 0;
-  const transactionId = searchParams.get('transactionId') || '';
-  const responseCode = searchParams.get('responseCode') || '';
+  const transactionId = searchParams.get('transId') || searchParams.get('transactionId') || '';
+  const responseCode = hasMomoRaw
+    ? momoResultCode || ''
+    : searchParams.get('responseCode') || searchParams.get('code') || '';
 
   useEffect(() => {
+    // Nếu MoMo redirect thẳng về (không qua backend), gọi backend cập nhật order
+    if (hasMomoRaw && momoResultCode === '0' && orderId) {
+      setResolving(true);
+      fetch(`http://localhost:5000/api/payment/momo/confirm-direct`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, transId: transactionId, amount })
+      }).finally(() => setResolving(false));
+    }
+
     if (isSuccess) {
-      // Thanh toán thành công -> xóa giỏ hàng
       dispatch(clearCart());
-      
-      // Hiệu ứng confetti
       createConfetti();
     }
   }, [isSuccess, dispatch]);
 
   const getErrorMessage = () => {
-    if (responseCode && VNPAY_ERRORS[responseCode]) {
-      return VNPAY_ERRORS[responseCode];
+    if (responseCode && MOMO_ERRORS[responseCode]) {
+      return MOMO_ERRORS[responseCode];
     }
     return 'Thanh toán không thành công. Vui lòng thử lại.';
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 dark:from-dark-300 dark:via-dark-200 dark:to-dark-300 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-amber-50 to-emerald-50 dark:from-dark-300 dark:via-dark-200 dark:to-dark-300 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -159,7 +177,7 @@ export default function PaymentResultPage() {
               className="text-gray-500 dark:text-gray-400 mb-6"
             >
               {isSuccess 
-                ? 'Đơn hàng của bạn đã được thanh toán thành công qua VNPay'
+                ? 'Đơn hàng của bạn đã được thanh toán thành công qua MoMo 💜'
                 : getErrorMessage()
               }
             </motion.p>
@@ -174,7 +192,7 @@ export default function PaymentResultPage() {
                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-dark-100 dark:to-dark-300 rounded-2xl p-5 mb-6 text-left space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1.5">
-                      <FiFileText className="text-orange-500" /> Mã đơn hàng
+                      <FiFileText className="text-primary-500" /> Mã đơn hàng
                     </span>
                     <span className="font-bold text-gray-800 dark:text-gray-200 font-mono">
                       #{orderId.slice(-8).toUpperCase()}
@@ -184,7 +202,7 @@ export default function PaymentResultPage() {
                   {amount > 0 && (
                     <div className="flex justify-between items-center">
                       <span className="text-gray-500 dark:text-gray-400 text-sm">💰 Số tiền</span>
-                      <span className="font-bold text-orange-600 dark:text-orange-400 text-lg">
+                      <span className="font-bold text-primary-600 dark:text-primary-400 text-lg">
                         {formatPrice(amount)}
                       </span>
                     </div>
@@ -210,11 +228,11 @@ export default function PaymentResultPage() {
                     </span>
                   </div>
 
-                  {/* VNPay badge */}
+                  {/* MoMo badge */}
                   <div className="flex items-center justify-center pt-2 mt-2 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <FiShield className="text-blue-500" />
-                      <span>Thanh toán an toàn qua <strong className="text-blue-600 dark:text-blue-400">VNPay</strong></span>
+                      <span>💜</span>
+                      <span>Thanh toán an toàn qua <strong className="text-pink-600 dark:text-pink-400">MoMo</strong></span>
                     </div>
                   </div>
                 </div>
@@ -250,7 +268,7 @@ export default function PaymentResultPage() {
                 <>
                   <button
                     onClick={() => navigate('/tracking', { state: { orderId } })}
-                    className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-orange-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                    className="w-full py-3.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-primary-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                   >
                     <FiFileText /> Theo dõi đơn hàng
                   </button>
@@ -265,7 +283,7 @@ export default function PaymentResultPage() {
                 <>
                   <button
                     onClick={() => navigate('/checkout')}
-                    className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-orange-500/25 transition-all active:scale-[0.98]"
+                    className="w-full py-3.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-primary-500/25 transition-all active:scale-[0.98]"
                   >
                     🔄 Thử thanh toán lại
                   </button>
@@ -292,7 +310,7 @@ export default function PaymentResultPage() {
               transition={{ delay: 0.9 }}
               className="text-sm text-gray-400 dark:text-gray-500 mt-6"
             >
-              Cần hỗ trợ? Liên hệ: <a href="tel:1900555577" className="text-orange-500 hover:underline font-medium">1900 555 577</a>
+              Cần hỗ trợ? Liên hệ: <a href="tel:1900555577" className="text-primary-500 hover:underline font-medium">1900 555 577</a>
             </motion.p>
           </div>
         </div>

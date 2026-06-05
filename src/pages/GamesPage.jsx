@@ -1614,7 +1614,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
             <button 
               onClick={handleSpin}
               disabled={isSpinning || (user?.spins || 0) <= 0}
-              className={`w-full py-4 rounded-2xl font-bold text-lg transition-transform ${isSpinning || (user?.spins || 0) <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-inner' : 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:scale-[1.02] shadow-[0_8px_20px_rgba(245,158,11,0.4)]'}`}
+              className={`w-full py-4 rounded-2xl font-bold text-lg transition-transform ${isSpinning || (user?.spins || 0) <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-inner' : 'bg-gradient-to-r from-primary-400 to-primary-600 text-white hover:scale-[1.02] shadow-[0_8px_20px_rgba(212,149,42,0.4)]'}`}
             >
               {isSpinning ? 'Đang quay...' : (user?.spins || 0) > 0 ? '🎰 QUAY NGAY!' : 'HẾT LƯỢT QUAY'}
             </button>
@@ -1631,7 +1631,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
                 {VOUCHERS.map(voucher => (
                   <div key={voucher.id} className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-dark-200 transition-colors">
                     <div className="flex items-center gap-4 w-full sm:w-auto">
-                      <div className="w-16 h-16 rounded-xl bg-orange-500/10 text-orange-500 flex flex-col items-center justify-center shrink-0">
+                      <div className="w-16 h-16 rounded-xl bg-primary-500/10 text-primary-500 flex flex-col items-center justify-center shrink-0">
                         <span className="font-bold">{voucher.discount / 1000}K</span>
                       </div>
                       <div>
@@ -1715,11 +1715,11 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
         {/* Sliding Puzzle Game Section */}
         <div className="bg-white dark:bg-dark-100 rounded-3xl p-6 sm:p-10 shadow-card mb-8 border border-gray-100 dark:border-gray-800">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-orange-500 mb-2 flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold text-primary-500 mb-2 flex items-center justify-center gap-2">
               🧩 Trò Chơi Xếp Hình Thực Thần
             </h2>
             <p className="text-gray-500 dark:text-gray-400">
-              Chi phí: <span className="font-bold text-orange-500">20 Xu</span>. Thắng cuộc nhận ngay <span className="font-bold text-green-500">80 Xu</span>!
+              Chi phí: <span className="font-bold text-primary-500">20 Xu</span>. Thắng cuộc nhận ngay <span className="font-bold text-green-500">80 Xu</span>!
             </p>
           </div>
 
@@ -1770,7 +1770,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
                 </div>
               )}
 
-              <div className="bg-orange-500/5 border border-orange-500/10 p-4 rounded-2xl text-xs text-orange-600 dark:text-orange-400 leading-relaxed">
+              <div className="bg-primary-500/5 border border-primary-500/10 p-4 rounded-2xl text-xs text-primary-600 dark:text-primary-400 leading-relaxed">
                 <p className="font-bold mb-1">💡 Hướng dẫn chơi:</p>
                 <ul className="list-disc pl-4 space-y-1">
                   <li>Nhấp chuột vào mảnh ghép nằm cạnh ô trống để dịch chuyển nó vào vị trí trống.</li>
@@ -1881,7 +1881,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
           {puzzleState === 'playing' && (
             <div className="max-w-md mx-auto flex flex-col gap-2 mt-4">
               <div className="flex justify-between items-center text-sm font-semibold dark:text-white">
-                <span className="flex items-center gap-1">⏰ Thời gian: <span className={`font-bold ${puzzleTime < 15 ? 'text-red-500 animate-pulse' : 'text-orange-500'}`}>{puzzleTime}s</span></span>
+                <span className="flex items-center gap-1">⏰ Thời gian: <span className={`font-bold ${puzzleTime < 15 ? 'text-red-500 animate-pulse' : 'text-primary-500'}`}>{puzzleTime}s</span></span>
                 <span>🧩 Lượt đi: <span className="text-primary-500 font-bold">{puzzleMoves}</span></span>
               </div>
               {/* Progress bar thời gian */}
@@ -2024,7 +2024,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
                     <motion.div
                       className={`h-full rounded-full ${
                         monkeyEnergy < 30 
-                          ? 'bg-gradient-to-r from-red-500 to-orange-500 animate-pulse' 
+                          ? 'bg-gradient-to-r from-red-600 to-red-400 animate-pulse' 
                           : monkeyEnergy < 60 
                             ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' 
                             : 'bg-gradient-to-r from-green-400 to-emerald-500'
@@ -2220,11 +2220,11 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
         {/* Block Blast Game Section */}
         <div className="bg-white dark:bg-dark-100 rounded-3xl p-6 sm:p-10 shadow-card mb-8 border border-gray-100 dark:border-gray-800">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-orange-500 mb-2 flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold text-primary-500 mb-2 flex items-center justify-center gap-2">
               🧱 Trận Chiến Khối Thực Thần (Block Blast)
             </h2>
             <p className="text-gray-500 dark:text-gray-400">
-              Chi phí: <span className="font-bold text-orange-500">20 Xu</span>. Bùng nổ thạch để nhận thưởng tới <span className="font-bold text-green-500">100 Xu</span>!
+              Chi phí: <span className="font-bold text-primary-500">20 Xu</span>. Bùng nổ thạch để nhận thưởng tới <span className="font-bold text-green-500">100 Xu</span>!
             </p>
           </div>
 
@@ -2273,7 +2273,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
                 </div>
               )}
 
-              <div className="bg-orange-500/5 border border-orange-500/10 p-4 rounded-2xl text-xs text-orange-600 dark:text-orange-400 leading-relaxed">
+              <div className="bg-primary-500/5 border border-primary-500/10 p-4 rounded-2xl text-xs text-primary-600 dark:text-primary-400 leading-relaxed">
                 <p className="font-bold mb-1">💡 Hướng dẫn chơi:</p>
                 <ul className="list-disc pl-4 space-y-1">
                   <li><strong>Kéo thả hoặc Bấm chọn</strong> một khối thạch bất kỳ ở hàng dưới.</li>
@@ -2430,7 +2430,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
                       }}
                       className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center cursor-pointer transition-all duration-300 ${
                         isSelected 
-                          ? 'bg-orange-500/10 border-2 border-orange-500 shadow-md scale-110' 
+                          ? 'bg-primary-500/10 border-2 border-primary-500 shadow-md scale-110' 
                           : 'bg-white dark:bg-dark-100 hover:bg-slate-50 dark:hover:bg-slate-200/5 border border-slate-200 dark:border-slate-800 shadow-sm hover:scale-105'
                       }`}
                     >
@@ -2716,7 +2716,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
               transition={{ type: 'spring', stiffness: 350, damping: 25 }}
               className="relative bg-white/95 dark:bg-dark-200/95 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center backdrop-blur-lg"
             >
-              <div className="w-16 h-16 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto mb-4 text-3xl">
+              <div className="w-16 h-16 rounded-2xl bg-primary-500/10 text-primary-500 flex items-center justify-center mx-auto mb-4 text-3xl">
                 ⚠️
               </div>
               <h3 className="text-xl font-bold dark:text-white mb-2 leading-snug">
@@ -2734,7 +2734,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
                 </button>
                 <button 
                   onClick={confirmModal.onConfirm}
-                  className="py-3 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-sm hover:scale-[1.02] active:scale-98 shadow-[0_5px_15px_rgba(239,68,68,0.3)] transition-all"
+                  className="py-3 px-4 rounded-xl bg-gradient-primary text-white font-bold text-sm hover:scale-[1.02] active:scale-98 shadow-[0_5px_15px_rgba(212,149,42,0.3)] transition-all"
                 >
                   Xác nhận
                 </button>
@@ -2765,7 +2765,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
                 <div className="absolute -top-12 -left-12 w-32 h-32 bg-yellow-400/20 rounded-full blur-3xl pointer-events-none" />
               )}
               {gameResultModal.isWin && (
-                <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-orange-500/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-primary-500/20 rounded-full blur-3xl pointer-events-none" />
               )}
 
               {/* Game Label */}
@@ -2837,7 +2837,7 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
                     setGameResultModal(null)
                     gameResultModal.onReplay()
                   }}
-                  className="py-3 px-4 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold text-sm hover:scale-[1.02] active:scale-98 shadow-[0_5px_15px_rgba(245,158,11,0.4)] transition-all"
+                  className="py-3 px-4 rounded-xl bg-gradient-primary text-white font-bold text-sm hover:scale-[1.02] active:scale-98 shadow-[0_5px_15px_rgba(212,149,42,0.3)] transition-all"
                 >
                   Chơi lại ván mới
                 </button>

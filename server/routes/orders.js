@@ -24,7 +24,35 @@ router.post('/', async (req, res) => {
     }
     
     // Bắn thông báo Socket.io cho Admin biết có đơn hàng mới
-    req.app.get('io').emit('new-order', savedOrder);
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('new-order', savedOrder);
+    }
+    
+    // ✅ Tạo thông báo cho tất cả admin
+    try {
+      const admins = await User.find({ role: 'admin' });
+      for (const admin of admins) {
+        const notification = new Notification({
+          userId: admin._id,
+          type: 'order_new',
+          title: '🛒 Đơn hàng mới!',
+          message: `Có đơn hàng mới #${savedOrder._id.toString().slice(-6).toUpperCase()} từ khách hàng`,
+          data: {
+            orderId: savedOrder._id.toString()
+          },
+          read: false
+        });
+        await notification.save();
+        
+        // Gửi real-time notification qua Socket.io
+        if (io) {
+          io.to(`user-${admin._id.toString()}`).emit('new-notification', notification);
+        }
+      }
+    } catch (notifError) {
+      console.error('Error creating admin notification for new order:', notifError);
+    }
     
     res.status(201).json(savedOrder);
   } catch (error) {
@@ -35,10 +63,24 @@ router.post('/', async (req, res) => {
 // Lấy chi tiết đơn hàng
 router.get('/:id', async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id).populate('restaurantId');
+    const order = await Order.findById(req.params.id).populate('restaurantId').lean();
     if (!order) return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    
+    // Nếu có shipperId, lấy thông tin shipper
+    if (order.shipperId) {
+      try {
+        const shipper = await User.findById(order.shipperId).select('name phone avatar shipperRating totalDeliveries vehicleType vehicleNumber').lean();
+        if (shipper) {
+          order.shipper = shipper;
+        }
+      } catch (err) {
+        console.error('Lỗi khi lấy thông tin shipper:', err);
+      }
+    }
+    
     res.json(order);
   } catch (error) {
+    console.error('Get order by ID error:', error);
     res.status(500).json({ message: 'Lỗi server' });
   }
 });
@@ -53,7 +95,7 @@ router.get('/', async (req, res) => {
     if (req.query.shipperId) {
       filter.shipperId = req.query.shipperId;
     }
-    const orders = await Order.find(filter).sort({ createdAt: -1 });
+    const orders = await Order.find(filter).sort({ createdAt: -1 }).populate('restaurantId', 'name address');
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server' });
@@ -107,8 +149,8 @@ router.patch('/:id/status', async (req, res) => {
           userId: order.userId,
           title: 'Cập nhật đơn hàng',
           message: statusMessages[newStatus],
-          type: 'order',
-          relatedId: order._id,
+          type: 'order_status',
+          data: { orderId: order._id.toString() },
           read: false
         });
         await notification.save();
@@ -116,7 +158,7 @@ router.patch('/:id/status', async (req, res) => {
         // Gửi thông báo real-time qua Socket.io
         const io = req.app.get('io');
         if (io) {
-          io.to(`user-${order.userId}`).emit('new-notification', notification);
+          io.to(`user-${order.userId.toString()}`).emit('new-notification', notification);
         }
       } catch (notifError) {
         console.error('Error creating notification:', notifError);
@@ -125,10 +167,13 @@ router.patch('/:id/status', async (req, res) => {
     }
     
     // Phát sự kiện Socket.io đến client đang theo dõi đơn hàng này
-    req.app.get('io').to(`order-${order._id}`).emit('order-status-updated', { 
-      orderId: order._id, 
-      status: order.status 
-    });
+    const ioInstance = req.app.get('io');
+    if (ioInstance) {
+      ioInstance.to(`order-${order._id.toString()}`).emit('order-status-updated', { 
+        orderId: order._id.toString(), 
+        status: order.status 
+      });
+    }
     
     res.json(order);
   } catch (error) {
@@ -226,12 +271,14 @@ router.post('/:id/accept-shipper', async (req, res) => {
           userId: order.userId,
           title: 'Tài xế đã nhận đơn',
           message: '🛵 Tài xế đã nhận đơn hàng của bạn và đang đến lấy món',
-          type: 'order',
-          relatedId: order._id,
+          type: 'order_status',
+          data: { orderId: order._id.toString() },
           read: false
         });
         await notification.save();
-        io.to(`user-${order.userId}`).emit('new-notification', notification);
+        if (io) {
+          io.to(`user-${order.userId.toString()}`).emit('new-notification', notification);
+        }
       } catch (e) {
         console.error('Notification error:', e);
       }

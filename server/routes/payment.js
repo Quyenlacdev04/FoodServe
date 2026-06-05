@@ -19,7 +19,7 @@ const momoConfig = {
   accessKey: process.env.MOMO_ACCESS_KEY || 'F8BBA842ECF85',
   secretKey: process.env.MOMO_SECRET_KEY || 'K951B6PE1waDMi640xX08PD3vg6EkVlz',
   endpoint: 'https://test-payment.momo.vn',
-  redirectUrl: process.env.MOMO_REDIRECT_URL || 'http://localhost:3000/payment-result',
+  redirectUrl: process.env.MOMO_REDIRECT_URL || 'http://localhost:5000/api/payment/momo/return',
   ipnUrl: process.env.MOMO_IPN_URL || 'http://localhost:5000/api/payment/momo/ipn',
 };
 
@@ -154,7 +154,7 @@ router.post('/momo/ipn', async (req, res) => {
       return res.status(400).json({ message: 'Invalid signature' });
     }
 
-    if (resultCode === 0) {
+    if (String(resultCode) === '0') {
       // Tìm order theo transactionId
       const order = await Order.findOne({ transactionId: orderId });
       if (order) {
@@ -172,21 +172,65 @@ router.post('/momo/ipn', async (req, res) => {
   }
 });
 
-// ===== MOMO: Return URL callback =====
-router.get('/momo/return', async (req, res) => {
-  const { resultCode, orderId } = req.query;
-
-  if (resultCode === '0') {
-    // Cập nhật order nếu chưa được cập nhật qua IPN
+// ===== MOMO: Confirm khi redirect thẳng về frontend (fallback) =====
+router.post('/momo/confirm-direct', async (req, res) => {
+  try {
+    const { orderId, transId, amount } = req.body;
+    // orderId ở đây là requestId của MoMo (dạng MOMO17804...)
     const order = await Order.findOne({ transactionId: orderId });
     if (order && order.paymentStatus !== 'paid') {
       order.paymentStatus = 'paid';
       order.paymentMethod = 'momo';
+      order.paidAt = new Date();
+      if (transId) order.transactionId = transId;
       await order.save();
     }
-    res.redirect(`http://localhost:3000/payment-result?success=true&orderId=${orderId}`);
-  } else {
-    res.redirect(`http://localhost:3000/payment-result?success=false&code=${resultCode}`);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false });
+  }
+});
+
+// ===== MOMO: Return URL callback =====
+router.get('/momo/return', async (req, res) => {
+  const { resultCode, orderId, amount, transId } = req.query;
+
+  try {
+    // resultCode từ query param là string, '0' = thành công
+    if (String(resultCode) === '0') {
+      const order = await Order.findOne({ transactionId: orderId });
+      if (order && order.paymentStatus !== 'paid') {
+        order.paymentStatus = 'paid';
+        order.paymentMethod = 'momo';
+        order.paidAt = new Date();
+        await order.save();
+
+        // Emit thông báo real-time
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('payment-confirmed', {
+            orderId: order._id,
+            paymentMethod: 'MoMo 💜',
+            amount: order.finalAmount,
+            message: `Khách hàng đã thanh toán qua MoMo 💜`
+          });
+        }
+      }
+
+      const realOrderId = order ? order._id : orderId;
+      res.redirect(
+        `http://localhost:3000/payment-result?success=true&orderId=${realOrderId}&amount=${amount || ''}&transactionId=${transId || ''}`
+      );
+    } else {
+      const order = await Order.findOne({ transactionId: orderId });
+      const realOrderId = order ? order._id : '';
+      res.redirect(
+        `http://localhost:3000/payment-result?success=false&orderId=${realOrderId}&responseCode=${resultCode}`
+      );
+    }
+  } catch (error) {
+    console.error('MoMo return error:', error);
+    res.redirect('http://localhost:3000/payment-result?success=false&responseCode=99');
   }
 });
 
@@ -220,6 +264,17 @@ router.post('/coins/pay', async (req, res) => {
       order.paymentStatus = 'paid';
       order.paymentMethod = 'coins';
       await order.save();
+
+      // Emit thông báo real-time
+      const io = req.body._io || req.app.get('io');
+      if (io) {
+        io.emit('payment-confirmed', {
+          orderId: order._id,
+          paymentMethod: 'Xu 🪙',
+          amount: order.finalAmount,
+          message: `Khách hàng đã thanh toán bằng Xu 🪙`
+        });
+      }
     }
 
     res.json({

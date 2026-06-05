@@ -28,12 +28,12 @@ export default function MessageInput({ onSend }) {
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="Nhập tin nhắn..."
-          className="flex-1 px-4 py-2 bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+          className="flex-1 px-4 py-2 bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
         />
         <button
           type="submit"
           disabled={!message.trim()}
-          className="w-10 h-10 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl flex items-center justify-center hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-10 h-10 bg-gradient-primary text-white rounded-xl flex items-center justify-center hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <FiSend />
         </button>

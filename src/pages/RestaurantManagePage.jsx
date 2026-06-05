@@ -877,7 +877,7 @@ export default function RestaurantManagePage() {
                           {/* Nút Chat */}
                           <button
                             onClick={() => setSelectedOrderId(order._id)}
-                            className="mt-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:shadow-lg text-white rounded-xl font-bold transition-all flex items-center gap-2"
+                            className="mt-2 px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-500 hover:shadow-lg text-white rounded-xl font-bold transition-all flex items-center gap-2"
                           >
                             <FiMessageCircle /> Chat với khách
                           </button>

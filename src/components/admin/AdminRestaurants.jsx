@@ -236,7 +236,7 @@ export default function AdminRestaurants() {
                   </button>
                 </div>
                 {item.popular && (
-                  <span className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  <span className="absolute top-2 left-2 bg-primary-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                     🔥 Phổ biến
                   </span>
                 )}
@@ -247,7 +247,7 @@ export default function AdminRestaurants() {
                 <h4 className="font-bold text-sm dark:text-white line-clamp-1">{item.name}</h4>
                 <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{item.category}</p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-orange-500 font-bold text-sm">{Number(item.price).toLocaleString()}đ</span>
+                  <span className="text-primary-500 font-bold text-sm">{Number(item.price).toLocaleString()}đ</span>
                   <div className="flex gap-1">
                     <button onClick={() => openEditMenuModal(item)}
                       className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center hover:bg-blue-100 transition-colors">
@@ -343,7 +343,7 @@ export default function AdminRestaurants() {
                     </div>
                     <div className="col-span-2 flex items-center gap-2">
                       <input type="checkbox" id="popular" checked={menuForm.popular} onChange={e => setMenuForm(p => ({ ...p, popular: e.target.checked }))}
-                        className="w-4 h-4 accent-orange-500" />
+                        className="w-4 h-4 accent-primary-500" />
                       <label htmlFor="popular" className="text-sm text-gray-700 dark:text-gray-300">🔥 Đánh dấu là món phổ biến</label>
                     </div>
                   </div>

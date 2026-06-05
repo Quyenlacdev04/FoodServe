@@ -41,9 +41,9 @@ export default function FavoritesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-amber-50 to-emerald-50 dark:from-dark-300 dark:via-dark-200 dark:to-dark-300 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-500 border-t-transparent mx-auto mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
         </div>
       </div>
@@ -51,9 +51,9 @@ export default function FavoritesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-amber-50 to-emerald-50 dark:from-dark-300 dark:via-dark-200 dark:to-dark-300 pb-20">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-500 to-pink-500 text-white py-8 px-4">
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 text-white py-8 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-3 mb-2">
             <FiHeart className="text-3xl" />
@@ -82,7 +82,7 @@ export default function FavoritesPage() {
             </p>
             <button
               onClick={() => navigate('/')}
-              className="px-6 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg transition-all"
+              className="px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all"
             >
               Khám phá nhà hàng
             </button>
@@ -146,7 +146,7 @@ export default function FavoritesPage() {
                   </div>
 
                   {restaurant.promo && (
-                    <div className="mt-3 bg-orange-50 text-orange-600 px-3 py-2 rounded-lg text-sm">
+                    <div className="mt-3 bg-primary-50 text-primary-600 px-3 py-2 rounded-lg text-sm">
                       🎉 {restaurant.promo}
                     </div>
                   )}

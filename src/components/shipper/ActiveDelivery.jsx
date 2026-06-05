@@ -1,7 +1,119 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { FiMapPin, FiPhone, FiPackage, FiCheckCircle, FiNavigation } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiMapPin, FiPhone, FiPackage, FiCheckCircle, FiNavigation, FiArrowRight } from 'react-icons/fi';
+import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
+
+// Helper: hiển thị trạng thái thanh toán
+const PaymentBadge = ({ order }) => {
+  if (order.paymentMethod === 'cash') return null;
+  const isPaid = order.paymentStatus === 'paid';
+  const methodLabel = { momo: '💜 MoMo', coins: '🪙 Xu', vnpay: '💳 VNPay', zalopay: '💙 ZaloPay' }[order.paymentMethod] || order.paymentMethod;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+      {isPaid ? `✅ Khách đã thanh toán qua ${methodLabel}` : `⏳ Chờ thanh toán ${methodLabel}`}
+    </span>
+  );
+};
+
+// Stepper địa chỉ: lấy hàng → giao hàng
+const AddressStepper = ({ order }) => {
+  const isPickedUp = order.status === 'delivering' || order.status === 'ready';
+  const isDelivering = order.status === 'delivering';
+
+  const restaurantAddress = order.restaurantId?.address || order.restaurantAddress || 'Địa chỉ nhà hàng';
+  const restaurantName = order.restaurantId?.name || 'Nhà hàng';
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-gray-200 mb-6">
+      {/* Header */}
+      <div className="bg-gray-800 px-4 py-2.5 flex items-center gap-2">
+        <FiMapPin className="text-white" />
+        <span className="text-white font-bold text-sm">Lộ trình giao hàng</span>
+      </div>
+
+      <div className="p-4 space-y-0">
+        {/* Điểm lấy hàng */}
+        <div className={`flex gap-3 items-start ${isDelivering ? 'opacity-50' : ''}`}>
+          <div className="flex flex-col items-center">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+              isPickedUp ? 'bg-green-500 text-white' : 'bg-primary-500 text-white animate-pulse'
+            }`}>
+              {isPickedUp ? '✅' : '🏪'}
+            </div>
+            <div className="w-0.5 h-10 bg-gray-200 mt-1" />
+          </div>
+          <div className="pt-2 pb-4 flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                isPickedUp ? 'bg-green-100 text-green-700' : 'bg-primary-100 text-primary-700'
+              }`}>
+                {isPickedUp ? 'Đã lấy hàng' : 'Điểm lấy hàng'}
+              </span>
+            </div>
+            <p className="font-semibold text-gray-800 text-sm">{restaurantName}</p>
+            <p className="text-gray-500 text-xs mt-0.5">{restaurantAddress}</p>
+            {!isPickedUp && (
+              <button
+                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurantAddress)}`, '_blank')}
+                className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium"
+              >
+                <FiNavigation size={11} /> Chỉ đường đến nhà hàng
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Điểm giao hàng */}
+        <div className={`flex gap-3 items-start ${!isPickedUp ? 'opacity-40' : ''}`}>
+          <div className="flex flex-col items-center">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+              order.status === 'completed' ? 'bg-green-500 text-white'
+              : isDelivering ? 'bg-blue-500 text-white animate-pulse'
+              : 'bg-gray-300 text-gray-500'
+            }`}>
+              {order.status === 'completed' ? '✅' : '🏠'}
+            </div>
+          </div>
+          <div className="pt-2 flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                order.status === 'completed' ? 'bg-green-100 text-green-700'
+                : isDelivering ? 'bg-blue-100 text-blue-700'
+                : 'bg-gray-100 text-gray-500'
+              }`}>
+                {order.status === 'completed' ? 'Đã giao' : isDelivering ? 'Đang giao' : 'Điểm giao hàng'}
+              </span>
+            </div>
+            <p className="font-semibold text-gray-800 text-sm">{order.contactPhone || 'Khách hàng'}</p>
+            <p className="text-gray-500 text-xs mt-0.5">{order.deliveryAddress}</p>
+            {isDelivering && (
+              <button
+                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.deliveryAddress)}`, '_blank')}
+                className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium"
+              >
+                <FiNavigation size={11} /> Chỉ đường giao hàng
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mũi tên chuyển phase */}
+      {!isDelivering && isPickedUp && (
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-blue-50 border-t border-blue-100 px-4 py-2.5 flex items-center gap-2 text-blue-600 text-sm font-bold"
+          >
+            <FiArrowRight /> Bây giờ đến địa chỉ giao hàng!
+          </motion.div>
+        </AnimatePresence>
+      )}
+    </div>
+  );
+};
 
 export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrderChange }) {
   const [activeOrder, setActiveOrder] = useState(null);
@@ -10,6 +122,18 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
 
   useEffect(() => {
     fetchActiveOrder();
+
+    // Lắng nghe thông báo thanh toán online
+    const socket = io('http://localhost:5000');
+    socket.on('payment-confirmed', (data) => {
+      toast.success(data.message || 'Khách đã thanh toán online!', {
+        icon: '💳',
+        duration: 5000,
+        style: { fontWeight: 'bold' }
+      });
+      fetchActiveOrder(); // Refresh để hiện 0đ
+    });
+    return () => socket.disconnect();
   }, [shipperId]);
 
   useEffect(() => {
@@ -119,7 +243,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
   if (loading) {
     return (
       <div className="text-center py-10">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent mx-auto mb-4"></div>
         <p className="text-gray-600">Đang tải...</p>
       </div>
     );
@@ -143,7 +267,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-white rounded-2xl p-6 shadow-xl border-2 border-orange-500"
+      className="bg-white rounded-2xl p-6 shadow-xl border-2 border-primary-500"
     >
       {/* Status Badge */}
       <div className="flex items-center justify-between mb-6">
@@ -166,13 +290,24 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
         </div>
       </div>
 
-      {/* Order Info */}
-      <div className="bg-gradient-to-r from-orange-50 to-pink-50 rounded-xl p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-sm text-gray-600">Tổng tiền:</div>
-          <div className="text-2xl font-bold text-orange-600">
-            {activeOrder.finalAmount.toLocaleString()}đ
+      <div className="bg-gradient-to-r from-primary-50 to-amber-50 rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm text-gray-600">Tổng tiền đơn:</div>
+          <div className="text-2xl font-bold text-primary-600">
+            {activeOrder.paymentStatus === 'paid' && activeOrder.paymentMethod !== 'cash'
+              ? <span className="text-green-600">0đ <span className="text-sm font-normal text-gray-500">(đã thanh toán)</span></span>
+              : `${activeOrder.finalAmount.toLocaleString()}đ`
+            }
           </div>
+        </div>
+        {/* Badge thanh toán */}
+        <div className="mb-2">
+          <PaymentBadge order={activeOrder} />
+          {activeOrder.paymentMethod === 'cash' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">
+              💵 Thu tiền mặt khi giao
+            </span>
+          )}
         </div>
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">Bạn nhận được:</div>
@@ -181,6 +316,9 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
           </div>
         </div>
       </div>
+
+      {/* Stepper địa chỉ lấy hàng → giao hàng */}
+      <AddressStepper order={activeOrder} />
 
       {/* Items */}
       <div className="mb-6">
@@ -201,21 +339,13 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
         </div>
       </div>
 
-      {/* Customer Info */}
+      {/* Customer Info — chỉ SĐT và ghi chú */}
       <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-3">
-        <div className="flex items-start gap-3">
-          <FiMapPin className="text-orange-500 mt-1 flex-shrink-0" />
-          <div className="flex-1">
-            <div className="font-semibold text-gray-700 mb-1">Địa chỉ giao:</div>
-            <div className="text-gray-600 text-sm">{activeOrder.deliveryAddress}</div>
-          </div>
-        </div>
-        
         <div className="flex items-center gap-3">
-          <FiPhone className="text-orange-500" />
+          <FiPhone className="text-primary-500" />
           <div>
-            <div className="font-semibold text-gray-700">Liên hệ:</div>
-            <a href={`tel:${activeOrder.contactPhone}`} className="text-blue-600 hover:underline">
+            <div className="font-semibold text-gray-700">Liên hệ khách:</div>
+            <a href={`tel:${activeOrder.contactPhone}`} className="text-blue-600 hover:underline font-medium">
               {activeOrder.contactPhone}
             </a>
           </div>
@@ -223,7 +353,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
 
         {activeOrder.note && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <div className="font-semibold text-yellow-800 mb-1">💬 Ghi chú:</div>
+            <div className="font-semibold text-yellow-800 mb-1">💬 Ghi chú từ khách:</div>
             <div className="text-yellow-700 text-sm">{activeOrder.note}</div>
           </div>
         )}
@@ -231,12 +361,6 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
 
       {/* Actions */}
       <div className="space-y-3">
-        <button
-          onClick={openGoogleMaps}
-          className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
-        >
-          <FiNavigation /> Mở Google Maps
-        </button>
 
         {activeOrder.status === 'preparing' && (
           <button

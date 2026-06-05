@@ -603,4 +603,60 @@ router.post('/payment-requests/:requestId/reject', async (req, res) => {
   }
 });
 
+// ===== TÍNH PHÍ GIAO HÀNG THEO KM =====
+// 5.000đ/km, tối thiểu 10.000đ, tối đa 50.000đ
+// Dùng Haversine giữa tọa độ nhà hàng và địa chỉ khách
+router.post('/calculate-fee', async (req, res) => {
+  try {
+    const { restaurantId, deliveryAddress } = req.body;
+    if (!restaurantId || !deliveryAddress) {
+      return res.json({ deliveryFee: 15000, distance: null, message: 'Thiếu thông tin' });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId).lean();
+    if (!restaurant) return res.json({ deliveryFee: 15000, distance: null });
+
+    // Geocode địa chỉ khách qua Nominatim (OpenStreetMap - miễn phí)
+    const encodedAddress = encodeURIComponent(deliveryAddress + ', Việt Nam');
+    const geoRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+      { headers: { 'User-Agent': 'FoodServe/1.0' } }
+    );
+    const geoData = await geoRes.json();
+
+    if (!geoData || geoData.length === 0) {
+      return res.json({ deliveryFee: 15000, distance: null, message: 'Không geocode được địa chỉ' });
+    }
+
+    const customerLat = parseFloat(geoData[0].lat);
+    const customerLng = parseFloat(geoData[0].lon);
+
+    // Tọa độ nhà hàng (dùng distance từ DB hoặc tọa độ mặc định TP.HCM)
+    // Nếu nhà hàng chưa có tọa độ → dùng trung tâm TP.HCM
+    const restLat = restaurant.location?.lat || 10.762622;
+    const restLng = restaurant.location?.lng || 106.660172;
+
+    // Tính khoảng cách Haversine (km)
+    const R = 6371;
+    const dLat = (customerLat - restLat) * Math.PI / 180;
+    const dLon = (customerLng - restLng) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 +
+      Math.cos(restLat * Math.PI/180) * Math.cos(customerLat * Math.PI/180) * Math.sin(dLon/2)**2;
+    const distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    // Tính phí: 5.000đ/km, tối thiểu 10.000đ, tối đa 50.000đ
+    const fee = Math.min(50000, Math.max(10000, Math.round(distanceKm * 5000 / 1000) * 1000));
+
+    res.json({
+      deliveryFee: fee,
+      distance: Math.round(distanceKm * 10) / 10, // km, 1 chữ số thập phân
+      customerLat,
+      customerLng
+    });
+  } catch (error) {
+    console.error('Calculate fee error:', error.message);
+    res.json({ deliveryFee: 15000, distance: null });
+  }
+});
+
 export default router;
