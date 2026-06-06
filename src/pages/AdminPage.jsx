@@ -10,6 +10,7 @@ import AdminRestaurants from '../components/admin/AdminRestaurants'
 import AdminUsers from '../components/admin/AdminUsers'
 import AdminSettings from '../components/admin/AdminSettings'
 import AdminDrivers from '../components/admin/AdminDrivers'
+import AdminVouchers from '../components/admin/AdminVouchers'
 import NotificationBell from '../components/ui/NotificationBell'
 import { logout } from '../store/slices/authSlice'
 import { toggleDarkMode } from '../store/slices/uiSlice'
@@ -436,6 +437,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('drivers')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'drivers' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             🛵 Quản lý Tài xế
           </button>
+          <button onClick={() => setActiveTab('vouchers')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'vouchers' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
+            🎫 Quản lý Voucher
+          </button>
           <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'users' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiUsers /> Quản lý Users
           </button>
@@ -547,6 +551,8 @@ export default function AdminPage() {
           {activeTab === 'restaurants' && <AdminRestaurants />}
           
           {activeTab === 'drivers' && <AdminDrivers />}
+
+          {activeTab === 'vouchers' && <AdminVouchers adminId={user?._id || user?.id} />}
           
           {activeTab === 'partner-requests' && (
             <div className="bg-white dark:bg-dark-100 rounded-2xl shadow-card overflow-hidden">

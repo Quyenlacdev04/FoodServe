@@ -123,6 +123,14 @@ cd server && npm run dev
 - ✅ Duyệt đăng ký đối tác
 - ✅ Duyệt đăng ký tài xế
 - ✅ Duyệt yêu cầu thanh toán phí duy trì
+- ✅ **Quản lý Voucher nâng cao:**
+  - ✅ Tạo/sửa/xóa voucher
+  - ✅ Phát voucher cho nhóm: Khách hàng / Tài xế / Đối tác / Tất cả
+  - ✅ Tìm kiếm & lọc voucher (theo trạng thái, loại)
+  - ✅ Xem chi tiết voucher & thống kê sử dụng
+  - ✅ Nhân bản voucher nhanh chóng
+  - ✅ Export danh sách voucher (CSV)
+  - ✅ Theo dõi voucher hết hạn
 - ✅ Cấu hình hệ thống
 - ✅ Thông báo real-time đơn hàng mới + thanh toán
 

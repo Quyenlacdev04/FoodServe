@@ -14,9 +14,36 @@ export default function CartSidebar() {
   const count = useSelector(selectCartCount)
   const navigate = useNavigate()
   const [voucherCode, setVoucherCode] = useState('')
+  const [voucherLoading, setVoucherLoading] = useState(false)
 
   const deliveryFee = total > 100000 ? 0 : 15000
   const finalTotal = Math.max(0, total + deliveryFee - discount)
+
+  // Validate voucher qua API
+  const handleApplyVoucher = async (code) => {
+    const c = (code || voucherCode).trim().toUpperCase()
+    if (!c) return
+    setVoucherLoading(true)
+    try {
+      const res = await fetch('http://localhost:5000/api/vouchers/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: c, userId: user?._id || user?.id, orderTotal: total })
+      })
+      const data = await res.json()
+      if (res.ok && data.valid) {
+        dispatch(applyVoucher({ code: c, discountAmount: data.discount, voucherInfo: data.voucher }))
+        setVoucherCode('')
+        toast.success(data.message, { icon: '🎫' })
+      } else {
+        toast.error(data.message || 'Mã không hợp lệ')
+      }
+    } catch {
+      toast.error('Lỗi kết nối server')
+    } finally {
+      setVoucherLoading(false)
+    }
+  }
 
   const handleCheckout = () => {
     dispatch(closeCart())

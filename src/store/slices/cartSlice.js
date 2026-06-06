@@ -57,38 +57,12 @@ const cartSlice = createSlice({
       localStorage.removeItem('foodserve_cart')
     },
     applyVoucher: (state, action) => {
-      const vouchers = {
-        'SALE10': { discount: 0, type: 'percent', value: 10, label: 'Giảm 10%', minOrder: 0 },
-        'FOOD50': { discount: 50000, label: 'Giảm 50K', minOrder: 150000 },
-        'FREESHIP': { discount: 25000, label: 'Freeship 25K', minOrder: 0 },
-        'NEW30': { discount: 30000, label: 'Giảm 30K', minOrder: 100000 },
-        'VIP100': { discount: 100000, label: 'Giảm 100K', minOrder: 300000 },
-        'SALE20': { discount: 20000, label: 'Giảm 20K', minOrder: 0 }
-      }
-      
-      const code = action.payload.toUpperCase()
-      const voucherInfo = vouchers[code]
-      
-      if (voucherInfo) {
-        // Calculate subtotal to check minOrder
-        const subtotal = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-
-        if (subtotal < (voucherInfo.minOrder || 0)) {
-          toast.error(`Đơn hàng tối thiểu ${new Intl.NumberFormat('vi-VN').format(voucherInfo.minOrder)}đ để áp dụng mã này!`)
-          return
-        }
-
-        state.voucher = { code, ...voucherInfo }
-        if (voucherInfo.type === 'percent') {
-          state.discount = (subtotal * voucherInfo.value) / 100
-        } else {
-          state.discount = voucherInfo.discount
-        }
-        
-        toast.success(`Áp dụng mã ${code} thành công!`, { icon: '🎉' })
-      } else {
-        toast.error('Mã giảm giá không hợp lệ hoặc đã hết hạn!')
-      }
+      // action.payload = { code, discountAmount, voucherInfo }
+      // Đã validate từ API trước khi dispatch
+      const { code, discountAmount, voucherInfo } = action.payload
+      state.voucher = { code, ...voucherInfo }
+      state.discount = discountAmount
+      toast.success(`Áp dụng mã ${code} thành công! 🎉`, { icon: '🎫' })
     },
     removeVoucher: (state) => {
       state.voucher = null
