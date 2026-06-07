@@ -23,7 +23,7 @@ export default function RestaurantPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-300">
+      <div className="min-h-screen flex items-center justify-center bg-surface-light dark:bg-dark-300">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent mx-auto mb-4"></div>
           <p className="text-gray-500 dark:text-gray-400 font-bold">Đang tải dữ liệu nhà hàng...</p>
@@ -34,7 +34,7 @@ export default function RestaurantPage() {
 
   if (!selectedRestaurant) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-300">
+      <div className="min-h-screen flex items-center justify-center bg-surface-light dark:bg-dark-300">
         <div className="text-center glass-card p-8 rounded-3xl max-w-sm border border-gray-100 dark:border-white/5 shadow-card">
           <span className="text-6xl block mb-4">🔍</span>
           <p className="text-xl font-bold dark:text-white mb-2">Không tìm thấy nhà hàng</p>
@@ -68,7 +68,7 @@ export default function RestaurantPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 dark:bg-dark-300 pb-20 transition-colors duration-500">
+    <div className="min-h-screen bg-surface-light/60 dark:bg-dark-300 pb-20 transition-colors duration-500">
       {/* Cover Header Image */}
       <div className="relative h-72 md:h-96 overflow-hidden">
         <img src={selectedRestaurant.cover} alt={selectedRestaurant.name} className="w-full h-full object-cover" />

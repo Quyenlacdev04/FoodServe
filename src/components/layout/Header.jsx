@@ -185,11 +185,11 @@ export default function Header() {
             : 'py-3 md:py-4'
         }`}
         style={scrolled ? {
-          background: darkMode ? 'rgba(10,10,20,0.85)' : 'rgba(255,255,255,0.8)',
+          background: darkMode ? 'rgba(28,25,23,0.92)' : 'rgba(255,255,255,0.85)',
           backdropFilter: 'blur(24px) saturate(180%)',
           WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-          boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.04)',
-          borderBottom: darkMode ? '1px solid rgba(255,255,255,0.04)' : '1px solid rgba(0,0,0,0.03)',
+          boxShadow: '0 1px 0 rgba(0,0,0,0.02), 0 4px 24px rgba(255,107,0,0.04)',
+          borderBottom: darkMode ? '1px solid rgba(255,255,255,0.04)' : '1px solid rgba(255,107,0,0.06)',
         } : {
           background: 'transparent',
         }}
@@ -202,7 +202,7 @@ export default function Header() {
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2.5 flex-shrink-0 group">
               <div className="w-10 h-10 md:w-11 md:h-11 rounded-2xl bg-gradient-primary flex items-center justify-center relative overflow-hidden"
-                style={{ boxShadow: '0 4px 16px rgba(255,107,0,0.25)' }}>
+                style={{ boxShadow: '0 4px 16px rgba(255,107,0,0.3)' }}>
                 <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
                 <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 md:w-6 md:h-6 text-white transform -rotate-12 relative z-10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
@@ -248,7 +248,7 @@ export default function Header() {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     className="absolute -top-0.5 -right-0.5 w-5 h-5 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
-                    style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(239,68,68,0.4)' }}
+                    style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(239,68,68,0.35)' }}
                   >
                     {cartCount}
                   </motion.span>

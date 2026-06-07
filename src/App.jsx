@@ -50,7 +50,7 @@ function App() {
 
   return (
     <div className={`min-h-screen ${darkMode ? 'dark' : ''}`}>
-      <div className="min-h-screen bg-gray-50 dark:bg-dark-300 transition-colors duration-500">
+      <div className="min-h-screen bg-surface-light dark:bg-dark-300 transition-colors duration-500">
         <AnimatePresence mode="wait">
           {loading && <LoadingScreen key="loading" />}
         </AnimatePresence>

@@ -55,7 +55,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
 
   return (
     <div className="w-full max-w-4xl mx-auto mb-6">
-      {/* Search Bar */}
+      {/* Search Bar — Light glass design */}
       <form onSubmit={handleSearch} className="relative mb-4">
         <div className="relative">
           <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl" />
@@ -64,7 +64,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm nhà hàng, món ăn..."
-            className="w-full pl-12 pr-24 py-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full pl-12 pr-24 py-4 rounded-2xl bg-white/80 dark:bg-dark-100/80 backdrop-blur-md border border-gray-200/60 dark:border-white/10 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/40 transition-all shadow-depth-sm"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
             <button
@@ -72,15 +72,15 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
               onClick={() => setShowFilters(!showFilters)}
               className={`p-2 rounded-xl transition-all ${
                 showFilters
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  ? 'bg-primary-500 text-white shadow-glow'
+                  : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
               }`}
             >
               <FiFilter className="text-xl" />
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-gradient-primary rounded-xl text-white font-medium hover:shadow-lg transition-all"
+              className="px-4 py-2 bg-gradient-primary rounded-xl text-white font-medium hover:shadow-glow transition-all"
             >
               Tìm
             </button>
@@ -88,7 +88,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
         </div>
       </form>
 
-      {/* Filter Panel */}
+      {/* Filter Panel — Light glass */}
       <AnimatePresence>
         {showFilters && (
           <motion.div
@@ -97,10 +97,10 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 p-6">
+            <div className="bg-white/80 dark:bg-dark-100/80 backdrop-blur-md rounded-2xl border border-gray-200/60 dark:border-white/10 p-6 shadow-depth">
               {/* Categories */}
               <div className="mb-6">
-                <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                <h3 className="text-gray-800 dark:text-white font-semibold mb-3 flex items-center gap-2">
                   🍽️ Danh mục
                 </h3>
                 <div className="flex flex-wrap gap-2">
@@ -110,11 +110,11 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
                       onClick={() =>
                         handleFilterChange('category', cat === 'Tất cả' ? '' : cat)
                       }
-                      className={`px-4 py-2 rounded-xl transition-all ${
+                      className={`px-4 py-2 rounded-xl transition-all font-medium ${
                         (cat === 'Tất cả' && !filters.category) ||
                         filters.category === cat
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                          ? 'bg-primary-500 text-white shadow-glow'
+                          : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
                       }`}
                     >
                       {cat}
@@ -125,7 +125,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
 
               {/* Rating */}
               <div className="mb-6">
-                <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                <h3 className="text-gray-800 dark:text-white font-semibold mb-3 flex items-center gap-2">
                   ⭐ Đánh giá tối thiểu
                 </h3>
                 <div className="flex gap-2">
@@ -133,10 +133,10 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
                     <button
                       key={rating}
                       onClick={() => handleFilterChange('minRating', rating)}
-                      className={`px-4 py-2 rounded-xl transition-all ${
+                      className={`px-4 py-2 rounded-xl transition-all font-medium ${
                         filters.minRating === rating
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                          ? 'bg-primary-500 text-white shadow-glow'
+                          : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
                       }`}
                     >
                       {rating}+
@@ -147,7 +147,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
 
               {/* Sort By */}
               <div className="mb-6">
-                <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                <h3 className="text-gray-800 dark:text-white font-semibold mb-3 flex items-center gap-2">
                   🔄 Sắp xếp theo
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -155,10 +155,10 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
                     <button
                       key={option.value}
                       onClick={() => handleFilterChange('sortBy', option.value)}
-                      className={`px-4 py-2 rounded-xl transition-all ${
+                      className={`px-4 py-2 rounded-xl transition-all font-medium ${
                         filters.sortBy === option.value
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                          ? 'bg-primary-500 text-white shadow-glow'
+                          : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
                       }`}
                     >
                       {option.label}
@@ -178,7 +178,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
                     }
                     className="w-5 h-5 rounded accent-primary-500"
                   />
-                  <span className="text-white font-medium">
+                  <span className="text-gray-700 dark:text-white font-medium">
                     🚚 Chỉ hiển thị nhà hàng Freeship
                   </span>
                 </label>
@@ -187,7 +187,7 @@ export default function SearchAndFilter({ onSearch, onFilter }) {
               {/* Clear Filters */}
               <button
                 onClick={clearFilters}
-                className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-white font-medium transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-xl text-gray-700 dark:text-white font-medium transition-all flex items-center justify-center gap-2"
               >
                 <FiX /> Xóa bộ lọc
               </button>

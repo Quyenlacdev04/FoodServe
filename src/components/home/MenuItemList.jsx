@@ -65,7 +65,7 @@ export default function MenuItemList() {
   }
 
   return (
-    <section className="py-12 bg-gradient-to-b from-gray-50/50 to-white dark:from-dark-400 dark:to-dark-300 relative">
+    <section className="py-12 bg-gradient-to-b from-surface-light/60 to-white dark:from-dark-400 dark:to-dark-300 relative">
       {/* Background Decor */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-accent-500/5 rounded-full blur-3xl pointer-events-none" />
 

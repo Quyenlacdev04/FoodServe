@@ -51,10 +51,10 @@ export default function RestaurantList() {
   }
 
   return (
-    <section id="restaurants" className="py-12 md:py-16 relative overflow-hidden bg-white dark:bg-dark-300 transition-colors duration-500">
+    <section id="restaurants" className="py-12 md:py-16 relative overflow-hidden bg-slate-50/50 dark:bg-dark-300 transition-colors duration-500">
       {/* Decorative Orbs */}
-      <div className="absolute top-1/3 right-0 w-[400px] h-[400px] bg-primary-500/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/3 left-0 w-[400px] h-[400px] bg-accent-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 right-0 w-[400px] h-[400px] bg-primary-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/3 left-0 w-[400px] h-[400px] bg-accent-500/[0.04] rounded-full blur-3xl pointer-events-none" />
 
       {/* Floating 3D Food Emojis */}
       <div className="hidden xl:block absolute -left-16 top-1/4 pointer-events-none z-0">
@@ -92,7 +92,7 @@ export default function RestaurantList() {
               className={`flex-shrink-0 px-5 py-3 rounded-2xl text-sm font-bold transition-all duration-300 border ${
                 selectedFilter === f.id
                   ? 'bg-gradient-primary border-transparent text-white shadow-glow'
-                  : 'bg-white dark:bg-dark-100/60 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-200 border-gray-100 dark:border-white/5 shadow-card'
+                  : 'bg-white dark:bg-dark-100/60 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-200 border-gray-200/60 dark:border-white/5 shadow-depth-sm'
               }`}
             >
               {f.label}
@@ -173,11 +173,11 @@ export default function RestaurantList() {
 
                     {/* Promo tag */}
                     {r.promo ? (
-                      <div className="mt-4 px-3.5 py-2 rounded-xl bg-gradient-to-r from-primary-500/10 to-primary-600/10 dark:from-primary-500/5 dark:to-primary-600/5 text-primary-600 dark:text-primary-400 text-xs font-black border border-primary-500/20 truncate">
+                      <div className="mt-4 px-3.5 py-2 rounded-xl bg-gradient-to-r from-primary-500/10 to-accent-500/10 dark:from-primary-500/5 dark:to-accent-500/5 text-primary-600 dark:text-primary-400 text-xs font-black border border-primary-500/15 truncate">
                         🏷️ {r.promo}
                       </div>
                     ) : (
-                      <div className="mt-4 px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-dark-200 text-gray-400 text-xs font-bold border border-gray-100 dark:border-white/5 truncate">
+                      <div className="mt-4 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-dark-200 text-gray-400 text-xs font-bold border border-gray-200/60 dark:border-white/5 truncate">
                         ✨ Không có ưu đãi đặc biệt
                       </div>
                     )}

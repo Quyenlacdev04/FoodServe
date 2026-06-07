@@ -8,7 +8,7 @@ export default function CategorySection() {
   const { selectedCategory } = useSelector((s) => s.restaurants)
 
   return (
-    <section id="categories" className="py-12 md:py-16 bg-gradient-to-b from-white to-gray-50/50 dark:from-dark-300 dark:to-dark-400 relative overflow-hidden">
+    <section id="categories" className="py-12 md:py-16 bg-gradient-to-b from-white to-slate-50/80 dark:from-dark-300 dark:to-dark-400 relative overflow-hidden">
       {/* Background Orbs */}
       <div className="absolute top-1/2 left-1/4 w-80 h-80 bg-primary-500/5 rounded-full blur-3xl pointer-events-none" />
       
@@ -51,7 +51,7 @@ export default function CategorySection() {
               className={`category-card border transition-all duration-300 ${
                 selectedCategory === cat.id
                   ? 'bg-primary-500/10 border-primary-500/40 shadow-glow text-primary-500 font-bold ring-1 ring-primary-500/20'
-                  : 'bg-white dark:bg-dark-100/60 border-gray-100 dark:border-white/5 shadow-card hover:bg-gray-50 dark:hover:bg-dark-100 hover:border-primary-500/20'
+                  : 'bg-white dark:bg-dark-100/60 border-gray-200/60 dark:border-white/5 shadow-card hover:bg-gray-50 dark:hover:bg-dark-100 hover:border-primary-500/20'
               }`}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}

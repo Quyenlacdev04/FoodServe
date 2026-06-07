@@ -66,7 +66,7 @@ export default function AllMenuItems() {
   }
 
   return (
-    <section className="py-12 bg-gray-50/50 dark:bg-dark-400 relative">
+    <section className="py-12 bg-surface-light/60 dark:bg-dark-400 relative">
       <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-primary-500/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 relative z-10">

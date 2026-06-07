@@ -305,29 +305,36 @@ router.post('/forgot-password', async (req, res) => {
     const transporter = createTransporter();
 
     if (transporter) {
-      // Gửi email thật qua Gmail
-      await transporter.sendMail({
-        from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: '🔐 Mã OTP đặt lại mật khẩu FoodServe',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-            <div style="background: linear-gradient(135deg, #ff6b35, #f7c948); padding: 32px; text-align: center;">
-              <h1 style="color: white; margin: 0; font-size: 28px;">🍽️ FoodServe</h1>
-              <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Ăn ngon mỗi ngày</p>
-            </div>
-            <div style="padding: 32px; text-align: center;">
-              <h2 style="color: #333; margin-bottom: 8px;">Đặt lại mật khẩu</h2>
-              <p style="color: #666; margin-bottom: 24px;">Mã OTP của bạn là:</p>
-              <div style="background: #f8f9fa; border: 2px dashed #ff6b35; border-radius: 12px; padding: 20px; margin: 0 auto; max-width: 200px;">
-                <span style="font-size: 36px; font-weight: bold; color: #ff6b35; letter-spacing: 8px;">${otp}</span>
+      try {
+        // Gửi email thật qua Gmail
+        await transporter.sendMail({
+          from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: '🔐 Mã OTP đặt lại mật khẩu FoodServe',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+              <div style="background: linear-gradient(135deg, #ff6b35, #f7c948); padding: 32px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">🍽️ FoodServe</h1>
+                <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Ăn ngon mỗi ngày</p>
               </div>
-              <p style="color: #999; font-size: 13px; margin-top: 20px;">⏰ Mã có hiệu lực trong <strong>5 phút</strong></p>
-              <p style="color: #bbb; font-size: 12px; margin-top: 8px;">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.</p>
+              <div style="padding: 32px; text-align: center;">
+                <h2 style="color: #333; margin-bottom: 8px;">Đặt lại mật khẩu</h2>
+                <p style="color: #666; margin-bottom: 24px;">Mã OTP của bạn là:</p>
+                <div style="background: #f8f9fa; border: 2px dashed #ff6b35; border-radius: 12px; padding: 20px; margin: 0 auto; max-width: 200px;">
+                  <span style="font-size: 36px; font-weight: bold; color: #ff6b35; letter-spacing: 8px;">${otp}</span>
+                </div>
+                <p style="color: #999; font-size: 13px; margin-top: 20px;">⏰ Mã có hiệu lực trong <strong>5 phút</strong></p>
+                <p style="color: #bbb; font-size: 12px; margin-top: 8px;">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.</p>
+              </div>
             </div>
-          </div>
-        `,
-      });
+          `,
+        });
+      } catch (mailError) {
+        console.error('Mail sending error:', mailError);
+        return res.status(500).json({ 
+          message: 'Không thể gửi email OTP. Vui lòng kiểm tra lại cấu hình EMAIL_USER và EMAIL_PASS trong file .env!' 
+        });
+      }
     } else {
       // Không có email config — log OTP ra console cho demo/đồ án
       console.log(`\n🔐 OTP cho ${email}: ${otp} (hết hạn sau 5 phút)\n`);

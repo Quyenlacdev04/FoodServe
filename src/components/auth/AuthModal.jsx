@@ -398,9 +398,9 @@ export default function AuthModal() {
             exit={{ scale: 0.8, y: 50 }}
             transition={{ type: 'spring', damping: 20 }}
           >
-            {/* Header Gradient */}
+            {/* Header Gradient — Modern Indigo */}
             <div className="bg-gradient-primary p-6 text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-black/10" />
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
               <button
                 onClick={handleClose}
                 className="absolute top-4 right-4 p-2 rounded-xl bg-white/20 text-white hover:bg-white/30 transition-colors"
