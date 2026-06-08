@@ -96,7 +96,8 @@ export default function AdminRestaurants() {
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { toast.error('Ảnh tối đa 5MB'); return }
     const url = await uploadImage(file)
-    if (url) setFormData(prev => ({ ...prev, image: url }))
+    // Cập nhật cả image và cover để đồng nhất
+    if (url) setFormData(prev => ({ ...prev, image: url, cover: url }))
   }
 
   const handleDelete = async (id) => {
@@ -161,6 +162,7 @@ export default function AdminRestaurants() {
     setEditingId(restaurant._id)
     setFormData({
       name: restaurant.name || '', image: restaurant.image || '',
+      cover: restaurant.cover || restaurant.image || '',
       categories: restaurant.categories?.join(', ') || '',
       rating: restaurant.rating || 5.0, deliveryTime: restaurant.deliveryTime || '15-30',
       distance: restaurant.distance || 2.5, minOrder: restaurant.minOrder || 0, discount: restaurant.discount || ''
@@ -459,7 +461,7 @@ export default function AdminRestaurants() {
                   )}
                   <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleRestaurantImageUpload} />
                   <input type="url" placeholder="Hoặc nhập URL ảnh..." value={formData.image}
-                    onChange={e => setFormData(p => ({ ...p, image: e.target.value }))}
+                    onChange={e => setFormData(p => ({ ...p, image: e.target.value, cover: e.target.value }))}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-100 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
                 </div>
 
@@ -487,10 +489,11 @@ export default function AdminRestaurants() {
                       className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-100 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Khuyến mãi</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Khuyến mãi (hiển thị)</label>
                     <input type="text" value={formData.discount} onChange={e => setFormData({...formData, discount: e.target.value})}
-                      placeholder="VD: 30K hoặc 20%"
+                      placeholder="VD: Giảm 30K, Freeship 2km"
                       className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-100 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
+                    <p className="text-xs text-gray-400 mt-1">Nhập text tự do, VD: "30k", "20%", "Freeship"</p>
                   </div>
                 </div>
 

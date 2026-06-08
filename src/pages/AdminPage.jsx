@@ -242,6 +242,46 @@ export default function AdminPage() {
     }
   }
 
+  const [orderSearch, setOrderSearch] = useState('')
+  const [orderStatusFilter, setOrderStatusFilter] = useState('all')
+  const [orderPaymentFilter, setOrderPaymentFilter] = useState('all')
+  const [orderDateFilter, setOrderDateFilter] = useState('all') // all, today, week, month
+  const [orderPage, setOrderPage] = useState(1)
+  const ORDER_PAGE_SIZE = 10
+
+  // Filter đơn hàng
+  const filteredOrders = orders.filter(order => {
+    const matchSearch = !orderSearch ||
+      order._id.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      (order.deliveryAddress || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
+      (order.userId?.name || '').toLowerCase().includes(orderSearch.toLowerCase())
+
+    const matchStatus = orderStatusFilter === 'all' || order.status === orderStatusFilter
+
+    const matchPayment = orderPaymentFilter === 'all' ||
+      (orderPaymentFilter === 'paid' && order.paymentStatus === 'paid') ||
+      (orderPaymentFilter === 'unpaid' && order.paymentStatus !== 'paid') ||
+      (orderPaymentFilter === 'cash' && order.paymentMethod === 'cash') ||
+      (orderPaymentFilter === 'momo' && order.paymentMethod === 'momo') ||
+      (orderPaymentFilter === 'coins' && order.paymentMethod === 'coins')
+
+    const now = new Date()
+    let matchDate = true
+    if (orderDateFilter === 'today') {
+      matchDate = new Date(order.createdAt).toDateString() === now.toDateString()
+    } else if (orderDateFilter === 'week') {
+      const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000)
+      matchDate = new Date(order.createdAt) >= weekAgo
+    } else if (orderDateFilter === 'month') {
+      const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000)
+      matchDate = new Date(order.createdAt) >= monthAgo
+    }
+
+    return matchSearch && matchStatus && matchPayment && matchDate
+  })
+
+  const totalOrderPages = Math.ceil(filteredOrders.length / ORDER_PAGE_SIZE)
+  const pagedOrders = filteredOrders.slice((orderPage - 1) * ORDER_PAGE_SIZE, orderPage * ORDER_PAGE_SIZE)
   const revenue = orders.filter(o => o.status === 'completed').reduce((acc, curr) => acc + (curr.finalAmount || 0), 0)
 
   return (
@@ -479,16 +519,93 @@ export default function AdminPage() {
           {/* Orders Table */}
           {activeTab === 'orders' && (
             <div className="bg-white dark:bg-dark-100 rounded-2xl shadow-card overflow-hidden">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                <h3 className="font-bold text-lg dark:text-white">Đơn hàng mới nhất</h3>
-                <button onClick={fetchOrders} className="text-sm text-primary-500 font-semibold hover:underline">Làm mới</button>
+              {/* Header + Search + Filter */}
+              <div className="p-5 border-b border-gray-100 dark:border-gray-800 space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold text-lg dark:text-white">Quản lý Đơn hàng</h3>
+                    <p className="text-sm text-gray-400">
+                      Hiển thị {filteredOrders.length}/{orders.length} đơn hàng
+                    </p>
+                  </div>
+                  <button onClick={() => { fetchOrders(); setOrderPage(1) }}
+                    className="text-sm text-primary-500 font-semibold hover:underline flex items-center gap-1">
+                    🔄 Làm mới
+                  </button>
+                </div>
+
+                {/* Search + Filters */}
+                <div className="flex flex-wrap gap-3">
+                  {/* Search */}
+                  <div className="flex-1 min-w-[200px] relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+                    <input
+                      type="text"
+                      placeholder="Tìm mã đơn, địa chỉ..."
+                      value={orderSearch}
+                      onChange={e => { setOrderSearch(e.target.value); setOrderPage(1) }}
+                      className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 dark:text-white text-sm focus:ring-2 focus:ring-primary-400 outline-none"
+                    />
+                  </div>
+                  {/* Lọc trạng thái */}
+                  <select value={orderStatusFilter}
+                    onChange={e => { setOrderStatusFilter(e.target.value); setOrderPage(1) }}
+                    className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 dark:text-white text-sm focus:ring-2 focus:ring-primary-400 outline-none">
+                    <option value="all">📋 Tất cả TT</option>
+                    <option value="pending">⏳ Chờ xác nhận</option>
+                    <option value="confirmed">✅ Đã xác nhận</option>
+                    <option value="preparing">👨‍🍳 Đang chuẩn bị</option>
+                    <option value="delivering">🛵 Đang giao</option>
+                    <option value="completed">🎉 Hoàn thành</option>
+                    <option value="cancelled">❌ Đã hủy</option>
+                  </select>
+                  {/* Lọc thanh toán */}
+                  <select value={orderPaymentFilter}
+                    onChange={e => { setOrderPaymentFilter(e.target.value); setOrderPage(1) }}
+                    className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 dark:text-white text-sm focus:ring-2 focus:ring-primary-400 outline-none">
+                    <option value="all">💳 Tất cả TT toán</option>
+                    <option value="paid">✅ Đã thanh toán</option>
+                    <option value="unpaid">⏳ Chưa thanh toán</option>
+                    <option value="cash">💵 COD</option>
+                    <option value="momo">🟣 MoMo</option>
+                    <option value="coins">🪙 Xu</option>
+                  </select>
+                  {/* Lọc thời gian */}
+                  <select value={orderDateFilter}
+                    onChange={e => { setOrderDateFilter(e.target.value); setOrderPage(1) }}
+                    className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 dark:text-white text-sm focus:ring-2 focus:ring-primary-400 outline-none">
+                    <option value="all">📅 Tất cả ngày</option>
+                    <option value="today">📅 Hôm nay</option>
+                    <option value="week">📅 7 ngày qua</option>
+                    <option value="month">📅 30 ngày qua</option>
+                  </select>
+                  {/* Reset filter */}
+                  {(orderSearch || orderStatusFilter !== 'all' || orderPaymentFilter !== 'all' || orderDateFilter !== 'all') && (
+                    <button onClick={() => { setOrderSearch(''); setOrderStatusFilter('all'); setOrderPaymentFilter('all'); setOrderDateFilter('all'); setOrderPage(1) }}
+                      className="px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 text-sm font-semibold hover:bg-red-100 transition-colors">
+                      ✕ Xóa lọc
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick stats khi filter */}
+                {filteredOrders.length > 0 && (
+                  <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span>✅ Hoàn thành: <b className="text-green-600">{filteredOrders.filter(o => o.status === 'completed').length}</b></span>
+                    <span>⏳ Đang xử lý: <b className="text-yellow-600">{filteredOrders.filter(o => !['completed','cancelled'].includes(o.status)).length}</b></span>
+                    <span>❌ Đã hủy: <b className="text-red-600">{filteredOrders.filter(o => o.status === 'cancelled').length}</b></span>
+                    <span>💰 Doanh thu filter: <b className="text-primary-500">{formatPrice(filteredOrders.filter(o => o.status === 'completed').reduce((s, o) => s + (o.finalAmount || 0), 0))}</b></span>
+                  </div>
+                )}
               </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50 dark:bg-dark-200 text-gray-500 text-sm">
                       <th className="p-4 font-medium">Mã đơn</th>
                       <th className="p-4 font-medium">Ngày đặt</th>
+                      <th className="p-4 font-medium">Địa chỉ</th>
                       <th className="p-4 font-medium">Tổng tiền</th>
                       <th className="p-4 font-medium">Trạng thái</th>
                       <th className="p-4 font-medium text-right">Thao tác</th>
@@ -496,21 +613,30 @@ export default function AdminPage() {
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan="5" className="p-8 text-center text-gray-400">Đang tải...</td></tr>
-                    ) : orders.map(order => (
+                      <tr><td colSpan="6" className="p-8 text-center text-gray-400">Đang tải...</td></tr>
+                    ) : pagedOrders.length === 0 ? (
+                      <tr><td colSpan="6" className="p-10 text-center">
+                        <div className="text-4xl mb-2">🔍</div>
+                        <p className="text-gray-400">Không tìm thấy đơn hàng nào</p>
+                        <p className="text-xs text-gray-300 mt-1">Thử thay đổi bộ lọc</p>
+                      </td></tr>
+                    ) : pagedOrders.map(order => (
                       <tr key={order._id} className="border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-dark-200 transition-colors">
-                        <td className="p-4 font-mono text-sm dark:text-gray-300">#{order._id.substring(0,6).toUpperCase()}</td>
-                        <td className="p-4 text-sm text-gray-500">{new Date(order.createdAt).toLocaleString()}</td>
+                        <td className="p-4 font-mono text-sm dark:text-gray-300">#{order._id.substring(0,7).toUpperCase()}</td>
+                        <td className="p-4 text-sm text-gray-500 whitespace-nowrap">
+                          {new Date(order.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                        </td>
+                        <td className="p-4 text-xs text-gray-500 max-w-[160px]">
+                          <span className="line-clamp-2">{order.deliveryAddress || '—'}</span>
+                        </td>
                         <td className="p-4 font-semibold text-primary-500">
                           <div>{formatPrice(order.finalAmount || order.totalAmount)}</div>
                           {order.paymentMethod !== 'cash' && (
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              order.paymentStatus === 'paid'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-yellow-100 text-yellow-700'
+                              order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                             }`}>
                               {order.paymentStatus === 'paid'
-                                ? `✅ TT ${order.paymentMethod === 'momo' ? 'MoMo' : order.paymentMethod === 'coins' ? 'Xu' : order.paymentMethod}`
+                                ? `✅ ${order.paymentMethod === 'momo' ? 'MoMo' : order.paymentMethod === 'coins' ? 'Xu' : order.paymentMethod}`
                                 : '⏳ Chưa TT'}
                             </span>
                           )}
@@ -524,7 +650,7 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="p-4 text-right">
-                          <select 
+                          <select
                             className="bg-white dark:bg-dark-100 border border-gray-200 dark:border-gray-700 text-sm rounded-lg px-3 py-1.5 outline-none dark:text-white"
                             value={order.status}
                             onChange={(e) => updateOrderStatus(order._id, e.target.value)}
@@ -539,12 +665,40 @@ export default function AdminPage() {
                         </td>
                       </tr>
                     ))}
-                    {orders.length === 0 && !loading && (
-                      <tr><td colSpan="5" className="p-8 text-center text-gray-400">Chưa có đơn hàng nào</td></tr>
-                    )}
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {totalOrderPages > 1 && (
+                <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                  <span className="text-sm text-gray-400">
+                    Trang {orderPage}/{totalOrderPages} — {filteredOrders.length} đơn hàng
+                  </span>
+                  <div className="flex gap-2">
+                    <button disabled={orderPage <= 1} onClick={() => setOrderPage(p => p - 1)}
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-dark-200 transition-colors dark:text-white">
+                      ← Trước
+                    </button>
+                    {Array.from({ length: Math.min(5, totalOrderPages) }, (_, i) => {
+                      const page = orderPage <= 3 ? i + 1 : orderPage + i - 2
+                      if (page < 1 || page > totalOrderPages) return null
+                      return (
+                        <button key={page} onClick={() => setOrderPage(page)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            page === orderPage ? 'bg-primary-500 text-white' : 'border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-dark-200 dark:text-white'
+                          }`}>
+                          {page}
+                        </button>
+                      )
+                    })}
+                    <button disabled={orderPage >= totalOrderPages} onClick={() => setOrderPage(p => p + 1)}
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-dark-200 transition-colors dark:text-white">
+                      Sau →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           

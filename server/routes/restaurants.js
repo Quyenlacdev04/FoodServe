@@ -216,7 +216,22 @@ router.delete('/:id', async (req, res) => {
 // Cập nhật thông tin nhà hàng
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await Restaurant.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const body = { ...req.body };
+
+    // Parse các trường Number để tránh lỗi cast
+    if (body.discount !== undefined) {
+      // Chấp nhận "30k", "30K", "30000", 30000, "" => convert sang Number
+      const raw = String(body.discount).toLowerCase().replace('k', '000').replace('đ', '').replace(/\s/g, '').replace('%', '');
+      const parsed = parseFloat(raw);
+      body.discount = isNaN(parsed) ? 0 : parsed;
+    }
+    if (body.rating !== undefined) body.rating = parseFloat(body.rating) || 0;
+    if (body.distance !== undefined) body.distance = parseFloat(body.distance) || 0;
+    if (body.orders !== undefined) body.orders = parseInt(body.orders) || 0;
+    if (body.reviews !== undefined) body.reviews = parseInt(body.reviews) || 0;
+    if (body.minOrder !== undefined) body.minOrder = parseInt(body.minOrder) || 0;
+
+    const updated = await Restaurant.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: false });
     if (!updated) {
       return res.status(404).json({ message: 'Không tìm thấy nhà hàng' });
     }

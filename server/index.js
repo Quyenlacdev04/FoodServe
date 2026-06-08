@@ -60,7 +60,7 @@ const limiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5, // 5 login attempts per 15 minutes
+  max: 100, // 100 login attempts per 15 minutes (dev mode)
   message: 'Quá nhiều lần đăng nhập thất bại, vui lòng thử lại sau 15 phút'
 })
 

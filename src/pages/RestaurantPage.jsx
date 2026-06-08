@@ -71,7 +71,12 @@ export default function RestaurantPage() {
     <div className="min-h-screen bg-surface-light/60 dark:bg-dark-300 pb-20 transition-colors duration-500">
       {/* Cover Header Image */}
       <div className="relative h-72 md:h-96 overflow-hidden">
-        <img src={selectedRestaurant.cover} alt={selectedRestaurant.name} className="w-full h-full object-cover" />
+        <img
+          src={selectedRestaurant.cover || selectedRestaurant.image}
+          alt={selectedRestaurant.name}
+          className="w-full h-full object-cover"
+          onError={e => { e.target.src = selectedRestaurant.image || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200' }}
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
         
         {/* Back Button */}
