@@ -27,7 +27,105 @@ const createTransporter = () => {
   return null;
 };
 
-// Register
+// Register — Step 1: Gửi OTP xác minh email
+router.post('/register/send-otp', async (req, res) => {
+  try {
+    const { email, name } = req.body;
+    if (!email) return res.status(400).json({ message: 'Vui lòng nhập email' });
+
+    // Kiểm tra email đã tồn tại chưa
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ message: 'Email này đã được đăng ký' });
+
+    // Tạo OTP 6 số
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 phút
+    otpStore.set(`reg:${email}`, { otp, expiresAt });
+
+    const transporter = createTransporter();
+    if (transporter) {
+      try {
+        await transporter.sendMail({
+          from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: '✅ Xác minh email đăng ký FoodServe',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+              <div style="background: linear-gradient(135deg, #ff6b35, #f7c948); padding: 32px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">🍽️ FoodServe</h1>
+                <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Ăn ngon mỗi ngày</p>
+              </div>
+              <div style="padding: 32px; text-align: center;">
+                <h2 style="color: #333; margin-bottom: 8px;">Xác minh Email Đăng ký</h2>
+                <p style="color: #666; margin-bottom: 8px;">Xin chào <strong>${name || 'bạn'}</strong>!</p>
+                <p style="color: #666; margin-bottom: 24px;">Nhập mã OTP dưới đây để hoàn tất đăng ký:</p>
+                <div style="background: #f8f9fa; border: 2px dashed #ff6b35; border-radius: 12px; padding: 20px; margin: 0 auto; max-width: 200px;">
+                  <span style="font-size: 36px; font-weight: bold; color: #ff6b35; letter-spacing: 8px;">${otp}</span>
+                </div>
+                <p style="color: #999; font-size: 13px; margin-top: 20px;">⏰ Mã có hiệu lực trong <strong>5 phút</strong></p>
+                <p style="color: #bbb; font-size: 12px; margin-top: 8px;">Nếu bạn không đăng ký tài khoản FoodServe, hãy bỏ qua email này.</p>
+              </div>
+            </div>
+          `,
+        });
+      } catch (mailError) {
+        console.error('Mail error:', mailError);
+        return res.status(500).json({ message: 'Không thể gửi email. Kiểm tra lại cấu hình EMAIL trong .env' });
+      }
+    } else {
+      console.log(`\n📧 OTP đăng ký cho ${email}: ${otp} (hết hạn 5 phút)\n`);
+    }
+
+    res.json({
+      message: 'Mã OTP đã gửi đến email!',
+      demo: !transporter ? otp : undefined
+    });
+  } catch (error) {
+    console.error('Register send OTP error:', error);
+    res.status(500).json({ message: 'Lỗi server khi gửi OTP' });
+  }
+});
+
+// Register — Step 2: Xác minh OTP + Tạo tài khoản
+router.post('/register/verify-otp', async (req, res) => {
+  try {
+    const { name, email, password, phone, otp } = req.body;
+    if (!otp) return res.status(400).json({ message: 'Thiếu mã OTP' });
+
+    const record = otpStore.get(`reg:${email}`);
+    if (!record) return res.status(400).json({ message: 'OTP không tồn tại hoặc đã hết hạn' });
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(`reg:${email}`);
+      return res.status(400).json({ message: 'OTP đã hết hạn. Vui lòng gửi lại.' });
+    }
+    if (record.otp !== String(otp)) {
+      return res.status(400).json({ message: 'Mã OTP không chính xác' });
+    }
+
+    // Xóa OTP sau khi dùng
+    otpStore.delete(`reg:${email}`);
+
+    // Kiểm tra email lần cuối
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ message: 'Email đã được đăng ký' });
+
+    const role = email.toLowerCase().includes('admin') ? 'admin' : 'user';
+    const user = new User({ name, email, password, phone, role, isEmailVerified: true });
+    await user.save();
+
+    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const capabilities = await getUserCapabilities(user);
+    const userData = attachCapabilities(user, capabilities);
+    delete userData.password;
+
+    res.status(201).json({ user: userData, token, message: 'Đăng ký thành công!' });
+  } catch (error) {
+    console.error('Register verify OTP error:', error);
+    res.status(500).json({ message: 'Lỗi server khi tạo tài khoản' });
+  }
+});
+
+// Register — Legacy (giữ lại để tương thích ngược, không verify email)
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;

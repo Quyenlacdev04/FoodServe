@@ -92,6 +92,15 @@ const authSlice = createSlice({
       localStorage.removeItem('foodserve_user')
       localStorage.removeItem('foodserve_token')
     },
+    setAuth: (state, action) => {
+      // Dùng sau khi verify OTP đăng ký thành công
+      state.user = action.payload.user
+      state.token = action.payload.token
+      state.isAuthenticated = true
+      state.loading = false
+      localStorage.setItem('foodserve_user', JSON.stringify(action.payload.user))
+      localStorage.setItem('foodserve_token', action.payload.token)
+    },
     updateUser: (state, action) => {
       state.user = { ...state.user, ...action.payload }
       if (action.payload.capabilities) {
@@ -169,5 +178,5 @@ const authSlice = createSlice({
   }
 })
 
-export const { logout, updateUser, clearError } = authSlice.actions
+export const { logout, updateUser, clearError, setUserCapabilities, setAuth } = authSlice.actions
 export default authSlice.reducer

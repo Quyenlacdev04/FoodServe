@@ -3,15 +3,21 @@ import { useSelector, useDispatch } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiX, FiMail, FiLock, FiUser, FiPhone, FiArrowLeft, FiEye, FiEyeOff } from 'react-icons/fi'
 import { closeAuthModal } from '../../store/slices/uiSlice'
-import { loginUser, registerUser, clearError } from '../../store/slices/authSlice'
+import { loginUser, registerUser, clearError, setAuth } from '../../store/slices/authSlice'
 import toast from 'react-hot-toast'
 
 // Bước quên mật khẩu
 const FORGOT_STEPS = {
-  EMAIL: 'email',   // Nhập email
-  OTP: 'otp',       // Nhập OTP
-  NEW_PASS: 'new_password', // Nhập mật khẩu mới
-  SUCCESS: 'success' // Thành công
+  EMAIL: 'email',
+  OTP: 'otp',
+  NEW_PASS: 'new_password',
+  SUCCESS: 'success'
+}
+
+// Bước đăng ký với xác minh email
+const REG_STEPS = {
+  FORM: 'form',       // Nhập thông tin
+  OTP: 'otp',         // Xác minh OTP
 }
 
 export default function AuthModal() {
@@ -22,6 +28,13 @@ export default function AuthModal() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
 
+  // Register OTP state
+  const [regStep, setRegStep] = useState(REG_STEPS.FORM)
+  const [regOtp, setRegOtp] = useState('')
+  const [regOtpLoading, setRegOtpLoading] = useState(false)
+  const [regOtpTimer, setRegOtpTimer] = useState(0)
+  const [regDemoOtp, setRegDemoOtp] = useState('')
+
   // Forgot password state
   const [forgotStep, setForgotStep] = useState(FORGOT_STEPS.EMAIL)
   const [forgotEmail, setForgotEmail] = useState('')
@@ -31,34 +44,13 @@ export default function AuthModal() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
   const [otpTimer, setOtpTimer] = useState(0)
-  const [demoOtp, setDemoOtp] = useState('') // Hiển thị OTP demo khi không có email config
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    dispatch(clearError())
-    
-    let resultAction;
-    
-    if (tab === 'login') {
-      resultAction = await dispatch(loginUser({ email: form.email, password: form.password }))
-    } else {
-      resultAction = await dispatch(registerUser(form))
-    }
-    
-    if (resultAction.meta.requestStatus === 'fulfilled') {
-      dispatch(closeAuthModal())
-      toast.success(tab === 'login' ? 'Đăng nhập thành công!' : 'Đăng ký thành công!', { icon: '👋' })
-      setForm({ name: '', email: '', phone: '', password: '' })
-    } else {
-      toast.error(resultAction.payload || 'Có lỗi xảy ra', { icon: '❌' })
-    }
-  }
+  const [demoOtp, setDemoOtp] = useState('')
 
   // Bắt đầu timer đếm ngược OTP
-  const startTimer = (seconds = 300) => {
-    setOtpTimer(seconds)
+  const startTimer = (setter, seconds = 300) => {
+    setter(seconds)
     const interval = setInterval(() => {
-      setOtpTimer(prev => {
+      setter(prev => {
         if (prev <= 1) { clearInterval(interval); return 0 }
         return prev - 1
       })
@@ -67,7 +59,86 @@ export default function AuthModal() {
 
   const formatTimer = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
-  // Bước 1: Gửi OTP
+  // ===== ĐĂNG KÝ: Bước 1 — Gửi OTP xác minh email =====
+  const handleRegisterSendOtp = async (e) => {
+    e.preventDefault()
+    if (!form.name || !form.email || !form.password) return toast.error('Vui lòng điền đầy đủ thông tin')
+    if (form.password.length < 6) return toast.error('Mật khẩu phải có ít nhất 6 ký tự')
+    setRegOtpLoading(true)
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/register/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, name: form.name })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('Mã OTP đã gửi đến email!', { icon: '📧' })
+        setRegStep(REG_STEPS.OTP)
+        startTimer(setRegOtpTimer, 300)
+        if (data.demo) setRegDemoOtp(data.demo)
+      } else {
+        toast.error(data.message || 'Lỗi gửi OTP')
+      }
+    } catch {
+      toast.error('Lỗi kết nối server')
+    } finally {
+      setRegOtpLoading(false)
+    }
+  }
+
+  // ===== ĐĂNG KÝ: Bước 2 — Xác minh OTP + Tạo tài khoản =====
+  const handleRegisterVerifyOtp = async (e) => {
+    if (e) e.preventDefault()
+    if (regOtp.length !== 6) return toast.error('OTP phải có 6 số')
+    setRegOtpLoading(true)
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/register/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, otp: regOtp })
+      })
+      const data = await res.json()
+      if (res.ok && data.token && data.user) {
+        dispatch(setAuth({ token: data.token, user: data.user }))
+        dispatch(closeAuthModal())
+        toast.success('🎉 Đăng ký thành công! Chào mừng đến với FoodServe!', { duration: 4000 })
+        resetRegFlow()
+      } else {
+        toast.error(data.message || 'OTP không chính xác')
+      }
+    } catch {
+      toast.error('Lỗi kết nối server')
+    } finally {
+      setRegOtpLoading(false)
+    }
+  }
+
+  const resetRegFlow = () => {
+    setRegStep(REG_STEPS.FORM)
+    setRegOtp('')
+    setRegOtpTimer(0)
+    setRegDemoOtp('')
+    setForm({ name: '', email: '', phone: '', password: '' })
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    dispatch(clearError())
+    if (tab === 'login') {
+      const resultAction = await dispatch(loginUser({ email: form.email, password: form.password }))
+      if (resultAction.meta.requestStatus === 'fulfilled') {
+        dispatch(closeAuthModal())
+        toast.success('Đăng nhập thành công!', { icon: '👋' })
+        setForm({ name: '', email: '', phone: '', password: '' })
+      } else {
+        toast.error(resultAction.payload || 'Có lỗi xảy ra', { icon: '❌' })
+      }
+    }
+    // Register được handle bởi handleRegisterSendOtp
+  }
+
+  // Bước 1: Gửi OTP quên mật khẩu
   const handleSendOtp = async (e) => {
     e.preventDefault()
     if (!forgotEmail) return toast.error('Vui lòng nhập email')
@@ -82,8 +153,7 @@ export default function AuthModal() {
       if (res.ok) {
         toast.success('OTP đã được gửi!')
         setForgotStep(FORGOT_STEPS.OTP)
-        startTimer(300)
-        // Nếu server trả về OTP demo (không có email config)
+        startTimer(setOtpTimer, 300)
         if (data.demo) setDemoOtp(data.demo)
       } else {
         toast.error(data.message || 'Lỗi gửi OTP')
@@ -161,6 +231,7 @@ export default function AuthModal() {
   const handleClose = () => {
     dispatch(closeAuthModal())
     resetForgotFlow()
+    resetRegFlow()
     setTab('login')
   }
 
@@ -436,83 +507,166 @@ export default function AuthModal() {
 
             {/* Forgot password flow */}
             {tab === 'forgot' ? renderForgot() : (
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {tab === 'register' && (
-                  <div className="relative">
-                    <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <form onSubmit={tab === 'register' ? handleRegisterSendOtp : handleSubmit} className="p-6 space-y-4">
+                {/* Register OTP step */}
+                {tab === 'register' && regStep === REG_STEPS.OTP ? (
+                  <>
+                    <div className="flex items-center gap-3 mb-2">
+                      <button type="button" onClick={() => { setRegStep(REG_STEPS.FORM); setRegDemoOtp('') }}
+                        className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors">
+                        <FiArrowLeft className="dark:text-white" />
+                      </button>
+                      <div>
+                        <h3 className="font-bold dark:text-white">Xác minh Email</h3>
+                        <p className="text-xs text-gray-400">Nhập mã OTP gửi đến <strong>{form.email}</strong></p>
+                      </div>
+                    </div>
+
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-xl p-3 text-center">
+                      <p className="text-sm text-green-700 dark:text-green-400 font-medium">📧 Kiểm tra hộp thư của bạn</p>
+                      <p className="text-xs text-green-600 dark:text-green-500 mt-1">Mã OTP đã được gửi đến <strong>{form.email}</strong></p>
+                    </div>
+
+                    {/* Demo OTP */}
+                    {regDemoOtp && (
+                      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                        className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-3 text-center">
+                        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">📧 Demo mode — Email chưa cấu hình</p>
+                        <p className="text-amber-900 dark:text-amber-300 font-mono font-bold text-xl tracking-widest mt-1">{regDemoOtp}</p>
+                        <button type="button" onClick={() => setRegOtp(regDemoOtp)}
+                          className="text-xs text-amber-600 underline mt-1">Điền tự động</button>
+                      </motion.div>
+                    )}
+
+                    {/* OTP Input */}
                     <input
                       type="text"
-                      placeholder="Họ và tên"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="input-search pl-11"
-                      required
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="Nhập 6 số OTP"
+                      value={regOtp}
+                      onChange={e => setRegOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="input-search text-center text-2xl font-bold tracking-[0.5em] w-full"
+                      required autoFocus
                     />
-                  </div>
-                )}
-                <div className="relative">
-                  <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="input-search pl-11"
-                    required
-                  />
-                </div>
-                {tab === 'register' && (
-                  <div className="relative">
-                    <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="tel"
-                      placeholder="Số điện thoại"
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      className="input-search pl-11"
-                    />
-                  </div>
-                )}
-                <div className="relative">
-                  <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Mật khẩu"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="input-search pl-11 pr-11"
-                    required
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    {showPassword ? <FiEyeOff /> : <FiEye />}
-                  </button>
-                </div>
 
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  whileTap={{ scale: 0.97 }}
-                  className="w-full btn-primary py-3.5 text-center disabled:opacity-50"
-                >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-                      Đang xử lý...
-                    </span>
-                  ) : tab === 'login' ? 'Đăng nhập' : 'Đăng ký'}
-                </motion.button>
+                    {/* Timer */}
+                    <div className="text-center">
+                      {regOtpTimer > 0 ? (
+                        <p className="text-sm text-gray-400">
+                          ⏰ OTP hết hạn sau <span className="text-primary-500 font-bold">{formatTimer(regOtpTimer)}</span>
+                        </p>
+                      ) : (
+                        <button type="button" onClick={handleRegisterSendOtp}
+                          className="text-sm text-primary-500 hover:underline font-medium">
+                          Gửi lại OTP
+                        </button>
+                      )}
+                    </div>
 
-                {tab === 'login' && (
-                  <p className="text-center text-sm text-gray-400">
-                    <button
-                      type="button"
-                      onClick={() => { setTab('forgot'); resetForgotFlow() }}
-                      className="text-primary-500 hover:underline font-medium"
+                    <motion.button type="button" onClick={handleRegisterVerifyOtp}
+                      disabled={regOtpLoading || regOtp.length !== 6}
+                      whileTap={{ scale: 0.97 }}
+                      className="w-full btn-primary py-3.5 disabled:opacity-50">
+                      {regOtpLoading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}
+                            className="w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                          Đang xác minh...
+                        </span>
+                      ) : '✅ Xác minh & Tạo tài khoản'}
+                    </motion.button>
+                  </>
+                ) : (
+                  <>
+                    {tab === 'register' && (
+                      <div className="relative">
+                        <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Họ và tên"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          className="input-search pl-11"
+                          required
+                        />
+                      </div>
+                    )}
+                    <div className="relative">
+                      <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        className="input-search pl-11"
+                        required
+                      />
+                    </div>
+                    {tab === 'register' && (
+                      <div className="relative">
+                        <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="tel"
+                          placeholder="Số điện thoại"
+                          value={form.phone}
+                          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                          className="input-search pl-11"
+                        />
+                      </div>
+                    )}
+                    <div className="relative">
+                      <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Mật khẩu"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        className="input-search pl-11 pr-11"
+                        required
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {showPassword ? <FiEyeOff /> : <FiEye />}
+                      </button>
+                    </div>
+
+                    {/* Thông báo xác minh email cho register */}
+                    {tab === 'register' && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 flex items-start gap-2">
+                        <span className="text-blue-500 mt-0.5">📧</span>
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Sau khi nhấn đăng ký, chúng tôi sẽ gửi mã OTP đến email của bạn để xác minh.
+                        </p>
+                      </div>
+                    )}
+
+                    <motion.button
+                      type="submit"
+                      disabled={loading || regOtpLoading}
+                      whileTap={{ scale: 0.97 }}
+                      className="w-full btn-primary py-3.5 text-center disabled:opacity-50"
                     >
-                      Quên mật khẩu?
-                    </button>
-                  </p>
+                      {(loading || regOtpLoading) ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                          {tab === 'register' ? 'Đang gửi OTP...' : 'Đang xử lý...'}
+                        </span>
+                      ) : tab === 'login' ? 'Đăng nhập' : '📨 Gửi mã xác minh'}
+                    </motion.button>
+
+                    {tab === 'login' && (
+                      <p className="text-center text-sm text-gray-400">
+                        <button
+                          type="button"
+                          onClick={() => { setTab('forgot'); resetForgotFlow() }}
+                          className="text-primary-500 hover:underline font-medium"
+                        >
+                          Quên mật khẩu?
+                        </button>
+                      </p>
+                    )}
+                  </>
                 )}
               </form>
             )}
