@@ -19,7 +19,8 @@ const userSchema = new mongoose.Schema({
   totalDeliveries: { type: Number, default: 0 },
   vehicleType: { type: String }, // 'bike', 'motorbike', 'car'
   vehicleNumber: { type: String },
-  isOnline: { type: Boolean, default: false }
+  isOnline: { type: Boolean, default: false },
+  claimedRanks: { type: [String], default: [] } // Danh sách cấp bậc đã nhận thưởng
 }, { timestamps: true });
 
 // Indexes để tăng hiệu suất truy vấn

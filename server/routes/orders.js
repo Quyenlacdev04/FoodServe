@@ -399,4 +399,50 @@ router.get('/restaurant/:restaurantId', async (req, res) => {
   }
 });
 
+// ===== SHIPPER NHẬN THƯỞNG MILESTONE CẤP BẬC =====
+router.post('/claim-rank-bonus', async (req, res) => {
+  try {
+    const { userId, rank, bonusCoins } = req.body;
+    if (!userId || !rank || bonusCoins === undefined) {
+      return res.status(400).json({ message: 'Thiếu thông tin yêu cầu' });
+    }
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    if (!user.claimedRanks) user.claimedRanks = [];
+    if (user.claimedRanks.includes(rank)) {
+      return res.status(400).json({ message: 'Đã nhận thưởng cấp này rồi' });
+    }
+    user.coins = Number(((user.coins || 0) + bonusCoins).toFixed(1));
+    user.claimedRanks.push(rank);
+    await user.save();
+    res.json({ message: `Nhận thưởng ${bonusCoins} Xu thành công!`, coins: user.coins, claimedRanks: user.claimedRanks });
+  } catch (error) {
+    console.error('Claim rank bonus error:', error);
+    res.status(500).json({ message: 'Lỗi server khi nhận thưởng' });
+  }
+});
+
+// Shipper nhận thưởng milestone cấp bậc
+router.post('/claim-rank-bonus', async (req, res) => {
+  try {
+    const { userId, rank, bonusCoins } = req.body;
+    if (!userId || !rank || bonusCoins === undefined) {
+      return res.status(400).json({ message: 'Thiếu thông tin yêu cầu' });
+    }
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    if (!user.claimedRanks) user.claimedRanks = [];
+    if (user.claimedRanks.includes(rank)) {
+      return res.status(400).json({ message: 'Đã nhận thưởng cấp này rồi' });
+    }
+    user.coins = Number(((user.coins || 0) + bonusCoins).toFixed(1));
+    user.claimedRanks.push(rank);
+    await user.save();
+    res.json({ message: `Nhận thưởng ${bonusCoins} Xu thành công!`, coins: user.coins, claimedRanks: user.claimedRanks });
+  } catch (error) {
+    console.error('Claim rank bonus error:', error);
+    res.status(500).json({ message: 'Lỗi server khi nhận thưởng' });
+  }
+});
+
 export default router;
