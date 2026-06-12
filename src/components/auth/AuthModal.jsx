@@ -469,15 +469,17 @@ export default function AuthModal() {
             exit={{ scale: 0.8, y: 50 }}
             transition={{ type: 'spring', damping: 20 }}
           >
-            {/* Header Gradient — Modern Indigo */}
+            {/* Nút X — đặt bên ngoài overflow-hidden, z cao */}
+            <button
+              onClick={handleClose}
+              className="absolute top-3 right-3 z-20 w-9 h-9 rounded-xl bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center justify-center"
+            >
+              <FiX size={18} />
+            </button>
+
+            {/* Header Gradient */}
             <div className="bg-gradient-primary p-6 text-center relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-              <button
-                onClick={handleClose}
-                className="absolute top-4 right-4 p-2 rounded-xl bg-white/20 text-white hover:bg-white/30 transition-colors"
-              >
-                <FiX />
-              </button>
               <div className="relative">
                 <span className="text-4xl mb-2 block">🍽️</span>
                 <h2 className="text-2xl font-display font-bold text-white">FoodServe</h2>

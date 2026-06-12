@@ -38,6 +38,7 @@ export default function AdminPage() {
   const [driverRequestsLoading, setDriverRequestsLoading] = useState(false)
   const [paymentRequests, setPaymentRequests] = useState([])
   const [paymentRequestsLoading, setPaymentRequestsLoading] = useState(false)
+  const [subscriptionRevenue, setSubscriptionRevenue] = useState(0)
   const [newOrderAlert, setNewOrderAlert] = useState(null) // popup thông báo đơn mới
   const [unreadOrders, setUnreadOrders] = useState(0) // số đơn chưa xem
   const audioRef = useRef(null)
@@ -52,6 +53,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchOrders()
+    fetchSubscriptionRevenue()
     
     // Listen for real-time changes
     const socket = io('http://localhost:5000')
@@ -96,6 +98,31 @@ export default function AdminPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Tính tổng phí duy trì đã thu từ nhà hàng
+  const fetchSubscriptionRevenue = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/restaurants')
+      if (res.ok) {
+        const data = await res.json()
+        const restaurants = data.restaurants || data
+        let total = 0
+        restaurants.forEach(r => {
+          if (r.paymentHistory) {
+            r.paymentHistory.forEach(p => {
+              if (p.status === 'completed') {
+                // coins: 1 xu = 1000đ, bank_transfer: giá trị thực
+                total += p.paymentMethod === 'coins'
+                  ? (p.amount * 1000)
+                  : (p.amount || 0)
+              }
+            })
+          }
+        })
+        setSubscriptionRevenue(total)
+      }
+    } catch {}
   }
 
   const fetchPartnerRequests = async () => {
@@ -492,19 +519,29 @@ export default function AdminPage() {
         <div className="flex-1 space-y-6">
           
           {/* Stats row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-dark-100 p-6 rounded-2xl shadow-card flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-xl"><FiPackage /></div>
               <div>
                 <p className="text-sm text-gray-400 font-medium">Tổng Đơn Hàng</p>
                 <h4 className="text-2xl font-bold dark:text-white">{orders.length}</h4>
+                <p className="text-xs text-gray-400 mt-0.5">{orders.filter(o => o.status === 'completed').length} hoàn thành</p>
               </div>
             </div>
             <div className="bg-white dark:bg-dark-100 p-6 rounded-2xl shadow-card flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 text-green-500 flex items-center justify-center text-xl"><FiCheckCircle /></div>
+              <div className="w-12 h-12 rounded-xl bg-green-500/10 text-green-500 flex items-center justify-center text-xl"><FiDollarSign /></div>
               <div>
-                <p className="text-sm text-gray-400 font-medium">Doanh Thu</p>
-                <h4 className="text-2xl font-bold dark:text-white">{formatPrice(revenue)}</h4>
+                <p className="text-sm text-gray-400 font-medium">Hoa hồng nền tảng</p>
+                <h4 className="text-2xl font-bold dark:text-white">{formatPrice(Math.round(revenue * 0.1))}</h4>
+                <p className="text-xs text-gray-400 mt-0.5">10% tổng đơn hoàn thành</p>
+              </div>
+            </div>
+            <div className="bg-white dark:bg-dark-100 p-6 rounded-2xl shadow-card flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl">🏪</div>
+              <div>
+                <p className="text-sm text-gray-400 font-medium">Phí duy trì đã thu</p>
+                <h4 className="text-2xl font-bold dark:text-white">{formatPrice(subscriptionRevenue)}</h4>
+                <p className="text-xs text-gray-400 mt-0.5">Từ nhà hàng đối tác</p>
               </div>
             </div>
             <div className="bg-white dark:bg-dark-100 p-6 rounded-2xl shadow-card flex items-center gap-4">
@@ -512,6 +549,7 @@ export default function AdminPage() {
               <div>
                 <p className="text-sm text-gray-400 font-medium">Đang Xử Lý</p>
                 <h4 className="text-2xl font-bold dark:text-white">{orders.filter(o => !['completed', 'cancelled'].includes(o.status)).length}</h4>
+                <p className="text-xs text-gray-400 mt-0.5">{orders.filter(o => o.status === 'cancelled').length} đã hủy</p>
               </div>
             </div>
           </div>
