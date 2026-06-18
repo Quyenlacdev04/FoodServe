@@ -16,7 +16,7 @@ const getFoodImageFallback = (name) => {
     return 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400';
   }
   if (lowercase.includes('cuốn') || lowercase.includes('gỏi')) {
-    return 'https://images.unsplash.com/photo-1550461716-4067086815fa?w=400';
+    return 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=400';
   }
   if (lowercase.includes('gà') || lowercase.includes('chicken') || lowercase.includes('kfc')) {
     return 'https://images.unsplash.com/photo-1564834724105-918b73d1b9e0?w=400';
@@ -249,7 +249,7 @@ const menuData = {
   ],
   'Chay Ngộ Nhận': [
     { name: 'Lẩu Nấm Thập Cẩm', price: 250000, image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200', popular: true, category: 'Lẩu' },
-    { name: 'Gỏi Cuốn Ngũ Sắc', price: 45000, image: 'https://images.unsplash.com/photo-1550461716-4067086815fa?w=200', popular: true, category: 'Khai vị' },
+    { name: 'Gỏi Cuốn Ngũ Sắc', price: 45000, image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=200', popular: true, category: 'Khai vị' },
     { name: 'Cơm Gạo Lứt Hạt Sen', price: 55000, image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200', popular: true, category: 'Món chính' },
     { name: 'Đậu Hũ Tứ Xuyên Chay', price: 65000, image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200', popular: false, category: 'Món chính' },
     { name: 'Nước Mót Hội An', price: 25000, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=200', popular: true, category: 'Đồ uống' },
