@@ -1543,12 +1543,6 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
             >
               {canCheckIn ? '📅 Điểm danh nhận lượt' : '✅ Đã điểm danh hôm nay'}
             </button>
-            <button 
-              onClick={() => dispatch(updateCoins({ userId: user._id || user.id, coins: 999999 }))} 
-              className="mt-2 px-3 py-1 bg-white/20 text-white text-xs font-bold rounded-full hover:bg-white/30 transition-colors"
-            >
-              Hack vô hạn Xu 🤫
-            </button>
           </div>
         </div>
 
@@ -1556,11 +1550,8 @@ toast.success('Đã cấp 3 khối thạch mới!', { icon: '✨', id: 'new-bloc
           {/* Wheel of Fortune Section */}
           <div className="bg-white dark:bg-dark-100 rounded-3xl p-6 sm:p-8 shadow-card flex flex-col items-center">
             <h2 className="text-xl font-bold dark:text-white mb-2 text-center">Vòng Quay May Mắn</h2>
-            <div className="text-center mb-8 flex flex-col items-center gap-2">
+            <div className="text-center mb-8">
               <p className="text-gray-500 text-sm">Bạn còn <span className="font-bold text-primary-500 text-lg">{user?.spins || 0}</span> lượt quay</p>
-              <button onClick={() => dispatch(updateCoins({ userId: user._id || user.id, spins: 999999 }))} className="px-3 py-1 bg-red-100 text-red-500 text-xs font-bold rounded-full hover:bg-red-200">
-                Hack vô hạn lượt 🤫
-              </button>
             </div>
             
             <div className="relative w-72 h-72 sm:w-96 sm:h-96 mb-12 mt-4">

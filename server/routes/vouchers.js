@@ -197,9 +197,12 @@ router.post('/validate', async (req, res) => {
 
     // Kiểm tra đơn tối thiểu
     if (orderTotal !== undefined && voucherData.minOrder > 0 && orderTotal < voucherData.minOrder) {
+      const shortage = voucherData.minOrder - orderTotal;
       return res.status(400).json({
-        message: `Đơn tối thiểu ${new Intl.NumberFormat('vi-VN').format(voucherData.minOrder)}đ`,
-        minOrder: voucherData.minOrder
+        message: `Bạn còn thiếu ${new Intl.NumberFormat('vi-VN').format(shortage)}đ để sử dụng mã này (đơn tối thiểu ${new Intl.NumberFormat('vi-VN').format(voucherData.minOrder)}đ)`,
+        minOrder: voucherData.minOrder,
+        currentTotal: orderTotal,
+        shortage
       });
     }
 

@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FiCheck, FiPackage, FiTruck, FiHome } from 'react-icons/fi'
+import { FiCheck, FiPackage, FiTruck, FiHome, FiX } from 'react-icons/fi'
 import { io } from 'socket.io-client'
 import ChatButton from '../components/chat/ChatButton'
 import SimpleMapView from '../components/tracking/SimpleMapView'
+import CancelOrderModal from '../components/orders/CancelOrderModal'
 
 const steps = [
   { icon: FiCheck, label: 'Đã xác nhận', statusId: 'confirmed' },
@@ -22,6 +23,7 @@ export default function OrderTrackingPage() {
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [shipperLocation, setShipperLocation] = useState(null)
+  const [showCancelModal, setShowCancelModal] = useState(false)
 
   useEffect(() => {
     let targetOrderId = location.state?.orderId
@@ -34,6 +36,13 @@ export default function OrderTrackingPage() {
           setOrder(data)
           const stepIndex = steps.findIndex(s => s.statusId === data.status)
           if (stepIndex !== -1) setCurrentStep(stepIndex)
+          
+          if (data.shipperLocation) {
+            setShipperLocation({
+              lat: data.shipperLocation.lat,
+              lng: data.shipperLocation.lng
+            })
+          }
         }
       } catch (error) {
         console.error('Error fetching order:', error)
@@ -102,6 +111,20 @@ export default function OrderTrackingPage() {
     init()
   }, [location.state, user])
 
+  const handleCancelSuccess = () => {
+    // Refresh order data
+    if (order?._id) {
+      fetch(`http://localhost:5000/api/orders/${order._id}`)
+        .then(res => res.json())
+        .then(data => {
+          setOrder(data);
+          const stepIndex = steps.findIndex(s => s.statusId === data.status);
+          if (stepIndex !== -1) setCurrentStep(stepIndex);
+        })
+        .catch(console.error);
+    }
+  };
+
 
 
   if (loading) {
@@ -133,12 +156,31 @@ export default function OrderTrackingPage() {
               animate={{ scale: [1, 1.1, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              {currentStep < 3 ? '🛵' : '✅'}
+              {order.status === 'cancelled' ? '❌' : currentStep < 3 ? '🛵' : '✅'}
             </motion.span>
             <h1 className="text-2xl font-display font-bold dark:text-white">
-              {currentStep < 3 ? 'Đang theo dõi đơn hàng' : 'Giao hàng thành công!'}
+              {order.status === 'cancelled' 
+                ? 'Đơn hàng đã bị hủy'
+                : currentStep < 3 
+                  ? 'Đang theo dõi đơn hàng' 
+                  : 'Giao hàng thành công!'
+              }
             </h1>
             <p className="text-gray-400 text-sm mt-1">Đơn hàng #{order._id.substring(0, 8).toUpperCase()}</p>
+            
+            {/* Nút hủy đơn - chỉ hiển thị khi đơn hàng có thể hủy */}
+            {['pending', 'confirmed', 'preparing'].includes(order.status) && (
+              <motion.button
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                onClick={() => setShowCancelModal(true)}
+                className="mt-4 inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-semibold transition-colors border-2 border-red-500/20 hover:border-red-500/40"
+              >
+                <FiX size={18} />
+                <span>Hủy đơn hàng</span>
+              </motion.button>
+            )}
           </div>
 
           {/* Progress */}
@@ -303,8 +345,55 @@ export default function OrderTrackingPage() {
               </div>
             </div>
           )}
+
+          {/* Hiển thị thông tin hủy đơn nếu đơn bị hủy */}
+          {order.status === 'cancelled' && (
+            <div className="mt-8 p-6 rounded-2xl bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-2xl flex-shrink-0">
+                  ❌
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-red-700 dark:text-red-400 text-lg mb-2">
+                    Đơn hàng đã bị hủy
+                  </h3>
+                  {order.cancellationReason && (
+                    <p className="text-red-600 dark:text-red-300 text-sm mb-2">
+                      <strong>Lý do:</strong> {order.cancellationReason}
+                    </p>
+                  )}
+                  {order.cancelledAt && (
+                    <p className="text-red-500 dark:text-red-400 text-xs">
+                      Hủy lúc: {new Date(order.cancelledAt).toLocaleString('vi-VN')}
+                    </p>
+                  )}
+                  {order.paymentStatus === 'refunded' && (
+                    <div className="mt-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                      <p className="text-green-700 dark:text-green-400 text-sm font-semibold flex items-center gap-2">
+                        <span>💰</span>
+                        <span>
+                          {order.paymentMethod === 'coins' 
+                            ? 'Xu đã được hoàn lại vào tài khoản'
+                            : 'Tiền sẽ được hoàn lại trong 3-5 ngày làm việc'
+                          }
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
       </div>
+
+      {/* Cancel Order Modal */}
+      <CancelOrderModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        order={order}
+        onSuccess={handleCancelSuccess}
+      />
 
       {/* Chat Button - chỉ hiển thị khi có đơn hàng */}
       {order && <ChatButton orderId={order._id} />}

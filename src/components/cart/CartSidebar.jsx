@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FiX, FiMinus, FiPlus, FiTrash2, FiTag, FiCheck } from 'react-icons/fi'
 import { closeCart, removeFromCart, updateQuantity, applyVoucher, removeVoucher, selectCartTotal, selectCartCount } from '../../store/slices/cartSlice'
 import { formatPrice } from '../../data/mockData'
+import toast from 'react-hot-toast'
 
 export default function CartSidebar() {
   const dispatch = useDispatch()
@@ -17,12 +18,16 @@ export default function CartSidebar() {
   const [voucherLoading, setVoucherLoading] = useState(false)
 
   const deliveryFee = total > 100000 ? 0 : 15000
-  const finalTotal = Math.max(0, total + deliveryFee - discount)
+  const finalTotal = Math.max(0, total + deliveryFee - (discount || 0))
 
   // Validate voucher qua API
   const handleApplyVoucher = async (code) => {
     const c = (code || voucherCode).trim().toUpperCase()
-    if (!c) return
+    if (!c) {
+      toast.error('Vui lòng nhập mã voucher', { icon: '⚠️' })
+      return
+    }
+    
     setVoucherLoading(true)
     try {
       const res = await fetch('http://localhost:5000/api/vouchers/validate', {
@@ -31,15 +36,39 @@ export default function CartSidebar() {
         body: JSON.stringify({ code: c, userId: user?._id || user?.id, orderTotal: total })
       })
       const data = await res.json()
+      
       if (res.ok && data.valid) {
         dispatch(applyVoucher({ code: c, discountAmount: data.discount, voucherInfo: data.voucher }))
         setVoucherCode('')
-        toast.success(data.message, { icon: '🎫' })
+        toast.success(data.message || `Áp dụng mã ${c} thành công!`, { 
+          icon: '🎉',
+          duration: 3000,
+          style: {
+            background: '#10b981',
+            color: '#fff',
+            fontWeight: 'bold'
+          }
+        })
       } else {
-        toast.error(data.message || 'Mã không hợp lệ')
+        // Hiển thị thông báo lỗi từ server với style nổi bật
+        const errorIcon = data.shortage ? '💰' : '❌'
+        toast.error(data.message || 'Mã voucher không hợp lệ', { 
+          icon: errorIcon,
+          duration: 5000,
+          style: {
+            background: '#ef4444',
+            color: '#fff',
+            fontWeight: 'bold',
+            maxWidth: '400px'
+          }
+        })
       }
-    } catch {
-      toast.error('Lỗi kết nối server')
+    } catch (error) {
+      console.error('Voucher validation error:', error)
+      toast.error('Không thể kết nối đến server. Vui lòng thử lại!', { 
+        icon: '⚠️',
+        duration: 4000
+      })
     } finally {
       setVoucherLoading(false)
     }
@@ -165,10 +194,11 @@ export default function CartSidebar() {
                     />
                   </div>
                   <button
-                    onClick={() => { dispatch(applyVoucher(voucherCode)); setVoucherCode('') }}
-                    className="px-5 py-3 bg-gradient-primary text-white text-sm font-bold rounded-2xl hover:shadow-glow transition-all duration-300"
+                    onClick={() => handleApplyVoucher(voucherCode)}
+                    disabled={voucherLoading}
+                    className="px-5 py-3 bg-gradient-primary text-white text-sm font-bold rounded-2xl hover:shadow-glow transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Áp dụng
+                    {voucherLoading ? 'Đang kiểm tra...' : 'Áp dụng'}
                   </button>
                 </div>
                 
@@ -180,8 +210,9 @@ export default function CartSidebar() {
                       {user.vouchers.map(v => (
                         <button 
                           key={v} 
-                          onClick={() => dispatch(applyVoucher(v))}
-                          className="text-xs px-3 py-1.5 rounded-xl border border-primary-200/50 bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 font-bold hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 dark:hover:text-white transition-all shadow-sm"
+                          onClick={() => handleApplyVoucher(v)}
+                          disabled={voucherLoading}
+                          className="text-xs px-3 py-1.5 rounded-xl border border-primary-200/50 bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 font-bold hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 dark:hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {v}
                         </button>

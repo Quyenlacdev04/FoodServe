@@ -74,13 +74,14 @@ cd server && npm run dev
 - ✅ Đổi mật khẩu (có thanh độ mạnh)
 - ✅ Cập nhật hồ sơ, avatar
 - ✅ Lịch sử đơn hàng
-- ✅ Theo dõi đơn hàng real-time + GPS
+- ✅ **Theo dõi đơn hàng real-time + GPS + Vẽ đường đi**
+- ✅ **Hủy đơn hàng với lý do + Hoàn tiền tự động**
 - ✅ Yêu thích nhà hàng ❤️
 - ✅ Chat với shipper 💬
 - ✅ Đánh giá & Review ⭐
-- ✅ Kho voucher cá nhân
+- ✅ **Kho voucher cá nhân + Cảnh báo sắp hết hạn**
 - ✅ Gamification: Xu, Vòng quay may mắn, Bảng xếp hạng
-- ✅ 🤖 FoodBot AI gợi ý món ăn + đặt ngay từ chat
+- ✅ 🤖 FoodBot AI gợi ý món ăn + **đặt hàng tự động qua chat**
 
 ### 🔍 Tìm kiếm & Lọc
 - ✅ Tìm kiếm nhà hàng, món ăn
@@ -134,10 +135,16 @@ cd server && npm run dev
 - ✅ Cấu hình hệ thống
 - ✅ Thông báo real-time đơn hàng mới + thanh toán
 
-### 🤖 FoodBot AI
+### 🤖 FoodBot AI (⚡ MỚI: Đặt hàng tự động)
 - ✅ Gợi ý món ăn theo thời tiết, tâm trạng, bữa ăn
 - ✅ Dữ liệu gợi ý lấy từ menu thực tế trong DB
 - ✅ Nút "Đặt ngay" trực tiếp từ chat
+- ✅ **🚀 ĐẶT HÀNG TỰ ĐỘNG QUA CHAT** (30-45 giây!)
+  - Chatbot hỏi địa chỉ, SĐT, thanh toán
+  - Quick action buttons để đặt nhanh
+  - Auto-fill thông tin từ profile
+  - Progress bar theo dõi tiến trình
+  - Có thể hủy bất cứ lúc nào
 - ✅ Trả lời câu hỏi về FoodServe & tính năng
 - ✅ Từ chối lịch sự khi hỏi ngoài phạm vi
 - ✅ Fallback thông minh khi không có API key
@@ -253,6 +260,7 @@ DELETE /api/restaurants/menu/:itemId # Xóa món
 POST   /api/orders                       # Tạo đơn hàng
 GET    /api/orders/:id                   # Chi tiết đơn
 PATCH  /api/orders/:id/status            # Cập nhật trạng thái
+POST   /api/orders/:id/cancel            # Hủy đơn hàng với lý do (⚡ MỚI)
 GET    /api/orders/shipper/available     # Đơn có sẵn cho shipper
 POST   /api/orders/:id/accept-shipper    # Shipper nhận đơn
 PATCH  /api/orders/:id/update-location   # Cập nhật GPS
@@ -270,6 +278,7 @@ POST /api/payment/coins/pay              # Thanh toán bằng Xu
 ### Chatbot AI
 ```
 POST /api/chatbot/chat                   # Chat với FoodBot
+POST /api/chatbot/create-order           # Tạo đơn hàng qua chatbot (⚡ MỚI)
 ```
 
 ### Upload

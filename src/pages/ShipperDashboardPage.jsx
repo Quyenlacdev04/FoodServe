@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,11 +6,12 @@ import {
   FiHome, FiPackage, FiTruck, FiDollarSign, FiStar, FiUser,
   FiPhone, FiCamera, FiSave, FiLock, FiEye, FiEyeOff, FiClock,
   FiCheckCircle, FiMapPin, FiNavigation, FiChevronDown, FiChevronUp,
-  FiAward, FiGift, FiChevronLeft, FiChevronRight
+  FiAward, FiGift, FiChevronLeft, FiChevronRight, FiX, FiZap, FiBell
 } from 'react-icons/fi';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { io } from 'socket.io-client';
 import AvailableOrders from '../components/shipper/AvailableOrders';
 import ActiveDelivery from '../components/shipper/ActiveDelivery';
 import ChatButton from '../components/chat/ChatButton';
@@ -678,9 +679,145 @@ function ShipperProfile({ user, onNavigate }) {
   );
 }
 
+// ===== INCOMING ORDER POPUP (Hiển thị trên bản đồ) =====
+const ORDER_POPUP_TIMEOUT = 120; // 2 phút
+
+function IncomingOrderPopup({ order, onAccept, onReject, accepting }) {
+  const [timeLeft, setTimeLeft] = useState(ORDER_POPUP_TIMEOUT);
+
+  useEffect(() => {
+    if (timeLeft <= 0) { onReject(); return; }
+    const t = setTimeout(() => setTimeLeft(p => p - 1), 1000);
+    return () => clearTimeout(t);
+  }, [timeLeft]);
+
+  const pct = (timeLeft / ORDER_POPUP_TIMEOUT) * 100;
+  const isUrgent = timeLeft <= 30;
+  const isWarning = timeLeft <= 60;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 300, scale: 0.8 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 300, scale: 0.8 }}
+      transition={{ type: 'spring', damping: 22, stiffness: 260 }}
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[1000] w-[94vw] max-w-md"
+    >
+      <div className="bg-white rounded-3xl shadow-2xl border-2 border-primary-500 overflow-hidden" style={{ boxShadow: '0 -8px 60px rgba(255,107,53,0.3), 0 20px 60px rgba(0,0,0,0.15)' }}>
+        {/* Thanh đếm ngược trên cùng */}
+        <div className="h-1.5 bg-gray-100">
+          <motion.div
+            className={`h-full ${isUrgent ? 'bg-red-500' : isWarning ? 'bg-yellow-400' : 'bg-primary-500'}`}
+            initial={{ width: '100%' }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 1, ease: 'linear' }}
+          />
+        </div>
+
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary-600 via-primary-500 to-orange-400 px-5 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <motion.div animate={{ rotate: [0, -15, 15, -15, 15, 0] }} transition={{ repeat: Infinity, duration: 1, repeatDelay: 0.5 }}>
+              <FiBell className="text-white text-xl" />
+            </motion.div>
+            <div>
+              <div className="text-white font-bold text-sm">🛒 Đơn hàng mới!</div>
+              <div className="text-white/70 text-[10px]">Có người đặt hàng gần bạn</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-mono font-black px-2 py-1 rounded-lg ${isUrgent ? 'bg-red-500/30 text-red-100' : 'bg-white/20 text-white/90'}`}>
+              {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+            </span>
+            <button onClick={onReject} className="text-white/60 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
+              <FiX size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-3">
+          {/* Mã đơn & Giá */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-gray-400 mb-0.5">Mã đơn</div>
+              <div className="font-mono font-black text-gray-800 text-sm">#{String(order._id || '').slice(-8).toUpperCase()}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-black text-primary-600">{formatPrice(order.finalAmount || 0)}</div>
+              <div className="text-xs font-bold text-green-600">🪙 +{Math.ceil((order.deliveryFee || 15000) * 0.9 / 1000)} Xu</div>
+            </div>
+          </div>
+
+          {/* Món ăn */}
+          {order.items?.length > 0 && (
+            <div className="bg-gray-50 rounded-xl px-3 py-2.5">
+              <div className="text-xs font-bold text-gray-500 mb-1">🍽️ {order.items.length} món</div>
+              {order.items.slice(0, 3).map((item, i) => (
+                <div key={i} className="text-xs text-gray-600 py-0.5">• {item.quantity}x {item.name} — {formatPrice(item.price * item.quantity)}</div>
+              ))}
+              {order.items.length > 3 && <div className="text-xs text-gray-400 mt-0.5">+{order.items.length - 3} món khác</div>}
+            </div>
+          )}
+
+          {/* Địa chỉ giao */}
+          {order.deliveryAddress && (
+            <div className="flex items-start gap-2 bg-blue-50 rounded-xl px-3 py-2.5">
+              <FiMapPin className="text-blue-500 mt-0.5 shrink-0" size={14} />
+              <div>
+                <div className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider mb-0.5">Giao đến</div>
+                <div className="text-xs text-blue-700 font-medium leading-relaxed">{order.deliveryAddress}</div>
+              </div>
+            </div>
+          )}
+
+          {/* SĐT + Phương thức thanh toán */}
+          <div className="flex items-center justify-between text-xs text-gray-400">
+            {order.contactPhone && <span className="flex items-center gap-1">📞 {order.contactPhone}</span>}
+            <span className="flex items-center gap-1">
+              {order.paymentMethod === 'cash' ? '💵 COD' : order.paymentMethod === 'momo' ? '💜 MoMo' : order.paymentMethod === 'coins' ? '🪙 Xu' : '💳 Online'}
+            </span>
+          </div>
+        </div>
+
+        {/* Nút Chấp nhận / Từ chối */}
+        <div className="px-5 pb-4 flex gap-3">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={onReject}
+            className="flex-1 py-3.5 rounded-2xl border-2 border-red-200 bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+          >
+            <FiX size={16} />
+            Từ chối
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onAccept(order._id)}
+            disabled={accepting}
+            className="flex-[2] py-3.5 rounded-2xl bg-gradient-to-r from-primary-500 to-orange-400 text-white font-bold text-sm hover:shadow-lg hover:shadow-primary-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {accepting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                Đang nhận...
+              </>
+            ) : (
+              <>
+                <FiZap size={16} />
+                Chấp nhận
+              </>
+            )}
+          </motion.button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 // ===== MAIN =====
 export default function ShipperDashboardPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector(s => s.auth);
   const [activeTab, setActiveTab] = useState('home');
   const [activeOrderId, setActiveOrderId] = useState(null);
@@ -689,7 +826,10 @@ export default function ShipperDashboardPage() {
   const [stats, setStats] = useState({ total: 0, earnings: 0, rating: 0 });
   const [todayOrders, setTodayOrders] = useState(0);
   const [showOnlineConfirm, setShowOnlineConfirm] = useState(false);
+  const [incomingOrder, setIncomingOrder] = useState(null);
+  const [acceptingOrder, setAcceptingOrder] = useState(false);
   const watchIdRef = useRef(null);
+  const socketRef = useRef(null);
 
   useEffect(() => {
     if (!isAuthenticated) { navigate('/'); return; }
@@ -703,14 +843,98 @@ export default function ShipperDashboardPage() {
   useEffect(() => {
     if (isOnline && navigator.geolocation) {
       watchIdRef.current = navigator.geolocation.watchPosition(
-        pos => setPosition([pos.coords.latitude, pos.coords.longitude]),
+        pos => {
+          const newPos = [pos.coords.latitude, pos.coords.longitude];
+          setPosition(newPos);
+          
+          // Gửi vị trí real-time lên server nếu tài xế đang online
+          // Backend sẽ tự động broadcast đến các đơn hàng đang giao của tài xế này
+          if (isOnline && user?._id) {
+            fetch(`http://localhost:5000/api/shipper/update-location`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                shipperId: user._id,
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude
+              })
+            }).catch(err => console.error('Failed to update location:', err));
+          }
+        },
         () => {}, { enableHighAccuracy: true, maximumAge: 5000 }
       );
     } else if (watchIdRef.current) {
       navigator.geolocation.clearWatch(watchIdRef.current);
     }
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
+  }, [isOnline, user]);
+
+  // ===== Socket.io: Lắng nghe đơn hàng mới real-time =====
+  useEffect(() => {
+    const socket = io('http://localhost:5000');
+    socketRef.current = socket;
+
+    socket.on('new-order', (order) => {
+      if (!isOnline) return;
+
+      // Âm thanh thông báo
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.3);
+          osc.start(ctx.currentTime + i * 0.15);
+          osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+        });
+      } catch {}
+
+      // Hiển thị popup đơn hàng mới
+      setIncomingOrder(order);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [isOnline]);
+
+  // ===== Nhận đơn hàng =====
+  const handleAcceptIncomingOrder = useCallback(async (orderId) => {
+    setAcceptingOrder(true);
+    try {
+      const shipperId = user?._id || user?.id;
+      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/accept-shipper`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipperId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('✅ Đã nhận đơn hàng thành công!');
+        setIncomingOrder(null);
+        setActiveTab('active');
+        fetchStats();
+      } else {
+        toast.error(data.message || 'Không thể nhận đơn');
+      }
+    } catch {
+      toast.error('Lỗi kết nối!');
+    } finally {
+      setAcceptingOrder(false);
+    }
+  }, [user]);
+
+  // ===== Từ chối đơn hàng =====
+  const handleRejectIncomingOrder = useCallback(() => {
+    setIncomingOrder(null);
+    toast('Đã bỏ qua đơn hàng', { icon: '👋', duration: 2000 });
+  }, []);
 
   const fetchStats = async () => {
     try {
@@ -801,6 +1025,18 @@ export default function ShipperDashboardPage() {
             </button>
           </div>
 
+          {/* Popup đơn hàng mới — hiện ngay trên bản đồ */}
+          <AnimatePresence>
+            {incomingOrder && (
+              <IncomingOrderPopup
+                order={incomingOrder}
+                onAccept={handleAcceptIncomingOrder}
+                onReject={handleRejectIncomingOrder}
+                accepting={acceptingOrder}
+              />
+            )}
+          </AnimatePresence>
+
           {/* Bottom Panel */}
           <div className="absolute bottom-16 left-0 right-0 max-w-2xl mx-auto px-4 z-[500]">
             <div className="bg-white rounded-3xl shadow-2xl p-3">
@@ -872,7 +1108,7 @@ export default function ShipperDashboardPage() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-dark-300">
-            {activeTab === 'available' && <div className="p-4"><AvailableOrders shipperId={user?._id || user?.id} onOrderAccepted={() => setActiveTab('active')} isOnline={isOnline} /></div>}
+            {activeTab === 'available' && <div className="p-4"><AvailableOrders shipperId={user?._id || user?.id} onOrderAccepted={() => setActiveTab('active')} isOnline={isOnline} shipperLocation={position ? { lat: position[0], lng: position[1] } : null} /></div>}
             {activeTab === 'active' && <div className="p-4"><ActiveDelivery shipperId={user?._id || user?.id} onDeliveryCompleted={() => { setActiveTab('available'); fetchStats(); }} onOrderChange={id => setActiveOrderId(id)} /></div>}
             {activeTab === 'history' && <ShipperHistory shipperId={user?._id || user?.id} />}
             {activeTab === 'profile' && <ShipperProfile user={user} onNavigate={setActiveTab} />}

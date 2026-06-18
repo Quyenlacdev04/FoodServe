@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiMapPin, FiPhone, FiPackage, FiCheckCircle, FiNavigation, FiArrowRight } from 'react-icons/fi';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import SimpleMapView from '../tracking/SimpleMapView';
 
 // Helper: hiển thị trạng thái thanh toán
 const PaymentBadge = ({ order }) => {
@@ -119,6 +120,10 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
   const [activeOrder, setActiveOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [shipperLocation, setShipperLocation] = useState(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simStep, setSimStep] = useState(0);
+  const [simPhase, setSimPhase] = useState('to_restaurant');
 
   useEffect(() => {
     fetchActiveOrder();
@@ -143,28 +148,113 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
         onOrderChange(activeOrder._id);
       }
       
-      // Cập nhật vị trí mỗi 10 giây
-      const interval = setInterval(updateLocation, 10000);
-      return () => clearInterval(interval);
+      // Khởi chạy cập nhật vị trí ngay lập tức nếu không trong chế độ giả lập
+      if (!isSimulating) {
+        updateLocation();
+        const interval = setInterval(updateLocation, 10000);
+        return () => clearInterval(interval);
+      }
     } else {
       // Không có đơn nào
       if (onOrderChange) {
         onOrderChange(null);
       }
     }
+  }, [activeOrder, isSimulating]);
+
+  // Đồng bộ phase của giả lập dựa trên status đơn hàng
+  useEffect(() => {
+    if (activeOrder) {
+      if (activeOrder.status === 'delivering') {
+        setSimPhase('to_customer');
+      } else {
+        setSimPhase('to_restaurant');
+      }
+    }
+  }, [activeOrder?.status]);
+
+  // Tắt giả lập khi không còn đơn hàng nào hoạt động
+  useEffect(() => {
+    if (!activeOrder) {
+      setIsSimulating(false);
+      setSimStep(0);
+    }
   }, [activeOrder]);
+
+  // Reset bước giả lập khi chuyển đổi phase (đi đến nhà hàng -> đi đến khách hàng)
+  useEffect(() => {
+    setSimStep(0);
+  }, [simPhase]);
+
+  // Vòng lặp chạy giả lập di chuyển GPS
+  useEffect(() => {
+    if (!isSimulating || !activeOrder) return;
+
+    const interval = setInterval(() => {
+      setSimStep(prevStep => {
+        const nextStep = prevStep + 1;
+        const maxSteps = 10;
+        
+        const restaurantLoc = activeOrder.restaurant?.location || { lat: 10.762622, lng: 106.660172 };
+        const customerLoc = activeOrder.deliveryLocation || { lat: 10.773996, lng: 106.700981 };
+        
+        let startPoint, endPoint;
+        
+        if (simPhase === 'to_restaurant') {
+          // Bắt đầu từ vị trí gần đó và di chuyển đến Nhà hàng
+          startPoint = {
+            lat: restaurantLoc.lat - 0.008,
+            lng: restaurantLoc.lng - 0.008
+          };
+          endPoint = restaurantLoc;
+        } else {
+          // Bắt đầu từ Nhà hàng và di chuyển đến Khách hàng
+          startPoint = restaurantLoc;
+          endPoint = customerLoc;
+        }
+        
+        const currentStep = Math.min(nextStep, maxSteps);
+        
+        const interpolatedLat = startPoint.lat + (endPoint.lat - startPoint.lat) * (currentStep / maxSteps);
+        const interpolatedLng = startPoint.lng + (endPoint.lng - startPoint.lng) * (currentStep / maxSteps);
+        
+        const newLoc = { lat: interpolatedLat, lng: interpolatedLng };
+        setShipperLocation(newLoc);
+        
+        fetch(`http://localhost:5000/api/orders/${activeOrder._id}/update-location`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newLoc)
+        }).catch(err => console.error('Simulated update error:', err));
+        
+        return currentStep;
+      });
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isSimulating, activeOrder?._id, simPhase]);
+
+  const toggleSimulation = () => {
+    setIsSimulating(prev => !prev);
+    toast.success(!isSimulating ? '🛵 Đã kích hoạt giả lập di chuyển GPS' : '🛑 Đã dừng giả lập di chuyển');
+  };
 
   const fetchActiveOrder = async () => {
     try {
       const response = await fetch(`http://localhost:5000/api/orders?shipperId=${shipperId}`);
       const data = await response.json();
       
-      // Lấy đơn đang giao (status = preparing hoặc delivering)
       const active = data.find(o => 
         o.status === 'preparing' || o.status === 'delivering' || o.status === 'ready'
       );
       
       setActiveOrder(active || null);
+      if (active && active.shipperLocation) {
+        setShipperLocation({
+          lat: active.shipperLocation.lat,
+          lng: active.shipperLocation.lng
+        });
+      }
     } catch (error) {
       console.error('Fetch active order error:', error);
     } finally {
@@ -173,13 +263,13 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
   };
 
   const updateLocation = async () => {
-    if (!activeOrder) return;
+    if (!activeOrder || isSimulating) return;
 
     try {
-      // Lấy vị trí hiện tại
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
+          setShipperLocation({ lat: latitude, lng: longitude });
           
           await fetch(`http://localhost:5000/api/orders/${activeOrder._id}/update-location`, {
             method: 'PATCH',
@@ -290,6 +380,42 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
         </div>
       </div>
 
+      {/* Giả lập GPS để Test */}
+      <div className="bg-primary-50/50 dark:bg-dark-200 border border-primary-100 dark:border-gray-700 rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <div className="font-bold text-gray-800 dark:text-white text-sm flex items-center gap-1.5">
+              <span>🛵</span> Chức năng giả lập di chuyển GPS
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Tự động di chuyển tọa độ shipper trên bản đồ để kiểm tra thực tế
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={toggleSimulation}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              isSimulating
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-primary-500 text-white hover:bg-primary-600'
+            }`}
+          >
+            {isSimulating ? '🛑 Tắt giả lập' : '⚡ Bật giả lập'}
+          </button>
+        </div>
+        
+        {isSimulating && (
+          <div className="mt-3 pt-3 border-t border-primary-100/30 dark:border-gray-700/30 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+            <span>
+              Trạng thái giả lập: <strong>{simPhase === 'to_customer' ? 'Giao đến Khách' : 'Đến Nhà hàng'}</strong>
+            </span>
+            <span>
+              Tọa độ: <strong>{shipperLocation?.lat?.toFixed(5)}, {shipperLocation?.lng?.toFixed(5)}</strong>
+            </span>
+          </div>
+        )}
+      </div>
+
       <div className="bg-gradient-to-r from-primary-50 to-amber-50 rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm text-gray-600">Tổng tiền đơn:</div>
@@ -319,6 +445,27 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
 
       {/* Stepper địa chỉ lấy hàng → giao hàng */}
       <AddressStepper order={activeOrder} />
+
+      {/* Bản đồ định vị và vẽ đường giao hàng */}
+      <div className="mb-6">
+        <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
+          <span>📍</span> Bản đồ lộ trình giao hàng
+        </h3>
+        <SimpleMapView
+          restaurantLocation={
+            activeOrder.restaurant?.location
+              ? { lat: activeOrder.restaurant.location.lat, lng: activeOrder.restaurant.location.lng }
+              : { lat: 10.762622, lng: 106.660172 }
+          }
+          customerLocation={
+            activeOrder.deliveryLocation
+              ? { lat: activeOrder.deliveryLocation.lat, lng: activeOrder.deliveryLocation.lng }
+              : { lat: 10.773996, lng: 106.700981 }
+          }
+          shipperLocation={shipperLocation}
+          orderStatus={activeOrder.status}
+        />
+      </div>
 
       {/* Items */}
       <div className="mb-6">

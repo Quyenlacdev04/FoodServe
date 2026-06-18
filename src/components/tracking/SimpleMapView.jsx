@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import L from 'leaflet';
+import 'leaflet-routing-machine';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 
 // Fix icon Leaflet bị vỡ khi dùng với bundler
 delete L.Icon.Default.prototype._getIconUrl;
@@ -25,9 +27,49 @@ const createIcon = (emoji, color) => L.divIcon({
   className: ''
 });
 
+// Icon shipper có animation pulse
+const createShipperIcon = () => L.divIcon({
+  html: `
+    <div style="position:relative;width:50px;height:50px;display:flex;align-items:center;justify-content:center;">
+      <div style="
+        position:absolute;
+        width:40px;height:40px;
+        border-radius:50%;
+        background:rgba(16,185,129,0.3);
+        animation:pulse 2s infinite;
+      "></div>
+      <div style="
+        width:40px;height:40px;border-radius:50% 50% 50% 0;
+        background:#10B981;border:3px solid white;
+        box-shadow:0 4px 12px rgba(16,185,129,0.5);
+        display:flex;align-items:center;justify-content:center;
+        font-size:18px;transform:rotate(-45deg);
+        animation:bounce 1s infinite;
+      ">
+        <span style="transform:rotate(45deg)">🛵</span>
+      </div>
+    </div>
+    <style>
+      @keyframes pulse {
+        0% { transform:scale(1); opacity:1; }
+        50% { transform:scale(1.5); opacity:0.5; }
+        100% { transform:scale(2); opacity:0; }
+      }
+      @keyframes bounce {
+        0%, 100% { transform:rotate(-45deg) translateY(0); }
+        50% { transform:rotate(-45deg) translateY(-5px); }
+      }
+    </style>
+  `,
+  iconSize: [50, 50],
+  iconAnchor: [25, 45],
+  popupAnchor: [0, -45],
+  className: ''
+});
+
 const restaurantIcon = createIcon('🏪', '#EF4444');
 const customerIcon   = createIcon('🏠', '#3B82F6');
-const shipperIcon    = createIcon('🛵', '#10B981');
+const shipperIcon    = createShipperIcon();
 
 export default function SimpleMapView({
   restaurantLocation,
@@ -38,6 +80,8 @@ export default function SimpleMapView({
   const mapRef   = useRef(null);
   const mapObj   = useRef(null);
   const markers  = useRef({ restaurant: null, customer: null, shipper: null });
+  const routingControl = useRef(null);
+  const routeInfo = useRef({ distance: null, duration: null });
 
   // Khởi tạo bản đồ
   useEffect(() => {
@@ -62,17 +106,23 @@ export default function SimpleMapView({
     mapObj.current = map;
 
     return () => {
+      if (routingControl.current) {
+        map.removeControl(routingControl.current);
+        routingControl.current = null;
+      }
       map.remove();
       mapObj.current = null;
     };
   }, []);
 
-  // Cập nhật markers & fit bounds
+  // Cập nhật markers, routing & fit bounds
   useEffect(() => {
     const map = mapObj.current;
     if (!map) return;
 
     const bounds = [];
+    const isDelivering = orderStatus === 'delivering' || orderStatus === 'ready' || orderStatus === 'preparing';
+    const isPickedUp = orderStatus === 'delivering'; // Đã lấy hàng
 
     // Marker nhà hàng
     if (restaurantLocation) {
@@ -101,7 +151,6 @@ export default function SimpleMapView({
     }
 
     // Marker shipper (chỉ hiện khi đang giao)
-    const isDelivering = orderStatus === 'delivering' || orderStatus === 'ready';
     if (shipperLocation && isDelivering) {
       const pos = [shipperLocation.lat, shipperLocation.lng];
       if (markers.current.shipper) {
@@ -117,16 +166,102 @@ export default function SimpleMapView({
       markers.current.shipper = null;
     }
 
+    // ========== VẼ ĐƯỜNG ĐI ==========
+    // Xóa đường đi cũ nếu có
+    if (routingControl.current) {
+      map.removeControl(routingControl.current);
+      routingControl.current = null;
+    }
+
+    // Vẽ đường đi mới
+    if (restaurantLocation && customerLocation && isDelivering) {
+      let waypoints = [];
+      
+      if (isPickedUp && shipperLocation) {
+        // Đã lấy hàng → vẽ từ shipper đến khách hàng
+        waypoints = [
+          L.latLng(shipperLocation.lat, shipperLocation.lng),
+          L.latLng(customerLocation.lat, customerLocation.lng)
+        ];
+      } else if (!isPickedUp && shipperLocation) {
+        // Chưa lấy hàng (status=ready) → vẽ từ shipper → nhà hàng → khách hàng
+        waypoints = [
+          L.latLng(shipperLocation.lat, shipperLocation.lng),
+          L.latLng(restaurantLocation.lat, restaurantLocation.lng),
+          L.latLng(customerLocation.lat, customerLocation.lng)
+        ];
+      } else {
+        // Không có vị trí shipper → vẽ từ nhà hàng đến khách
+        waypoints = [
+          L.latLng(restaurantLocation.lat, restaurantLocation.lng),
+          L.latLng(customerLocation.lat, customerLocation.lng)
+        ];
+      }
+
+      routingControl.current = L.Routing.control({
+        waypoints,
+        routeWhileDragging: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        showAlternatives: false,
+        lineOptions: {
+          styles: [{ 
+            color: '#10B981', 
+            opacity: 0.8, 
+            weight: 5 
+          }],
+          extendToWaypoints: true,
+          missingRouteTolerance: 0
+        },
+        createMarker: () => null, // Ẩn marker mặc định (đã có custom markers)
+        router: L.Routing.osrmv1({
+          serviceUrl: 'https://router.project-osrm.org/route/v1',
+          profile: 'driving'
+        })
+        // Xóa formatter với language 'vi' vì không được hỗ trợ
+      }).addTo(map);
+
+      // Lắng nghe khi route được tính toán xong
+      routingControl.current.on('routesfound', (e) => {
+        const routes = e.routes;
+        if (routes && routes[0]) {
+          const summary = routes[0].summary;
+          routeInfo.current = {
+            distance: (summary.totalDistance / 1000).toFixed(1), // km
+            duration: Math.ceil(summary.totalTime / 60) // phút
+          };
+        }
+      });
+
+      // Ẩn bảng hướng dẫn chi tiết (giữ lại chỉ đường vẽ)
+      setTimeout(() => {
+        const routingContainer = document.querySelector('.leaflet-routing-container');
+        if (routingContainer) {
+          routingContainer.style.display = 'none';
+        }
+      }, 100);
+    }
+
     // Fit bản đồ vừa với tất cả markers
     if (bounds.length >= 2) {
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [80, 80] });
     } else if (bounds.length === 1) {
       map.setView(bounds[0], 15);
     }
   }, [restaurantLocation, customerLocation, shipperLocation, orderStatus]);
 
-  // Tính khoảng cách thẳng (km)
-  const calcDistance = () => {
+  // Lấy thông tin khoảng cách từ routing hoặc tính trực tiếp
+  const getDistanceInfo = () => {
+    // Ưu tiên dùng kết quả từ routing (đường đi thực tế)
+    if (routeInfo.current.distance && routeInfo.current.duration) {
+      return {
+        distance: routeInfo.current.distance,
+        eta: routeInfo.current.duration
+      };
+    }
+
+    // Fallback: tính khoảng cách thẳng (Haversine)
     if (!shipperLocation || !customerLocation) return null;
     const R = 6371;
     const dLat = (customerLocation.lat - shipperLocation.lat) * Math.PI / 180;
@@ -139,8 +274,8 @@ export default function SimpleMapView({
     return { distance: dist.toFixed(1), eta: Math.ceil(dist / 20 * 60) };
   };
 
-  const distInfo = calcDistance();
-  const isDelivering = orderStatus === 'delivering' || orderStatus === 'ready';
+  const distInfo = getDistanceInfo();
+  const isDelivering = orderStatus === 'delivering' || orderStatus === 'ready' || orderStatus === 'preparing';
 
   return (
     <div className="relative">

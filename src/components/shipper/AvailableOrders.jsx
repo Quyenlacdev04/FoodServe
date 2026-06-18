@@ -1,11 +1,36 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMapPin, FiClock, FiPackage, FiBell, FiX, FiZap } from 'react-icons/fi';
+import { FiMapPin, FiClock, FiPackage, FiBell, FiX, FiZap, FiNavigation } from 'react-icons/fi';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import { formatPrice } from '../../data/mockData';
 
 const ORDER_TIMEOUT = 120; // 2 phút (giây)
+
+// Tính khoảng cách giữa 2 tọa độ (Haversine formula) - trả về km
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  if (!lat1 || !lng1 || !lat2 || !lng2) return null;
+  
+  const R = 6371; // Bán kính trái đất (km)
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return distance;
+}
+
+// Format khoảng cách hiển thị
+function formatDistance(km) {
+  if (km === null || km === undefined) return null;
+  if (km < 1) return `${Math.round(km * 1000)}m`;
+  return `${km.toFixed(1)}km`;
+}
 
 // Tính thời gian còn lại của đơn hàng kể từ lúc tạo
 function getSecondsLeft(createdAt) {
@@ -69,7 +94,7 @@ function OrderTimer({ createdAt, onExpire }) {
 }
 
 // Popup đơn mới nổi lên — chỉ hiện khi vừa có đơn mới real-time
-function NewOrderPopup({ order, onAccept, onDismiss, accepting }) {
+function NewOrderPopup({ order, onAccept, onDismiss, accepting, shipperLocation }) {
   const [timeLeft, setTimeLeft] = useState(() => getSecondsLeft(order.createdAt || Date.now()));
 
   useEffect(() => {
@@ -79,6 +104,25 @@ function NewOrderPopup({ order, onAccept, onDismiss, accepting }) {
   }, [timeLeft]);
 
   const pct = (timeLeft / ORDER_TIMEOUT) * 100;
+
+  // Tính khoảng cách
+  const distanceToRestaurant = shipperLocation && order.restaurantLocation
+    ? calculateDistance(
+        shipperLocation.lat,
+        shipperLocation.lng,
+        order.restaurantLocation.lat,
+        order.restaurantLocation.lng
+      )
+    : null;
+
+  const distanceToCustomer = shipperLocation && order.customerLocation
+    ? calculateDistance(
+        shipperLocation.lat,
+        shipperLocation.lng,
+        order.customerLocation.lat,
+        order.customerLocation.lng
+      )
+    : null;
 
   return (
     <motion.div
@@ -110,6 +154,29 @@ function NewOrderPopup({ order, onAccept, onDismiss, accepting }) {
           <span className="text-xs text-gray-400">Mã đơn</span>
           <span className="font-mono font-bold text-sm">#{String(order._id || '').slice(-8).toUpperCase()}</span>
         </div>
+
+        {/* Khoảng cách */}
+        {(distanceToRestaurant !== null || distanceToCustomer !== null) && (
+          <div className="bg-blue-50 rounded-lg px-3 py-2 space-y-1">
+            {distanceToRestaurant !== null && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-blue-600 font-medium flex items-center gap-1">
+                  🏪 Đến quán
+                </span>
+                <span className="font-bold text-blue-700">{formatDistance(distanceToRestaurant)}</span>
+              </div>
+            )}
+            {distanceToCustomer !== null && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-green-600 font-medium flex items-center gap-1">
+                  📍 Giao hàng
+                </span>
+                <span className="font-bold text-green-700">{formatDistance(distanceToCustomer)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {order.deliveryAddress && (
           <div className="flex items-start gap-1.5">
             <FiMapPin className="text-primary-500 mt-0.5 flex-shrink-0" size={13} />
@@ -152,7 +219,7 @@ function NewOrderPopup({ order, onAccept, onDismiss, accepting }) {
   );
 }
 
-export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline }) {
+export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline, shipperLocation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(null);
@@ -281,6 +348,7 @@ export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline }
             onAccept={handleAcceptOrder}
             onDismiss={() => setNewOrderAlert(null)}
             accepting={accepting}
+            shipperLocation={shipperLocation}
           />
         )}
       </AnimatePresence>
@@ -308,7 +376,27 @@ export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline }
           </div>
 
           <AnimatePresence>
-            {orders.map((order, index) => (
+            {orders.map((order, index) => {
+              // Tính khoảng cách cho mỗi đơn hàng
+              const distanceToRestaurant = shipperLocation && order.restaurantLocation
+                ? calculateDistance(
+                    shipperLocation.lat,
+                    shipperLocation.lng,
+                    order.restaurantLocation.lat,
+                    order.restaurantLocation.lng
+                  )
+                : null;
+
+              const distanceToCustomer = shipperLocation && order.customerLocation
+                ? calculateDistance(
+                    shipperLocation.lat,
+                    shipperLocation.lng,
+                    order.customerLocation.lat,
+                    order.customerLocation.lng
+                  )
+                : null;
+
+              return (
               <motion.div
                 key={order._id}
                 initial={{ opacity: 0, y: 20 }}
@@ -333,6 +421,24 @@ export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline }
                     <div className="mt-1"><PaymentBadge order={order} /></div>
                   </div>
                 </div>
+
+                {/* Khoảng cách */}
+                {(distanceToRestaurant !== null || distanceToCustomer !== null) && (
+                  <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-xl px-3 py-2.5 mb-3 grid grid-cols-2 gap-3">
+                    {distanceToRestaurant !== null && (
+                      <div className="flex flex-col">
+                        <span className="text-xs text-blue-600 font-medium mb-0.5">🏪 Đến quán</span>
+                        <span className="text-sm font-black text-blue-700">{formatDistance(distanceToRestaurant)}</span>
+                      </div>
+                    )}
+                    {distanceToCustomer !== null && (
+                      <div className="flex flex-col">
+                        <span className="text-xs text-green-600 font-medium mb-0.5">📍 Giao hàng</span>
+                        <span className="text-sm font-black text-green-700">{formatDistance(distanceToCustomer)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Món ăn */}
                 {order.items?.length > 0 && (
@@ -388,7 +494,7 @@ export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline }
                   )}
                 </button>
               </motion.div>
-            ))}
+            )})}
           </AnimatePresence>
         </>
       )}

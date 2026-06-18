@@ -75,9 +75,81 @@ export default function FoodBot() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
+  // Conversation state for auto-order flow
+  const [conversationState, setConversationState] = useState({
+    orderIntent: null,      // { dishId, dishName, quantity, price }
+    address: null,
+    phone: null,
+    paymentMethod: null,
+    step: 'idle'           // idle, order_intent, ask_address, ask_phone, ask_payment, confirm
+  })
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Handle creating order via chatbot
+  const handleCreateOrder = async (orderData) => {
+    try {
+      const res = await fetch('http://localhost:5000/api/chatbot/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user._id,
+          dishId: orderData.dishId,
+          quantity: orderData.quantity || 1,
+          address: orderData.address,
+          phone: orderData.phone,
+          paymentMethod: orderData.paymentMethod,
+          note: orderData.note || ''
+        })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        // Add success message
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `${data.message}\n\n📦 Mã đơn: #${data.order.orderId.slice(-6).toUpperCase()}\n💰 Tổng tiền: ${Number(data.order.totalAmount).toLocaleString('vi-VN')}đ\n\nBạn có thể theo dõi đơn hàng trong mục **"Đơn hàng của tôi"** 🚀`,
+          time: new Date()
+        }])
+
+        // Reset conversation state
+        setConversationState({
+          orderIntent: null,
+          address: null,
+          phone: null,
+          paymentMethod: null,
+          step: 'idle'
+        })
+
+        // Show success toast
+        toast.success('🎉 Đặt hàng thành công qua Chatbot!', {
+          duration: 5000
+        })
+      } else {
+        throw new Error(data.message)
+      }
+    } catch (error) {
+      toast.error('❌ Lỗi khi đặt hàng: ' + error.message)
+      
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '😔 Xin lỗi, có lỗi khi đặt hàng. Bạn có thể thử lại hoặc đặt qua trang chủ nhé!',
+        time: new Date()
+      }])
+
+      // Reset state on error
+      setConversationState({
+        orderIntent: null,
+        address: null,
+        phone: null,
+        paymentMethod: null,
+        step: 'idle'
+      })
+    }
+  }
 
   const handleOrder = (dish) => {
     if (dish.restaurantId) {
@@ -119,12 +191,18 @@ export default function FoodBot() {
       const res = await fetch('http://localhost:5000/api/chatbot/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, history, userId: user?._id })
+        body: JSON.stringify({ 
+          message: msg, 
+          history, 
+          userId: user?._id,
+          conversationState // Send current conversation state
+        })
       })
 
       const data = await res.json()
 
       if (res.ok) {
+        // Add bot response
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: data.reply || 'Đây là gợi ý cho bạn!',
@@ -132,6 +210,9 @@ export default function FoodBot() {
           time: new Date(),
           source: data.source
         }])
+
+        // Handle bot response tags
+        handleBotResponse(data, msg)
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -153,6 +234,65 @@ export default function FoodBot() {
     }
   }
 
+  // Handle bot response and update conversation state
+  const handleBotResponse = (data, userMessage) => {
+    // 1. Order intent detected
+    if (data.orderIntent) {
+      setConversationState(prev => ({
+        ...prev,
+        orderIntent: data.orderIntent,
+        step: 'order_intent'
+      }))
+    }
+
+    // 2. Bot asking for address
+    if (data.askAddress) {
+      setConversationState(prev => ({
+        ...prev,
+        step: 'ask_address'
+      }))
+    }
+
+    // 3. Bot asking for phone
+    if (data.askPhone) {
+      // Save the address from user's previous message
+      if (conversationState.step === 'ask_address') {
+        setConversationState(prev => ({
+          ...prev,
+          address: userMessage,
+          step: 'ask_phone'
+        }))
+      } else {
+        setConversationState(prev => ({
+          ...prev,
+          step: 'ask_phone'
+        }))
+      }
+    }
+
+    // 4. Bot asking for payment
+    if (data.askPayment) {
+      // Save the phone from user's previous message
+      if (conversationState.step === 'ask_phone') {
+        setConversationState(prev => ({
+          ...prev,
+          phone: userMessage,
+          step: 'ask_payment'
+        }))
+      } else {
+        setConversationState(prev => ({
+          ...prev,
+          step: 'ask_payment'
+        }))
+      }
+    }
+
+    // 5. Create order
+    if (data.createOrder) {
+      handleCreateOrder(data.createOrder)
+    }
+  }
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -167,6 +307,14 @@ export default function FoodBot() {
       time: new Date(),
       dishes: []
     }])
+    // Reset conversation state
+    setConversationState({
+      orderIntent: null,
+      address: null,
+      phone: null,
+      paymentMethod: null,
+      step: 'idle'
+    })
   }
 
   return (
@@ -189,6 +337,49 @@ export default function FoodBot() {
           <FiRefreshCw size={16} />
         </button>
       </div>
+
+      {/* Order Progress Bar */}
+      {conversationState.step !== 'idle' && conversationState.orderIntent && (
+        <div className="px-4 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800 bg-primary-50 dark:bg-primary-900/10">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">
+              🛒 Đang đặt: {conversationState.orderIntent.dishName}
+            </span>
+            <button 
+              onClick={() => {
+                setConversationState({
+                  orderIntent: null,
+                  address: null,
+                  phone: null,
+                  paymentMethod: null,
+                  step: 'idle'
+                })
+                toast.success('Đã hủy đơn hàng')
+              }}
+              className="text-xs text-red-500 hover:text-red-600 font-medium"
+            >
+              Hủy
+            </button>
+          </div>
+          <div className="flex gap-1">
+            {['order_intent', 'ask_address', 'ask_phone', 'ask_payment', 'confirm'].map((step, idx) => (
+              <div 
+                key={step}
+                className={`flex-1 h-1 rounded-full transition-all ${
+                  ['order_intent', 'ask_address', 'ask_phone', 'ask_payment', 'confirm'].indexOf(conversationState.step) >= idx
+                    ? 'bg-primary-500'
+                    : 'bg-gray-200 dark:bg-gray-700'
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex items-center justify-between mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <span>{conversationState.address && '✓ Địa chỉ'}</span>
+            <span>{conversationState.phone && '✓ SĐT'}</span>
+            <span>{conversationState.paymentMethod && '✓ Thanh toán'}</span>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
@@ -262,7 +453,7 @@ export default function FoodBot() {
       </div>
 
       {/* Quick questions */}
-      {messages.length <= 2 && !loading && (
+      {messages.length <= 2 && !loading && conversationState.step === 'idle' && (
         <div className="px-4 pb-2 flex-shrink-0">
           <p className="text-xs text-gray-400 mb-2">💡 Gợi ý nhanh:</p>
           <div className="flex gap-2 flex-wrap">
@@ -273,6 +464,68 @@ export default function FoodBot() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Quick Payment Method Buttons */}
+      {conversationState.step === 'ask_payment' && !loading && (
+        <div className="px-4 pb-2 flex-shrink-0">
+          <p className="text-xs text-gray-400 mb-2">💳 Chọn nhanh phương thức:</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { method: 'cash', label: '💵 Tiền mặt', value: 'tiền mặt' },
+              { method: 'momo', label: '🟣 MoMo', value: 'momo' },
+              { method: 'coins', label: '🪙 Xu', value: 'xu' }
+            ].map(pm => (
+              <button 
+                key={pm.method}
+                onClick={() => {
+                  setInput(pm.value)
+                  // Auto send after short delay
+                  setTimeout(() => {
+                    sendMessage(pm.value)
+                  }, 100)
+                }}
+                className="text-xs px-3 py-2 bg-white dark:bg-dark-100 border-2 border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded-xl hover:bg-primary-50 hover:border-primary-400 transition-all font-medium"
+              >
+                {pm.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Use Saved Address Button */}
+      {conversationState.step === 'ask_address' && !loading && user?.address && (
+        <div className="px-4 pb-2 flex-shrink-0">
+          <button
+            onClick={() => {
+              setInput(user.address)
+              setTimeout(() => {
+                sendMessage(user.address)
+              }, 100)
+            }}
+            className="w-full text-xs px-3 py-2 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 text-primary-600 dark:text-primary-400 rounded-xl hover:bg-primary-100 transition-colors font-medium flex items-center justify-center gap-2"
+          >
+            📍 Dùng địa chỉ đã lưu: {user.address.slice(0, 40)}...
+          </button>
+        </div>
+      )}
+
+      {/* Use Saved Phone Button */}
+      {conversationState.step === 'ask_phone' && !loading && user?.phone && (
+        <div className="px-4 pb-2 flex-shrink-0">
+          <button
+            onClick={() => {
+              setInput(user.phone)
+              setTimeout(() => {
+                sendMessage(user.phone)
+              }, 100)
+            }}
+            className="w-full text-xs px-3 py-2 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 text-primary-600 dark:text-primary-400 rounded-xl hover:bg-primary-100 transition-colors font-medium flex items-center justify-center gap-2"
+          >
+            📞 Dùng SĐT đã lưu: {user.phone}
+          </button>
         </div>
       )}
 

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { clearCart, selectCartTotal } from '../store/slices/cartSlice'
 import { updateUser } from '../store/slices/authSlice'
 import { formatPrice } from '../data/mockData'
 import toast from 'react-hot-toast'
-import { FiMapPin, FiCreditCard, FiDollarSign, FiChevronLeft, FiPhone, FiUser, FiTruck } from 'react-icons/fi'
+import { FiMapPin, FiCreditCard, FiDollarSign, FiChevronLeft, FiPhone, FiUser, FiTruck, FiEdit2 } from 'react-icons/fi'
 import PaymentMethodSelector from '../components/payment/PaymentMethodSelector'
+import AddressPickerMap from '../components/map/AddressPickerMap'
 
 export default function CheckoutPage() {
   const navigate = useNavigate()
@@ -21,12 +22,26 @@ export default function CheckoutPage() {
   const [deliveryFee, setDeliveryFee] = useState(15000)
   const [deliveryDistance, setDeliveryDistance] = useState(null)
   const [feeLoading, setFeeLoading] = useState(false)
+  const [showMapPicker, setShowMapPicker] = useState(false)
+  const [deliveryCoordinates, setDeliveryCoordinates] = useState(null)
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
-    address: '',
+    address: '', // Always initialize as empty string
+    coordinates: null,
     note: ''
   })
+
+  // Sync user data safely
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: String(user.name || ''),
+        phone: String(user.phone || '')
+      }));
+    }
+  }, [user]);
 
   // Redirect to home if cart is empty
   useEffect(() => {
@@ -36,7 +51,7 @@ export default function CheckoutPage() {
     }
   }, [items, navigate, loading])
 
-  const finalTotal = Math.max(0, total + deliveryFee - discount)
+  const finalTotal = Math.max(0, total + deliveryFee - (discount || 0))
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -91,11 +106,16 @@ export default function CheckoutPage() {
           image: item.image
         })),
         totalAmount: total,
-        discount: discount,
+        discount: discount || 0,
         deliveryFee: deliveryFee,
         finalAmount: finalTotal,
         paymentMethod: paymentMethod,
         deliveryAddress: formData.address,
+        deliveryLocation: formData.coordinates ? {
+          lat: formData.coordinates.lat,
+          lng: formData.coordinates.lng,
+          address: formData.address
+        } : null,
         contactPhone: formData.phone,
         note: formData.note
       }
@@ -175,6 +195,26 @@ export default function CheckoutPage() {
 
   return (
     <div className="pt-24 pb-20 min-h-screen bg-gray-50 dark:bg-dark-300">
+
+      {/* Map Picker Modal */}
+      <AnimatePresence>
+        {showMapPicker && (
+          <AddressPickerMap
+            value={formData.address}
+            onChange={(addressText, coords) => {
+              // Ensure addressText is always a string
+              const safeAddress = typeof addressText === 'string' ? addressText : String(addressText || '');
+              setFormData(p => ({ 
+                ...p, 
+                address: safeAddress,
+                coordinates: coords ? { lat: coords[0], lng: coords[1] } : null
+              }));
+              setDeliveryCoordinates(coords); // Save coordinates [lat, lng]
+            }}
+            onClose={() => setShowMapPicker(false)}
+          />
+        )}
+      </AnimatePresence>
       <div className="max-w-6xl mx-auto px-4">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -201,55 +241,68 @@ export default function CheckoutPage() {
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Tên */}
                 <div className="relative">
                   <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text" name="name"
-                    value={formData.name} onChange={handleInputChange}
+                  <input type="text" name="name" value={formData.name} onChange={handleInputChange}
                     placeholder="Tên người nhận"
-                    className="input-search pl-11 w-full bg-dark-200"
-                    required
-                  />
+                    className="input-search pl-11 w-full bg-dark-200" required />
                 </div>
+                {/* SĐT */}
                 <div className="relative">
                   <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="tel" name="phone"
-                    value={formData.phone} onChange={handleInputChange}
+                  <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange}
                     placeholder="Số điện thoại"
-                    className="input-search pl-11 w-full bg-dark-200"
-                    required
-                  />
+                    className="input-search pl-11 w-full bg-dark-200" required />
                 </div>
-                <div className="relative md:col-span-2">
-                  <FiMapPin className="absolute left-4 top-4 text-gray-400" />
-                  <textarea
-                    name="address"
-                    value={formData.address} onChange={handleInputChange}
-                    placeholder="Địa chỉ giao hàng chi tiết (Số nhà, tên đường, phường/xã...)"
-                    className="input-search pl-11 w-full min-h-[100px] resize-none bg-dark-200 py-3"
-                    required
-                  ></textarea>
-                  {formData.address.length >= 10 && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-xs">
-                      {feeLoading ? (
-                        <span className="text-gray-400 animate-pulse">🔄 Đang tính phí giao hàng...</span>
-                      ) : deliveryDistance ? (
-                        <span className="text-primary-500 font-medium">
-                          📍 Khoảng cách: <b>{deliveryDistance} km</b> — Phí ship: <b>{formatPrice(deliveryFee)}</b>
-                          <span className="text-gray-400 ml-1">(5.000đ/km)</span>
-                        </span>
-                      ) : null}
+
+                {/* ĐỊA CHỈ — nút mở map picker */}
+                <div className="md:col-span-2 space-y-2">
+                  {formData.address ? (
+                    // Đã chọn địa chỉ → hiển thị + nút đổi
+                    <div className="flex items-start gap-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-xl p-3.5">
+                      <FiMapPin className="text-primary-500 mt-0.5 shrink-0" size={16} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-primary-600 dark:text-primary-400 mb-0.5">Địa chỉ giao hàng</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-snug">
+                          {typeof formData.address === 'string' ? formData.address : String(formData.address || '')}
+                        </p>
+                        {deliveryDistance && !feeLoading && (
+                          <p className="text-xs text-primary-500 font-medium mt-1">
+                            📍 {deliveryDistance} km — Phí ship: <b>{formatPrice(deliveryFee)}</b>
+                            <span className="text-gray-400 ml-1">(5.000đ/km)</span>
+                          </p>
+                        )}
+                        {feeLoading && (
+                          <p className="text-xs text-gray-400 animate-pulse mt-1">🔄 Đang tính phí...</p>
+                        )}
+                      </div>
+                      <button onClick={() => setShowMapPicker(true)}
+                        className="shrink-0 text-xs font-semibold text-primary-500 hover:text-primary-600 flex items-center gap-1 bg-white dark:bg-dark-100 px-2.5 py-1.5 rounded-lg border border-primary-200 transition-colors">
+                        <FiEdit2 size={12} /> Đổi
+                      </button>
                     </div>
+                  ) : (
+                    // Chưa chọn → nút lớn mở map
+                    <button onClick={() => setShowMapPicker(true)}
+                      className="w-full flex items-center gap-3 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-primary-400 hover:bg-primary-50/5 dark:hover:border-primary-500 transition-all group">
+                      <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-primary-200 transition-colors">
+                        <FiMapPin className="text-primary-500" size={18} />
+                      </div>
+                      <div className="text-left">
+                        <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">Chọn địa chỉ giao hàng</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Tìm kiếm hoặc ghim trên bản đồ</p>
+                      </div>
+                      <FiMapPin className="ml-auto text-gray-300 group-hover:text-primary-400 transition-colors" size={16} />
+                    </button>
                   )}
                 </div>
+
+                {/* Ghi chú */}
                 <div className="relative md:col-span-2">
-                  <input
-                    type="text" name="note"
-                    value={formData.note} onChange={handleInputChange}
-                    placeholder="Ghi chú cho tài xế (Tùy chọn)"
-                    className="input-search px-4 w-full bg-dark-200"
-                  />
+                  <input type="text" name="note" value={formData.note} onChange={handleInputChange}
+                    placeholder="💬 Ghi chú cho tài xế (cổng sau, tầng 3, gọi trước...)"
+                    className="input-search px-4 w-full bg-dark-200" />
                 </div>
               </div>
             </motion.div>
@@ -309,10 +362,10 @@ export default function CheckoutPage() {
                     )}
                   </span>
                 </div>
-                {discount > 0 && (
+                {(discount || 0) > 0 && (
                   <div className="flex justify-between text-green-500">
                     <span>Giảm giá khuyến mãi</span>
-                    <span>-{formatPrice(discount)}</span>
+                    <span>-{formatPrice(discount || 0)}</span>
                   </div>
                 )}
                 

@@ -18,6 +18,8 @@ import notificationRoutes from './routes/notifications.js'
 import analyticsRoutes from './routes/analytics.js'
 import reviewRoutes from './routes/reviews.js'
 import favoriteRoutes from './routes/favorites.js'
+import shipperRoutes from './routes/shipper.js'
+import { startVoucherExpiryJob } from './services/voucherExpiry.js'
 import messageRoutes from './routes/messages.js'
 import paymentRoutes from './routes/payment.js'
 import chatbotRoutes from './routes/chatbot.js'
@@ -149,6 +151,7 @@ app.use('/api/messages', messageRoutes)
 app.use('/api/payment', paymentRoutes)
 app.use('/api/chatbot', chatbotRoutes)
 app.use('/api/vouchers', voucherRoutes)
+app.use('/api/shipper', shipperRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -200,4 +203,7 @@ httpServer.listen(PORT, () => {
   })
   
   console.log('⏰ Subscription checker scheduled (daily at 9:00 AM)')
+  
+  // Khởi động voucher expiry job
+  startVoucherExpiryJob(io)
 })

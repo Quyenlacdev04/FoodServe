@@ -75,11 +75,6 @@ export default function RestaurantManagePage() {
       return
     }
     if (user && !user.isMerchant && user.role !== 'merchant' && user.role !== 'admin') {
-      console.log('🔍 Debug - User info:', {
-        isMerchant: user.isMerchant,
-        role: user.role,
-        email: user.email
-      })
       toast.error('Bạn không có quyền truy cập! Vui lòng đăng xuất và đăng nhập lại để cập nhật quyền.')
       navigate('/')
       return

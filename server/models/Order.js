@@ -21,15 +21,19 @@ const orderSchema = new mongoose.Schema({
   },
   deliveryAddress: String,
   contactPhone: String,
-  customerLocation: {
+  note: String,
+  deliveryLocation: {
     lat: Number,
     lng: Number,
     address: String
   },
-  restaurantLocation: {
-    lat: Number,
-    lng: Number,
-    address: String
+  restaurant: {
+    location: {
+      lat: Number,
+      lng: Number
+    },
+    address: String,
+    name: String
   },
   shipperLocation: {
     lat: Number,
@@ -56,7 +60,11 @@ const orderSchema = new mongoose.Schema({
     default: 'pending' 
   },
   transactionId: String,
-  paidAt: Date
+  paidAt: Date,
+  // Thông tin hủy đơn
+  cancellationReason: String,
+  cancelledBy: { type: String, enum: ['customer', 'restaurant', 'admin', 'system'] },
+  cancelledAt: Date
 }, { timestamps: true });
 
 // Indexes for better query performance

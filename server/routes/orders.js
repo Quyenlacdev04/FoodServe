@@ -222,7 +222,55 @@ router.get('/shipper/available', async (req, res) => {
     .limit(50)
     .lean();
     
-    res.json(orders);
+    // Populate thông tin nhà hàng để lấy địa chỉ và tọa độ
+    const Restaurant = (await import('../models/Restaurant.js')).default;
+    
+    const ordersWithLocations = await Promise.all(
+      orders.map(async (order) => {
+        // Nếu đã có restaurantLocation thì không cần populate
+        if (order.restaurantLocation?.lat && order.restaurantLocation?.lng) {
+          return order;
+        }
+        
+        // Lấy thông tin nhà hàng
+        try {
+          const restaurant = await Restaurant.findById(order.restaurantId).lean();
+          if (restaurant) {
+            // Giả sử nhà hàng có địa chỉ, ta sẽ dùng tọa độ giả định dựa trên tên
+            // Trong thực tế, bạn cần geocoding API hoặc lưu tọa độ trong DB
+            // Tạm thời dùng tọa độ trung tâm TP.HCM với offset ngẫu nhiên
+            const baseLat = 10.7756;
+            const baseLng = 106.7019;
+            const offset = 0.05; // ~5km radius
+            
+            order.restaurantLocation = {
+              lat: baseLat + (Math.random() - 0.5) * offset,
+              lng: baseLng + (Math.random() - 0.5) * offset,
+              address: restaurant.address || restaurant.name
+            };
+          }
+        } catch (err) {
+          console.error('Error fetching restaurant location:', err);
+        }
+        
+        // Tạo customerLocation từ deliveryAddress nếu chưa có
+        if (!order.customerLocation?.lat && order.deliveryAddress) {
+          const baseLat = 10.7756;
+          const baseLng = 106.7019;
+          const offset = 0.05;
+          
+          order.customerLocation = {
+            lat: baseLat + (Math.random() - 0.5) * offset,
+            lng: baseLng + (Math.random() - 0.5) * offset,
+            address: order.deliveryAddress
+          };
+        }
+        
+        return order;
+      })
+    );
+    
+    res.json(ordersWithLocations);
   } catch (error) {
     console.error('Get available orders error:', error);
     res.status(500).json({ message: 'Lỗi khi lấy đơn hàng có sẵn' });
@@ -396,6 +444,155 @@ router.get('/restaurant/:restaurantId', async (req, res) => {
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server khi lấy đơn hàng của nhà hàng' });
+  }
+});
+
+// Hủy đơn hàng (Customer)
+router.post('/:id/cancel', async (req, res) => {
+  try {
+    const { reason, userId } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ message: 'Vui lòng chọn lý do hủy đơn' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    }
+
+    // Kiểm tra quyền hủy đơn
+    if (userId && order.userId !== userId) {
+      return res.status(403).json({ message: 'Bạn không có quyền hủy đơn hàng này' });
+    }
+
+    // Chỉ cho phép hủy ở một số trạng thái nhất định
+    const cancellableStatuses = ['pending', 'confirmed', 'preparing'];
+    
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ 
+        message: 'Đơn hàng đã được hủy trước đó.' 
+      });
+    }
+    
+    if (order.status === 'completed') {
+      return res.status(400).json({ 
+        message: 'Không thể hủy đơn hàng đã hoàn thành.' 
+      });
+    }
+    
+    if (order.status === 'delivering') {
+      return res.status(400).json({ 
+        message: 'Đơn hàng đang được giao, không thể hủy. Vui lòng liên hệ tài xế hoặc hỗ trợ.' 
+      });
+    }
+    
+    if (!cancellableStatuses.includes(order.status)) {
+      return res.status(400).json({ 
+        message: `Không thể hủy đơn hàng ở trạng thái "${order.status}". Vui lòng liên hệ hỗ trợ.` 
+      });
+    }
+
+    // Cập nhật trạng thái đơn hàng
+    order.status = 'cancelled';
+    order.cancellationReason = reason;
+    order.cancelledBy = 'customer';
+    order.cancelledAt = new Date();
+    order.steps.push({ status: 'cancelled', time: new Date() });
+
+    // Xử lý hoàn tiền nếu đã thanh toán online
+    let refundMessage = '';
+    if (order.paymentStatus === 'paid' && order.paymentMethod !== 'cash') {
+      order.paymentStatus = 'refunded';
+      
+      // Hoàn xu nếu thanh toán bằng coins
+      if (order.paymentMethod === 'coins' && order.userId) {
+        const user = await User.findById(order.userId);
+        if (user) {
+          const refundCoins = Number((order.finalAmount / 1000).toFixed(1));
+          user.coins = Number(((user.coins || 0) + refundCoins).toFixed(1));
+          await user.save();
+          refundMessage = ` Đã hoàn ${refundCoins} Xu vào tài khoản.`;
+        }
+      } else {
+        // Các phương thức thanh toán online khác (VNPay, MoMo, ZaloPay)
+        // Trong thực tế cần gọi API hoàn tiền của từng cổng thanh toán
+        refundMessage = ' Tiền sẽ được hoàn lại vào tài khoản trong 3-5 ngày làm việc.';
+      }
+    }
+
+    // Hoàn lại lượt quay và trừ totalSpent nếu có
+    if (order.userId && order.userId !== 'demo_user') {
+      await User.findByIdAndUpdate(order.userId, {
+        $inc: { 
+          spins: -1,
+          totalSpent: -order.finalAmount
+        }
+      });
+    }
+
+    await order.save();
+
+    // Thông báo real-time
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`order-${order._id}`).emit('order-status-updated', {
+        orderId: order._id,
+        status: order.status
+      });
+
+      // Thông báo cho shipper nếu đã có người nhận
+      if (order.shipperId) {
+        const notification = new Notification({
+          userId: order.shipperId,
+          title: '❌ Đơn hàng đã bị hủy',
+          message: `Đơn hàng #${order._id.toString().slice(-6).toUpperCase()} đã bị khách hàng hủy. Lý do: ${reason}`,
+          type: 'order_cancelled',
+          data: { orderId: order._id.toString() },
+          read: false
+        });
+        await notification.save();
+        io.to(`user-${order.shipperId.toString()}`).emit('new-notification', notification);
+      }
+
+      // Thông báo cho admin
+      const admins = await User.find({ role: 'admin' });
+      for (const admin of admins) {
+        const notification = new Notification({
+          userId: admin._id,
+          title: '❌ Đơn hàng bị hủy',
+          message: `Đơn hàng #${order._id.toString().slice(-6).toUpperCase()} đã bị khách hàng hủy`,
+          type: 'order_cancelled',
+          data: { orderId: order._id.toString() },
+          read: false
+        });
+        await notification.save();
+        io.to(`user-${admin._id.toString()}`).emit('new-notification', notification);
+      }
+
+      // Thông báo cho khách hàng xác nhận đã hủy
+      if (order.userId) {
+        const notification = new Notification({
+          userId: order.userId,
+          title: '✅ Đã hủy đơn hàng',
+          message: `Đơn hàng của bạn đã được hủy thành công.${refundMessage}`,
+          type: 'order_cancelled',
+          data: { orderId: order._id.toString() },
+          read: false
+        });
+        await notification.save();
+        io.to(`user-${order.userId.toString()}`).emit('new-notification', notification);
+      }
+    }
+
+    res.json({
+      message: `Đã hủy đơn hàng thành công.${refundMessage}`,
+      order
+    });
+  } catch (error) {
+    console.error('Cancel order error:', error);
+    res.status(500).json({ message: 'Lỗi khi hủy đơn hàng' });
   }
 });
 

@@ -61,7 +61,7 @@ const cartSlice = createSlice({
       // Đã validate từ API trước khi dispatch
       const { code, discountAmount, voucherInfo } = action.payload
       state.voucher = { code, ...voucherInfo }
-      state.discount = discountAmount
+      state.discount = Number(discountAmount) || 0 // Ensure discount is always a number
       toast.success(`Áp dụng mã ${code} thành công! 🎉`, { icon: '🎫' })
     },
     removeVoucher: (state) => {
