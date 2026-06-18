@@ -30,20 +30,66 @@ import { requestLogger, cleanOldLogs } from './middleware/logger.js'
 import { optimizeMongoConnection, ensureIndexes, startCacheCleaner } from './utils/dbOptimizer.js'
 import { sanitizeInput } from './middleware/validation.js'
 
+import fs from 'fs'
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 dotenv.config({ path: path.join(__dirname, '.env') })
 
+// Debug thư mục dist
+const distPath = path.join(__dirname, '..', 'dist')
+console.log('🔍 [Debug Deploy] NODE_ENV:', process.env.NODE_ENV)
+console.log('🔍 [Debug Deploy] __dirname:', __dirname)
+console.log('🔍 [Debug Deploy] Thư mục dist tồn tại không?:', fs.existsSync(distPath))
+if (fs.existsSync(distPath)) {
+  console.log('🔍 [Debug Deploy] Các file trong dist:', fs.readdirSync(distPath))
+} else {
+  console.log('🔍 [Debug Deploy] Các thư mục ở gốc dự án:', fs.readdirSync(path.join(__dirname, '..')))
+}
+
 const app = express()
 const httpServer = createServer(app)
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [process.env.FRONTEND_URL || '*']
+  : ['http://localhost:3000', 'http://localhost:5173']
+
 const io = new Server(httpServer, {
-  cors: { origin: ['http://localhost:3000', 'http://localhost:5173'], methods: ['GET', 'POST'] }
+  cors: { origin: allowedOrigins, methods: ['GET', 'POST'] }
 })
 
 // Store Socket.io instance on express app to prevent circular imports
 app.set('io', io)
 
-app.use(cors())
+// Middleware tự động chuyển đổi URL localhost:5000 thành host hiện tại của server
+app.use((req, res, next) => {
+  const originalJson = res.json;
+  res.json = function (body) {
+    if (body && typeof body === 'object') {
+      const host = req.get('host');
+      const protocol = req.protocol;
+      const currentOrigin = `${protocol}://${host}`;
+      
+      // Chuyển đối tượng JSON thành chuỗi để thay thế hàng loạt URL localhost:5000
+      let jsonString = JSON.stringify(body);
+      if (jsonString.includes('http://localhost:5000')) {
+        jsonString = jsonString.replace(/http:\/\/localhost:5000/g, currentOrigin);
+        try {
+          const updatedBody = JSON.parse(jsonString);
+          return originalJson.call(this, updatedBody);
+        } catch (e) {
+          console.error('Error parsing response body after URL replacement:', e);
+        }
+      }
+    }
+    return originalJson.call(this, body);
+  };
+  next();
+});
+
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
+  credentials: true
+}))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ limit: '10mb', extended: true }))
 
@@ -105,7 +151,10 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
       return res.status(400).json({ message: 'Không có file nào được upload!' })
     }
     
-    const imageUrl = `http://localhost:5000/uploads/${req.file.filename}`
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? `${req.protocol}://${req.get('host')}`
+      : 'http://localhost:5000'
+    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`
     res.json({ 
       message: 'Upload thành công!', 
       imageUrl: imageUrl,
@@ -157,6 +206,19 @@ app.use('/api/shipper', shipperRoutes)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'FoodServe API is running 🚀' })
 })
+
+// Serve frontend static files in production
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, '..', 'dist')
+  app.use(express.static(frontendPath))
+  
+  // Handle React Router - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/socket.io')) {
+      res.sendFile(path.join(frontendPath, 'index.html'))
+    }
+  })
+}
 
 // 404 handler
 app.use(notFoundHandler)

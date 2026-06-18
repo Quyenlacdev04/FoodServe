@@ -218,19 +218,22 @@ router.get('/momo/return', async (req, res) => {
       }
 
       const realOrderId = order ? order._id : orderId;
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
       res.redirect(
-        `http://localhost:3000/payment-result?success=true&orderId=${realOrderId}&amount=${amount || ''}&transactionId=${transId || ''}`
+        `${frontendUrl}/payment-result?success=true&orderId=${realOrderId}&amount=${amount || ''}&transactionId=${transId || ''}`
       );
     } else {
       const order = await Order.findOne({ transactionId: orderId });
       const realOrderId = order ? order._id : '';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
       res.redirect(
-        `http://localhost:3000/payment-result?success=false&orderId=${realOrderId}&responseCode=${resultCode}`
+        `${frontendUrl}/payment-result?success=false&orderId=${realOrderId}&responseCode=${resultCode}`
       );
     }
   } catch (error) {
     console.error('MoMo return error:', error);
-    res.redirect('http://localhost:3000/payment-result?success=false&responseCode=99');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+    res.redirect(`${frontendUrl}/payment-result?success=false&responseCode=99`);
   }
 });
 
