@@ -25,6 +25,18 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      # ===== CLOUDINARY (Lưu ảnh trên cloud - tránh mất ảnh khi Render restart) =====
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # ===== RESEND (Gửi email qua HTTP API - không bị Render block) =====
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
       - key: VNPAY_TMN_CODE
         sync: false
       - key: VNPAY_HASH_SECRET

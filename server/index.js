@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url'
 import multer from 'multer'
 import cron from 'node-cron'
 import rateLimit from 'express-rate-limit'
+import { uploadToCloud } from './utils/cloudinary.js'
 import authRoutes from './routes/auth.js'
 import restaurantRoutes from './routes/restaurants.js'
 import orderRoutes from './routes/orders.js'
@@ -116,54 +117,58 @@ app.use('/api/', limiter)
 app.use('/api/auth/login', authLimiter)
 app.use('/api/auth/register', authLimiter)
 
-// Serve static files from uploads directory
+// Serve static files from uploads directory (local dev fallback)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
-// Multer configuration for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'uploads'))
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname))
-  }
-})
-
-const upload = multer({ 
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true)
-    } else {
-      cb(new Error('Chỉ chấp nhận file ảnh!'), false)
+// ===== UPLOAD ENDPOINT =====
+// Production: dùng Cloudinary (cloud storage - tránh mất ảnh khi Render restart)
+// Development: nếu không có Cloudinary config, dùng local disk
+if (process.env.CLOUDINARY_CLOUD_NAME) {
+  // === Cloudinary upload (Production) ===
+  app.post('/api/upload', uploadToCloud.single('image'), (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'Không có file nào được upload!' })
+      }
+      // Cloudinary trả về URL public trực tiếp trong req.file.path
+      const imageUrl = req.file.path
+      res.json({
+        message: 'Upload thành công!',
+        imageUrl: imageUrl,
+        filename: req.file.filename
+      })
+    } catch (error) {
+      res.status(500).json({ message: 'Lỗi upload file', error: error.message })
     }
-  }
-})
-
-// Upload endpoint
-app.post('/api/upload', upload.single('image'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'Không có file nào được upload!' })
+  })
+} else {
+  // === Local disk upload (Development) ===
+  const localStorage = multer.diskStorage({
+    destination: (req, file, cb) => { cb(null, path.join(__dirname, 'uploads')) },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname))
     }
-    
-    const baseUrl = process.env.NODE_ENV === 'production'
-      ? `${req.protocol}://${req.get('host')}`
-      : 'http://localhost:5000'
-    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`
-    res.json({ 
-      message: 'Upload thành công!', 
-      imageUrl: imageUrl,
-      filename: req.file.filename
-    })
-  } catch (error) {
-    res.status(500).json({ message: 'Lỗi upload file', error: error.message })
-  }
-})
+  })
+  const localUpload = multer({
+    storage: localStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) cb(null, true)
+      else cb(new Error('Chỉ chấp nhận file ảnh!'), false)
+    }
+  })
+  app.post('/api/upload', localUpload.single('image'), (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: 'Không có file nào được upload!' })
+      const baseUrl = 'http://localhost:5000'
+      const imageUrl = `${baseUrl}/uploads/${req.file.filename}`
+      res.json({ message: 'Upload thành công!', imageUrl, filename: req.file.filename })
+    } catch (error) {
+      res.status(500).json({ message: 'Lỗi upload file', error: error.message })
+    }
+  })
+}
 
 // Database Connection
 optimizeMongoConnection()

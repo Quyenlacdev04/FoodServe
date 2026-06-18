@@ -1,9 +1,9 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import User from '../models/User.js';
 import { getUserCapabilities, attachCapabilities } from '../utils/userCapabilities.js';
+import { sendEmail, otpEmailTemplate } from '../utils/emailService.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'foodserve_secret_2026';
@@ -11,21 +11,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'foodserve_secret_2026';
 // In-memory OTP store: { email: { otp, expiresAt } }
 const otpStore = new Map();
 
-// Tạo email transporter (dùng Gmail hoặc Ethereal test)
-const createTransporter = () => {
-  // Nếu có cấu hình Gmail thật
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-  }
-  // Dùng Ethereal (email test, không cần cấu hình)
-  return null;
-};
 
 // Register — Step 1: Gửi OTP xác minh email
 router.post('/register/send-otp', async (req, res) => {
@@ -42,49 +27,34 @@ router.post('/register/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 phút
     otpStore.set(`reg:${email}`, { otp, expiresAt });
 
-    const transporter = createTransporter();
-    if (transporter) {
+    // Thử gửi email thật (Resend hoặc Gmail)
+    const hasEmailConfig = process.env.RESEND_API_KEY || (process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    if (hasEmailConfig) {
       try {
-        await transporter.sendMail({
-          from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
           to: email,
           subject: '✅ Xác minh email đăng ký FoodServe',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-              <div style="background: linear-gradient(135deg, #ff6b35, #f7c948); padding: 32px; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 28px;">🍽️ FoodServe</h1>
-                <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Ăn ngon mỗi ngày</p>
-              </div>
-              <div style="padding: 32px; text-align: center;">
-                <h2 style="color: #333; margin-bottom: 8px;">Xác minh Email Đăng ký</h2>
-                <p style="color: #666; margin-bottom: 8px;">Xin chào <strong>${name || 'bạn'}</strong>!</p>
-                <p style="color: #666; margin-bottom: 24px;">Nhập mã OTP dưới đây để hoàn tất đăng ký:</p>
-                <div style="background: #f8f9fa; border: 2px dashed #ff6b35; border-radius: 12px; padding: 20px; margin: 0 auto; max-width: 200px;">
-                  <span style="font-size: 36px; font-weight: bold; color: #ff6b35; letter-spacing: 8px;">${otp}</span>
-                </div>
-                <p style="color: #999; font-size: 13px; margin-top: 20px;">⏰ Mã có hiệu lực trong <strong>5 phút</strong></p>
-                <p style="color: #bbb; font-size: 12px; margin-top: 8px;">Nếu bạn không đăng ký tài khoản FoodServe, hãy bỏ qua email này.</p>
-              </div>
-            </div>
-          `,
+          html: otpEmailTemplate({ name, otp, type: 'register' }),
         });
       } catch (mailError) {
-        console.error('Mail error:', mailError);
-        return res.status(500).json({ message: 'Không thể gửi email. Kiểm tra lại cấu hình EMAIL trong .env' });
+        console.error('Mail error:', mailError.message);
+        return res.status(500).json({ message: 'Không thể gửi email. Kiểm tra lại cấu hình email trong .env' });
       }
     } else {
+      // Không có cấu hình email → log ra console (chế độ demo)
       console.log(`\n📧 OTP đăng ký cho ${email}: ${otp} (hết hạn 5 phút)\n`);
     }
 
     res.json({
       message: 'Mã OTP đã gửi đến email!',
-      demo: !transporter ? otp : undefined
+      demo: !hasEmailConfig ? otp : undefined
     });
   } catch (error) {
     console.error('Register send OTP error:', error);
     res.status(500).json({ message: 'Lỗi server khi gửi OTP' });
   }
 });
+
 
 // Register — Step 2: Xác minh OTP + Tạo tài khoản
 router.post('/register/verify-otp', async (req, res) => {
@@ -396,41 +366,21 @@ router.post('/forgot-password', async (req, res) => {
     // Tạo OTP 6 số
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 phút
-
     otpStore.set(email, { otp, expiresAt });
 
-    // Gửi email
-    const transporter = createTransporter();
-
-    if (transporter) {
+    // Thử gửi email thật (Resend hoặc Gmail)
+    const hasEmailConfig = process.env.RESEND_API_KEY || (process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    if (hasEmailConfig) {
       try {
-        // Gửi email thật qua Gmail
-        await transporter.sendMail({
-          from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
           to: email,
           subject: '🔐 Mã OTP đặt lại mật khẩu FoodServe',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-              <div style="background: linear-gradient(135deg, #ff6b35, #f7c948); padding: 32px; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 28px;">🍽️ FoodServe</h1>
-                <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Ăn ngon mỗi ngày</p>
-              </div>
-              <div style="padding: 32px; text-align: center;">
-                <h2 style="color: #333; margin-bottom: 8px;">Đặt lại mật khẩu</h2>
-                <p style="color: #666; margin-bottom: 24px;">Mã OTP của bạn là:</p>
-                <div style="background: #f8f9fa; border: 2px dashed #ff6b35; border-radius: 12px; padding: 20px; margin: 0 auto; max-width: 200px;">
-                  <span style="font-size: 36px; font-weight: bold; color: #ff6b35; letter-spacing: 8px;">${otp}</span>
-                </div>
-                <p style="color: #999; font-size: 13px; margin-top: 20px;">⏰ Mã có hiệu lực trong <strong>5 phút</strong></p>
-                <p style="color: #bbb; font-size: 12px; margin-top: 8px;">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.</p>
-              </div>
-            </div>
-          `,
+          html: otpEmailTemplate({ otp, type: 'reset' }),
         });
       } catch (mailError) {
-        console.error('Mail sending error:', mailError);
-        return res.status(500).json({ 
-          message: 'Không thể gửi email OTP. Vui lòng kiểm tra lại cấu hình EMAIL_USER và EMAIL_PASS trong file .env!' 
+        console.error('Mail sending error:', mailError.message);
+        return res.status(500).json({
+          message: 'Không thể gửi email OTP. Vui lòng kiểm tra lại cấu hình RESEND_API_KEY hoặc EMAIL_USER/EMAIL_PASS trong .env!'
         });
       }
     } else {
@@ -438,12 +388,13 @@ router.post('/forgot-password', async (req, res) => {
       console.log(`\n🔐 OTP cho ${email}: ${otp} (hết hạn sau 5 phút)\n`);
     }
 
-    res.json({ message: 'OTP đã được gửi! Kiểm tra email của bạn.', demo: !transporter ? otp : undefined });
+    res.json({ message: 'OTP đã được gửi! Kiểm tra email của bạn.', demo: !hasEmailConfig ? otp : undefined });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ message: 'Lỗi server khi gửi OTP' });
   }
 });
+
 
 // Bước 2: Xác nhận OTP
 router.post('/verify-otp', async (req, res) => {
