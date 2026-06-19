@@ -7,6 +7,16 @@ import nodemailer from 'nodemailer'
  * 3. Gmail (Nodemailer) — SMTP, chỉ dùng cho local dev (Render block SMTP ports)
  */
 
+// ===== HELPER: Timeout wrapper =====
+function withTimeout(promise, ms, label = 'Operation') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout sau ${ms / 1000}s`)), ms)
+    )
+  ])
+}
+
 // ===== BREVO / SENDINBLUE (ưu tiên dùng trên production) =====
 async function sendViaBrevo(to, subject, html) {
   const apiKey = process.env.BREVO_API_KEY
@@ -15,20 +25,24 @@ async function sendViaBrevo(to, subject, html) {
   const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.EMAIL_USER || 'noreply@foodserve.com'
   const senderName = process.env.BREVO_SENDER_NAME || 'FoodServe'
 
-  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'api-key': apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      sender: { name: senderName, email: senderEmail },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
+  const response = await withTimeout(
+    fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     }),
-  })
+    10000,
+    'Brevo API'
+  )
 
   const data = await response.json()
   if (!response.ok) {
@@ -44,14 +58,18 @@ async function sendViaResend(to, subject, html) {
 
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'FoodServe <onboarding@resend.dev>'
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from: fromEmail, to, subject, html }),
-  })
+  const response = await withTimeout(
+    fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from: fromEmail, to, subject, html }),
+    }),
+    10000,
+    'Resend API'
+  )
 
   const data = await response.json()
   if (!response.ok) {
@@ -66,14 +84,21 @@ function createGmailTransporter() {
   return nodemailer.createTransport({
     service: 'gmail',
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    // Timeout ngắn để không bị treo trên Render (Render block SMTP ports)
+    connectionTimeout: 5000,  // 5s để kết nối
+    greetingTimeout: 5000,    // 5s chờ greeting
+    socketTimeout: 5000,      // 5s cho mỗi socket operation
   })
 }
 
 /**
  * Hàm gửi email chính - tự chọn provider phù hợp
  * Thứ tự ưu tiên: Brevo → Resend → Gmail
+ * Có timeout tổng 15s để đảm bảo API luôn trả response
  */
 export async function sendEmail({ to, subject, html }) {
+  const errors = []
+
   // 1. Ưu tiên Brevo (hoạt động tốt nhất trên Render, miễn phí 300 email/ngày)
   if (process.env.BREVO_API_KEY) {
     try {
@@ -81,8 +106,8 @@ export async function sendEmail({ to, subject, html }) {
       console.log(`📧 Email gửi qua Brevo thành công đến: ${to}`)
       return { success: true, provider: 'brevo' }
     } catch (err) {
-      console.error('Brevo error:', err.message)
-      // Thử provider tiếp theo
+      console.error('❌ Brevo error:', err.message)
+      errors.push(`Brevo: ${err.message}`)
     }
   }
 
@@ -93,8 +118,8 @@ export async function sendEmail({ to, subject, html }) {
       console.log(`📧 Email gửi qua Resend thành công đến: ${to}`)
       return { success: true, provider: 'resend' }
     } catch (err) {
-      console.error('Resend error:', err.message)
-      // Thử provider tiếp theo
+      console.error('❌ Resend error:', err.message)
+      errors.push(`Resend: ${err.message}`)
     }
   }
 
@@ -102,22 +127,32 @@ export async function sendEmail({ to, subject, html }) {
   const transporter = createGmailTransporter()
   if (transporter) {
     try {
-      await transporter.sendMail({
-        from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
-        to,
-        subject,
-        html,
-      })
+      await withTimeout(
+        transporter.sendMail({
+          from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
+          to,
+          subject,
+          html,
+        }),
+        8000,  // 8s timeout tổng cho Gmail
+        'Gmail SMTP'
+      )
       console.log(`📧 Email gửi qua Gmail thành công đến: ${to}`)
       return { success: true, provider: 'gmail' }
     } catch (err) {
-      console.error('Gmail error:', err.message)
-      throw err
+      console.error('❌ Gmail error:', err.message)
+      errors.push(`Gmail: ${err.message}`)
+      // Đóng transporter để giải phóng kết nối bị treo
+      transporter.close()
     }
   }
 
-  // Không có provider nào → throw để caller xử lý
-  throw new Error('Chưa cấu hình email provider (BREVO_API_KEY, RESEND_API_KEY, hoặc EMAIL_USER/EMAIL_PASS)')
+  // Không có provider nào thành công
+  const errorMsg = errors.length > 0
+    ? `Tất cả email provider đều lỗi: ${errors.join(' | ')}`
+    : 'Chưa cấu hình email provider (BREVO_API_KEY, RESEND_API_KEY, hoặc EMAIL_USER/EMAIL_PASS)'
+  console.error(`🚫 ${errorMsg}`)
+  throw new Error(errorMsg)
 }
 
 // ===== HTML TEMPLATES =====
