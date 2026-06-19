@@ -32,7 +32,12 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
-      # ===== RESEND (Gửi email qua HTTP API - không bị Render block) =====
+      # ===== BREVO (Gửi email qua HTTP API - miễn phí 300 email/ngày) =====
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      # ===== RESEND (Backup - Gửi email qua HTTP API) =====
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL

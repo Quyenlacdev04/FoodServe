@@ -1,13 +1,43 @@
 import nodemailer from 'nodemailer'
 
 /**
- * Gửi email OTP sử dụng Resend API (hoạt động tốt trên Render)
- * hoặc fallback về Nodemailer nếu cần.
- * 
- * Render block SMTP outbound ports (465, 587) → dùng Resend (HTTP API)
+ * Gửi email OTP sử dụng nhiều provider:
+ * 1. Brevo (Sendinblue) — HTTP API, miễn phí 300 email/ngày, hoạt động trên Render
+ * 2. Resend — HTTP API, cần domain riêng cho production
+ * 3. Gmail (Nodemailer) — SMTP, chỉ dùng cho local dev (Render block SMTP ports)
  */
 
-// ===== RESEND (ưu tiên dùng trên production) =====
+// ===== BREVO / SENDINBLUE (ưu tiên dùng trên production) =====
+async function sendViaBrevo(to, subject, html) {
+  const apiKey = process.env.BREVO_API_KEY
+  if (!apiKey) throw new Error('BREVO_API_KEY chưa được cấu hình')
+
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.EMAIL_USER || 'noreply@foodserve.com'
+  const senderName = process.env.BREVO_SENDER_NAME || 'FoodServe'
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': apiKey,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
+  })
+
+  const data = await response.json()
+  if (!response.ok) {
+    throw new Error(`Brevo API error: ${JSON.stringify(data)}`)
+  }
+  return data
+}
+
+// ===== RESEND (backup cho production) =====
 async function sendViaResend(to, subject, html) {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new Error('RESEND_API_KEY chưa được cấu hình')
@@ -41,9 +71,22 @@ function createGmailTransporter() {
 
 /**
  * Hàm gửi email chính - tự chọn provider phù hợp
+ * Thứ tự ưu tiên: Brevo → Resend → Gmail
  */
 export async function sendEmail({ to, subject, html }) {
-  // Ưu tiên Resend (hoạt động trên Render)
+  // 1. Ưu tiên Brevo (hoạt động tốt nhất trên Render, miễn phí 300 email/ngày)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      await sendViaBrevo(to, subject, html)
+      console.log(`📧 Email gửi qua Brevo thành công đến: ${to}`)
+      return { success: true, provider: 'brevo' }
+    } catch (err) {
+      console.error('Brevo error:', err.message)
+      // Thử provider tiếp theo
+    }
+  }
+
+  // 2. Thử Resend (HTTP API, hoạt động trên Render)
   if (process.env.RESEND_API_KEY) {
     try {
       await sendViaResend(to, subject, html)
@@ -51,11 +94,11 @@ export async function sendEmail({ to, subject, html }) {
       return { success: true, provider: 'resend' }
     } catch (err) {
       console.error('Resend error:', err.message)
-      throw err
+      // Thử provider tiếp theo
     }
   }
 
-  // Fallback về Gmail (dev local)
+  // 3. Fallback về Gmail (dev local — Render block SMTP)
   const transporter = createGmailTransporter()
   if (transporter) {
     try {
@@ -74,7 +117,7 @@ export async function sendEmail({ to, subject, html }) {
   }
 
   // Không có provider nào → throw để caller xử lý
-  throw new Error('Chưa cấu hình email provider (RESEND_API_KEY hoặc EMAIL_USER/EMAIL_PASS)')
+  throw new Error('Chưa cấu hình email provider (BREVO_API_KEY, RESEND_API_KEY, hoặc EMAIL_USER/EMAIL_PASS)')
 }
 
 // ===== HTML TEMPLATES =====

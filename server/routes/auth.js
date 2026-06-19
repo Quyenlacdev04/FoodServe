@@ -27,8 +27,9 @@ router.post('/register/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 phút
     otpStore.set(`reg:${email}`, { otp, expiresAt });
 
-    // Thử gửi email thật (Resend hoặc Gmail)
-    const hasEmailConfig = process.env.RESEND_API_KEY || (process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    // Thử gửi email thật (Brevo, Resend hoặc Gmail)
+    const hasEmailConfig = process.env.BREVO_API_KEY || process.env.RESEND_API_KEY || (process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    let emailSent = false;
     if (hasEmailConfig) {
       try {
         await sendEmail({
@@ -36,18 +37,20 @@ router.post('/register/send-otp', async (req, res) => {
           subject: '✅ Xác minh email đăng ký FoodServe',
           html: otpEmailTemplate({ name, otp, type: 'register' }),
         });
+        emailSent = true;
       } catch (mailError) {
-        console.error('Mail error:', mailError.message);
-        return res.status(500).json({ message: 'Không thể gửi email. Kiểm tra lại cấu hình email trong .env' });
+        console.error('Mail error (fallback to demo mode):', mailError.message);
+        // Không block user — fallback sang demo mode, trả OTP trực tiếp
       }
-    } else {
-      // Không có cấu hình email → log ra console (chế độ demo)
+    }
+
+    if (!emailSent) {
       console.log(`\n📧 OTP đăng ký cho ${email}: ${otp} (hết hạn 5 phút)\n`);
     }
 
     res.json({
-      message: 'Mã OTP đã gửi đến email!',
-      demo: !hasEmailConfig ? otp : undefined
+      message: emailSent ? 'Mã OTP đã gửi đến email!' : 'Mã OTP đã được tạo (chế độ demo)',
+      demo: !emailSent ? otp : undefined
     });
   } catch (error) {
     console.error('Register send OTP error:', error);
@@ -368,8 +371,9 @@ router.post('/forgot-password', async (req, res) => {
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 phút
     otpStore.set(email, { otp, expiresAt });
 
-    // Thử gửi email thật (Resend hoặc Gmail)
-    const hasEmailConfig = process.env.RESEND_API_KEY || (process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    // Thử gửi email thật (Brevo, Resend hoặc Gmail)
+    const hasEmailConfig = process.env.BREVO_API_KEY || process.env.RESEND_API_KEY || (process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    let emailSent = false;
     if (hasEmailConfig) {
       try {
         await sendEmail({
@@ -377,18 +381,18 @@ router.post('/forgot-password', async (req, res) => {
           subject: '🔐 Mã OTP đặt lại mật khẩu FoodServe',
           html: otpEmailTemplate({ otp, type: 'reset' }),
         });
+        emailSent = true;
       } catch (mailError) {
-        console.error('Mail sending error:', mailError.message);
-        return res.status(500).json({
-          message: 'Không thể gửi email OTP. Vui lòng kiểm tra lại cấu hình RESEND_API_KEY hoặc EMAIL_USER/EMAIL_PASS trong .env!'
-        });
+        console.error('Mail sending error (fallback to demo mode):', mailError.message);
+        // Không block user — fallback sang demo mode
       }
-    } else {
-      // Không có email config — log OTP ra console cho demo/đồ án
+    }
+
+    if (!emailSent) {
       console.log(`\n🔐 OTP cho ${email}: ${otp} (hết hạn sau 5 phút)\n`);
     }
 
-    res.json({ message: 'OTP đã được gửi! Kiểm tra email của bạn.', demo: !hasEmailConfig ? otp : undefined });
+    res.json({ message: emailSent ? 'OTP đã được gửi! Kiểm tra email của bạn.' : 'OTP đã được tạo (chế độ demo)', demo: !emailSent ? otp : undefined });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ message: 'Lỗi server khi gửi OTP' });

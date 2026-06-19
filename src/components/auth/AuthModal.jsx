@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FiX, FiMail, FiLock, FiUser, FiPhone, FiArrowLeft, FiEye, FiEyeOff } from 'react-icons/fi'
 import { closeAuthModal } from '../../store/slices/uiSlice'
 import { loginUser, registerUser, clearError, setAuth } from '../../store/slices/authSlice'
+import API_BASE_URL from '../../config/api'
 import toast from 'react-hot-toast'
 
 // Bước quên mật khẩu
@@ -66,7 +67,7 @@ export default function AuthModal() {
     if (form.password.length < 6) return toast.error('Mật khẩu phải có ít nhất 6 ký tự')
     setRegOtpLoading(true)
     try {
-      const res = await fetch('http://localhost:5000/api/auth/register/send-otp', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.email, name: form.name })
@@ -93,7 +94,7 @@ export default function AuthModal() {
     if (regOtp.length !== 6) return toast.error('OTP phải có 6 số')
     setRegOtpLoading(true)
     try {
-      const res = await fetch('http://localhost:5000/api/auth/register/verify-otp', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, otp: regOtp })
@@ -144,7 +145,7 @@ export default function AuthModal() {
     if (!forgotEmail) return toast.error('Vui lòng nhập email')
     setForgotLoading(true)
     try {
-      const res = await fetch('http://localhost:5000/api/auth/forgot-password', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail })
@@ -171,7 +172,7 @@ export default function AuthModal() {
     if (otpValue.length !== 6) return toast.error('OTP phải có 6 số')
     setForgotLoading(true)
     try {
-      const res = await fetch('http://localhost:5000/api/auth/verify-otp', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, otp: otpValue })
@@ -198,7 +199,7 @@ export default function AuthModal() {
     if (newPassword !== confirmPassword) return toast.error('Mật khẩu xác nhận không khớp')
     setForgotLoading(true)
     try {
-      const res = await fetch('http://localhost:5000/api/auth/reset-password', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, resetToken, newPassword })

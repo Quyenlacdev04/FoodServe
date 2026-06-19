@@ -642,4 +642,126 @@ router.post('/claim-rank-bonus', async (req, res) => {
   }
 });
 
+// ===== HỦY ĐƠN HÀNG BỞI TÀI XẾ (Shipper Cancel) =====
+router.post('/:id/shipper-cancel', async (req, res) => {
+  try {
+    const { cancelReason, cancelReasonLabel, additionalNote, proofImage } = req.body;
+    
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    }
+
+    // Chỉ cho phép hủy khi đơn đang giao hoặc chuẩn bị
+    if (!['preparing', 'ready', 'delivering'].includes(order.status)) {
+      return res.status(400).json({ message: 'Không thể hủy đơn hàng ở trạng thái này' });
+    }
+
+    // Cập nhật trạng thái đơn hàng
+    order.status = 'cancelled';
+    order.cancellationReason = `[TÀI XẾ] ${cancelReasonLabel}${additionalNote ? ': ' + additionalNote : ''}`;
+    order.cancelledBy = 'shipper';
+    order.cancelledAt = new Date();
+    order.shipperCancelData = {
+      reason: cancelReason,
+      reasonLabel: cancelReasonLabel,
+      note: additionalNote,
+      proofImage: proofImage || null,
+      timestamp: new Date()
+    };
+    order.steps.push({ status: 'cancelled', time: new Date() });
+
+    // Xử lý hoàn tiền nếu đã thanh toán online
+    let refundMessage = '';
+    if (order.paymentStatus === 'paid' && order.paymentMethod !== 'cash') {
+      order.paymentStatus = 'refunded';
+      
+      // Hoàn xu nếu thanh toán bằng coins
+      if (order.paymentMethod === 'coins' && order.userId) {
+        const user = await User.findById(order.userId);
+        if (user) {
+          const refundCoins = Number((order.finalAmount / 1000).toFixed(1));
+          user.coins = Number(((user.coins || 0) + refundCoins).toFixed(1));
+          await user.save();
+          refundMessage = ` Đã hoàn ${refundCoins} Xu cho khách hàng.`;
+        }
+      } else {
+        refundMessage = ' Tiền sẽ được hoàn lại cho khách hàng trong 3-5 ngày làm việc.';
+      }
+    }
+
+    // Hoàn lại lượt quay và trừ totalSpent
+    if (order.userId && order.userId !== 'demo_user') {
+      await User.findByIdAndUpdate(order.userId, {
+        $inc: { 
+          spins: -1,
+          totalSpent: -order.finalAmount
+        }
+      });
+    }
+
+    // Xóa shipper khỏi đơn hàng (để đơn có thể được giao cho shipper khác nếu cần)
+    order.shipper = null;
+
+    await order.save();
+
+    // Thông báo cho khách hàng qua Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`order-${order._id}`).emit('order-status-updated', {
+        orderId: order._id,
+        status: 'cancelled',
+        message: 'Tài xế đã hủy đơn hàng của bạn'
+      });
+    }
+
+    // Tạo thông báo cho khách hàng
+    if (order.userId && order.userId !== 'demo_user') {
+      const notification = new Notification({
+        userId: order.userId,
+        type: 'order_cancelled',
+        title: '❌ Đơn hàng đã bị hủy',
+        message: `Tài xế đã hủy đơn hàng #${order._id.toString().slice(-6).toUpperCase()}. Lý do: ${cancelReasonLabel}${refundMessage}`,
+        data: { orderId: order._id.toString() },
+        read: false
+      });
+      await notification.save();
+      
+      if (io) {
+        io.to(`user-${order.userId.toString()}`).emit('new-notification', notification);
+      }
+    }
+
+    // Tạo thông báo cho Admin
+    const admins = await User.find({ role: 'admin' });
+    for (const admin of admins) {
+      const adminNotif = new Notification({
+        userId: admin._id,
+        type: 'order_cancelled',
+        title: '⚠️ Tài xế hủy đơn',
+        message: `Tài xế đã hủy đơn #${order._id.toString().slice(-6).toUpperCase()}. Lý do: ${cancelReasonLabel}`,
+        data: { 
+          orderId: order._id.toString(),
+          reason: cancelReason,
+          proofImage: proofImage
+        },
+        read: false
+      });
+      await adminNotif.save();
+      
+      if (io) {
+        io.to(`user-${admin._id.toString()}`).emit('new-notification', adminNotif);
+      }
+    }
+
+    res.json({ 
+      message: 'Đã hủy đơn hàng thành công' + refundMessage,
+      order 
+    });
+  } catch (error) {
+    console.error('Shipper cancel order error:', error);
+    res.status(500).json({ message: 'Lỗi server khi hủy đơn hàng' });
+  }
+});
+
 export default router;

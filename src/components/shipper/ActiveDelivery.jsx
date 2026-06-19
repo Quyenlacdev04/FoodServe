@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMapPin, FiPhone, FiPackage, FiCheckCircle, FiNavigation, FiArrowRight } from 'react-icons/fi';
+import { FiMapPin, FiPhone, FiPackage, FiCheckCircle, FiNavigation, FiArrowRight, FiX } from 'react-icons/fi';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import SimpleMapView from '../tracking/SimpleMapView';
+import ShipperCancelOrderModal from './ShipperCancelOrderModal';
 
 // Helper: hiển thị trạng thái thanh toán
 const PaymentBadge = ({ order }) => {
@@ -124,6 +125,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
   const [isSimulating, setIsSimulating] = useState(false);
   const [simStep, setSimStep] = useState(0);
   const [simPhase, setSimPhase] = useState('to_restaurant');
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   useEffect(() => {
     fetchActiveOrder();
@@ -508,6 +510,15 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
 
       {/* Actions */}
       <div className="space-y-3">
+        {/* Nút hủy đơn - Chỉ hiện khi chưa giao xong */}
+        {activeOrder.status !== 'completed' && (
+          <button
+            onClick={() => setShowCancelModal(true)}
+            className="w-full py-3 bg-red-50 hover:bg-red-100 border-2 border-red-200 text-red-600 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+          >
+            <FiX /> Hủy đơn hàng
+          </button>
+        )}
 
         {activeOrder.status === 'preparing' && (
           <button
@@ -544,6 +555,17 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
       <div className="mt-4 text-center text-xs text-gray-400">
         📍 Vị trí của bạn đang được cập nhật tự động mỗi 10 giây
       </div>
+
+      {/* Cancel Order Modal */}
+      <ShipperCancelOrderModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        order={activeOrder}
+        onSuccess={() => {
+          setActiveOrder(null);
+          if (onDeliveryCompleted) onDeliveryCompleted();
+        }}
+      />
     </motion.div>
   );
 }
