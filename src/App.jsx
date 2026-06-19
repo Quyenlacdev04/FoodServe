@@ -26,6 +26,8 @@ import ShipperDashboardPage from './pages/ShipperDashboardPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { fetchRestaurants } from './store/slices/restaurantSlice'
 
+import Footer from './components/layout/Footer'
+
 function App() {
   const dispatch = useDispatch()
   const location = useLocation()
@@ -81,6 +83,9 @@ function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>
+            
+            {/* Chỉ hiển thị Footer khi KHÔNG thuộc các trang ẩn */}
+            {!isHideLayout && <Footer />}
             
             {/* Chỉ hiển thị CartSidebar, AuthModal, BottomNav khi KHÔNG thuộc các trang ẩn */}
             {!isHideLayout && (
