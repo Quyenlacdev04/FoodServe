@@ -1281,9 +1281,9 @@ export default function RestaurantManagePage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-dark-200 w-full max-w-md rounded-3xl shadow-2xl relative z-10 overflow-hidden border border-gray-100 dark:border-gray-800"
+              className="bg-white dark:bg-dark-200 w-full max-w-md rounded-3xl shadow-2xl relative z-10 overflow-hidden border border-gray-100 dark:border-gray-800 max-h-[90vh] flex flex-col"
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center shrink-0">
                 <h3 className="font-bold text-lg dark:text-white">
                   Đóng phí duy trì cửa hàng
                 </h3>
@@ -1296,7 +1296,7 @@ export default function RestaurantManagePage() {
                 </button>
               </div>
 
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 overflow-y-auto flex-1">
                 {qrStep === 0 && (
                   <div className="space-y-4">
                     <div className="p-4 bg-gray-50 dark:bg-dark-300/50 rounded-2xl">
