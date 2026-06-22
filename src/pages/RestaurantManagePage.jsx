@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   FiHome, FiPlus, FiEdit, FiTrash2, FiShoppingBag, 
@@ -27,6 +27,7 @@ const orderStatusMap = {
 export default function RestaurantManagePage() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user, isAuthenticated } = useSelector((s) => s.auth)
   
   const [activeTab, setActiveTab] = useState('overview')
@@ -80,6 +81,27 @@ export default function RestaurantManagePage() {
       return
     }
   }, [user, isAuthenticated, navigate])
+
+  // Listen to payment callback query params
+  useEffect(() => {
+    const success = searchParams.get('success')
+    const tab = searchParams.get('tab')
+    
+    if (success === 'true' && tab === 'subscription') {
+      toast.success('Thanh toán phí duy trì qua MoMo thành công! Cửa hàng đã được gia hạn tự động.', {
+        icon: '🎉',
+        duration: 5000
+      })
+      setActiveTab('subscription')
+      triggerRefresh()
+      setSearchParams({}, { replace: true })
+    } else if (success === 'false') {
+      const errorCode = searchParams.get('responseCode') || searchParams.get('error')
+      toast.error(`Thanh toán phí duy trì thất bại (Mã lỗi: ${errorCode}). Vui lòng thử lại!`)
+      setActiveTab('subscription')
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Fetch restaurant and menu items
   useEffect(() => {
@@ -275,6 +297,25 @@ export default function RestaurantManagePage() {
   const handleRenewSubscription = async (method) => {
     try {
       setPaymentProcessing(true)
+      if (method === 'momo') {
+        const res = await fetch('/api/payment/momo/create-subscription-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            restaurantId: restaurant._id,
+            amount: monthlyFee
+          })
+        })
+        const data = await res.json()
+        if (res.ok && data.paymentUrl) {
+          toast.loading('Đang chuyển hướng tới MoMo...', { duration: 2000 })
+          window.location.href = data.paymentUrl
+        } else {
+          toast.error(data.message || 'Lỗi tạo liên kết thanh toán MoMo')
+        }
+        setPaymentProcessing(false)
+        return
+      }
       if (method === 'mockPayment') {
         setQrStep(1)
         // Không tự động chuyển sang bước 2, chờ user click "Đã chuyển khoản"
@@ -777,9 +818,16 @@ export default function RestaurantManagePage() {
                               <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
                                 payment.paymentMethod === 'coins'
                                   ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400'
-                                  : 'bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+                                  : payment.paymentMethod === 'momo'
+                                    ? 'bg-purple-100 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400'
+                                    : 'bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
                               }`}>
-                                {payment.paymentMethod === 'coins' ? '🪙 Xu thưởng' : '💳 Chuyển khoản'}
+                                {payment.paymentMethod === 'coins' 
+                                  ? '🪙 Xu thưởng' 
+                                  : payment.paymentMethod === 'momo'
+                                    ? '💜 MoMo'
+                                    : '💳 Chuyển khoản'
+                                }
                               </span>
                             </td>
                             <td className="p-4">
@@ -1262,7 +1310,7 @@ export default function RestaurantManagePage() {
                       </div>
                     </div>
 
-                    <p className="text-xs text-gray-400 text-center">Chọn một trong hai phương thức thanh toán bên dưới:</p>
+                    <p className="text-xs text-gray-400 text-center">Chọn một trong các phương thức thanh toán bên dưới:</p>
 
                     <div className="grid grid-cols-1 gap-3">
                       {/* Trừ Xu */}
@@ -1282,6 +1330,23 @@ export default function RestaurantManagePage() {
                         <span className="text-amber-500 font-bold group-hover:translate-x-1 transition-transform">➔</span>
                       </button>
 
+                      {/* Thanh toán MoMo */}
+                      <button
+                        type="button"
+                        disabled={paymentProcessing}
+                        onClick={() => handleRenewSubscription('momo')}
+                        className="w-full p-4 rounded-2xl border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 transition-colors flex items-center justify-between text-left group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">💜</span>
+                          <div>
+                            <p className="font-bold text-purple-600 dark:text-purple-400 text-sm">Thanh toán tự động qua MoMo</p>
+                            <p className="text-xs text-gray-400 mt-0.5">Duyệt và kích hoạt ngay lập tức sau khi thanh toán</p>
+                          </div>
+                        </div>
+                        <span className="text-purple-500 font-bold group-hover:translate-x-1 transition-transform">➔</span>
+                      </button>
+
                       {/* Quét mã QR */}
                       <button
                         type="button"
@@ -1294,7 +1359,7 @@ export default function RestaurantManagePage() {
                           <div>
                             <p className="font-bold text-primary-500 text-sm">Chuyển khoản / Quét mã QR</p>
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {customQRCode ? 'Sử dụng QR code của bạn' : 'Thanh toán demo (chưa cấu hình QR)'}
+                              {customQRCode ? 'Sử dụng QR code của bạn' : 'Thanh toán demo (chờ duyệt)'}
                             </p>
                           </div>
                         </div>
