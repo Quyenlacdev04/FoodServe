@@ -86,9 +86,11 @@ export default function RestaurantManagePage() {
   useEffect(() => {
     const success = searchParams.get('success')
     const tab = searchParams.get('tab')
+    const method = searchParams.get('method')
     
     if (success === 'true' && tab === 'subscription') {
-      toast.success('Thanh toán phí duy trì qua MoMo thành công! Cửa hàng đã được gia hạn tự động.', {
+      const providerName = method === 'payos' ? 'VietQR (PayOS)' : 'MoMo';
+      toast.success(`Thanh toán phí duy trì qua ${providerName} thành công! Cửa hàng đã được gia hạn tự động.`, {
         icon: '🎉',
         duration: 5000
       })
@@ -322,33 +324,21 @@ export default function RestaurantManagePage() {
         return
       }
       if (method === 'qr_payment') {
-        // Gửi yêu cầu thanh toán và tự động duyệt luôn
-        const res = await fetch(`/api/restaurants/${restaurant._id}/request-payment`, {
+        // Tạo link thanh toán VietQR qua PayOS
+        const res = await fetch('/api/payment/payos/create-subscription-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            paymentMethod: 'bank_transfer',
-            amount: monthlyFee,
-            userId: user._id || user.id,
             restaurantId: restaurant._id,
-            restaurantName: restaurant.name
+            amount: monthlyFee
           })
         })
         const data = await res.json()
-        if (res.ok) {
-          setQrStep(2)
-          toast.success(data.message || 'Thanh toán thành công! Cửa hàng đã được gia hạn tự động.', { icon: '🎉' })
-          setRestaurant(prev => ({ 
-            ...prev, 
-            isActive: true, 
-            subscriptionExpiry: data.subscriptionExpiry 
-          }))
-          setTimeout(() => {
-            setShowPaymentModal(false)
-            setQrStep(0)
-          }, 2000)
+        if (res.ok && data.paymentUrl) {
+          toast.loading('Đang chuyển hướng tới cổng thanh toán VietQR (PayOS)...', { duration: 2000 })
+          window.location.href = data.paymentUrl
         } else {
-          toast.error(data.message || 'Lỗi gửi yêu cầu thanh toán')
+          toast.error(data.message || 'Lỗi kết nối cổng thanh toán PayOS')
         }
         setPaymentProcessing(false)
         return

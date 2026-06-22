@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import https from 'https';
+import { PayOS } from '@payos/node';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
 import Restaurant from '../models/Restaurant.js';
@@ -533,6 +534,219 @@ router.post('/coins/pay', async (req, res) => {
   } catch (error) {
     console.error('Coins payment error:', error);
     res.status(500).json({ message: 'Lỗi khi thanh toán bằng Xu' });
+  }
+});
+
+// ===== PAYOS: Tích hợp thanh toán QR tự động qua PayOS =====
+
+// Khởi tạo PayOS instance với cấu hình mặc định (Sandbox) nếu env trống
+const payOS = new PayOS({
+  clientId: process.env.PAYOS_CLIENT_ID || 'c341cb8d-e5cf-4df5-be23-5e741f02271a',
+  apiKey: process.env.PAYOS_API_KEY || '6791eb08-59c4-42b7-a36c-9457221cf3e6',
+  checksumKey: process.env.PAYOS_CHECKSUM_KEY || '5b357e62a191f681a590680caebbf006f1577bd76722d56a31c5cf15a3bc2e2a'
+});
+
+// Route tạo link thanh toán PayOS
+router.post('/payos/create-subscription-payment', async (req, res) => {
+  try {
+    const { restaurantId, amount } = req.body;
+
+    if (!restaurantId || !amount) {
+      return res.status(400).json({ message: 'Thiếu restaurantId hoặc amount' });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (!restaurant) {
+      return res.status(404).json({ message: 'Không tìm thấy nhà hàng' });
+    }
+
+    // Tự động thiết lập redirect URL
+    const serverOrigin = `${req.protocol}://${req.get('host')}`;
+    const frontendUrl = serverOrigin.includes('localhost')
+      ? 'http://localhost:3000'
+      : serverOrigin;
+      
+    const redirectUrl = `${frontendUrl}/restaurant-manage?success=true&tab=subscription&method=payos`;
+    const cancelUrl = `${frontendUrl}/restaurant-manage?success=false&tab=subscription&method=payos`;
+
+    // Tạo mã orderCode ngẫu nhiên duy nhất dạng số nguyên
+    const orderCode = Number(String(Date.now()).slice(-8) + Math.floor(10 + Math.random() * 90));
+
+    // Làm sạch chuỗi mô tả (Tiếng Việt không dấu, không ký tự đặc biệt, max 25 ký tự)
+    const cleanName = restaurant.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .replace(/[^a-zA-Z0-9 ]/g, '')
+      .slice(0, 15);
+    const description = `Gia han ${cleanName}`.slice(0, 25);
+
+    // Lưu yêu cầu thanh toán ở trạng thái pending
+    const paymentRequest = {
+      _id: orderCode.toString(),
+      orderCode: orderCode,
+      restaurantId: restaurant._id,
+      restaurantName: restaurant.name,
+      userId: restaurant.ownerId,
+      amount: Number(amount),
+      paymentMethod: 'bank_transfer',
+      status: 'pending',
+      createdAt: new Date(),
+      note: `Yêu cầu gia hạn phí duy trì qua PayOS cho ${restaurant.name}`
+    };
+
+    if (!restaurant.paymentRequests) {
+      restaurant.paymentRequests = [];
+    }
+    restaurant.paymentRequests.push(paymentRequest);
+    await restaurant.save();
+
+    // Dữ liệu thanh toán gửi tới PayOS
+    const paymentData = {
+      orderCode: orderCode,
+      amount: Number(amount),
+      description: description,
+      cancelUrl: cancelUrl,
+      returnUrl: redirectUrl
+    };
+
+    console.log('📌 Tạo cổng thanh toán PayOS:', paymentData);
+    const paymentLinkRes = await payOS.createPaymentLink(paymentData);
+    
+    res.json({
+      message: 'Tạo liên kết thanh toán PayOS thành công',
+      paymentUrl: paymentLinkRes.checkoutUrl,
+      orderCode: orderCode
+    });
+  } catch (error) {
+    console.error('PayOS create payment error:', error);
+    res.status(500).json({ message: 'Lỗi khi kết nối với cổng thanh toán PayOS: ' + error.message });
+  }
+});
+
+// Webhook xử lý thông báo thanh toán thành công của PayOS gửi về
+router.post('/payos/webhook', async (req, res) => {
+  try {
+    const { code, data } = req.body;
+    
+    // Check webhook confirmation ping from PayOS
+    if (req.body.desc === 'confirm' || (data && data.description === 'demo')) {
+      return res.json({ success: true, message: 'Webhook confirmed' });
+    }
+
+    // Xác thực chữ ký webhook để đảm bảo an toàn
+    const webhookData = payOS.verifyPaymentWebhookData(req.body);
+    
+    if (webhookData && webhookData.code === '00') {
+      const orderCode = webhookData.orderCode;
+      const amount = webhookData.amount;
+      
+      console.log(`[PayOS Webhook] Giao dịch thành công. OrderCode: ${orderCode}, Số tiền: ${amount}`);
+
+      // Tìm nhà hàng
+      const restaurant = await Restaurant.findOne({
+        'paymentRequests.orderCode': orderCode
+      });
+      
+      if (!restaurant) {
+        console.error(`[PayOS Webhook] Không tìm thấy nhà hàng có orderCode: ${orderCode}`);
+        return res.status(404).json({ message: 'Không tìm thấy yêu cầu thanh toán' });
+      }
+      
+      // Tìm yêu cầu thanh toán cụ thể
+      const request = restaurant.paymentRequests.find(r => r.orderCode === orderCode);
+      if (!request) {
+        console.error(`[PayOS Webhook] Không tìm thấy request có orderCode: ${orderCode}`);
+        return res.status(404).json({ message: 'Không tìm thấy yêu cầu thanh toán' });
+      }
+      
+      if (request.status === 'approved') {
+        console.log(`[PayOS Webhook] Giao dịch ${orderCode} đã được xử lý từ trước`);
+        return res.json({ success: true, message: 'Already processed' });
+      }
+      
+      // Cập nhật trạng thái duyệt thanh toán
+      request.status = 'approved';
+      request.approvedBy = 'system_payos';
+      request.approvedAt = new Date();
+      
+      // Gia hạn thêm 30 ngày sử dụng
+      const currentExpiry = restaurant.subscriptionExpiry && new Date(restaurant.subscriptionExpiry) > new Date()
+        ? new Date(restaurant.subscriptionExpiry)
+        : new Date();
+      const newExpiry = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
+      restaurant.subscriptionExpiry = newExpiry;
+      restaurant.isActive = true;
+      
+      // Ghi nhận lịch sử giao dịch thành công
+      if (!restaurant.paymentHistory) {
+        restaurant.paymentHistory = [];
+      }
+      restaurant.paymentHistory.push({
+        _id: orderCode.toString(),
+        amount: amount,
+        paymentMethod: 'bank_transfer',
+        status: 'completed',
+        paidAt: new Date(),
+        periodStart: currentExpiry,
+        periodEnd: newExpiry,
+        transactionNote: `Thanh toán phí duy trì tự động qua VietQR (PayOS)`,
+        approvedBy: 'system_payos'
+      });
+      
+      await restaurant.save();
+      console.log(`✅ [PayOS Webhook] Đã tự động gia hạn thành công cho: ${restaurant.name}`);
+      
+      // Tạo thông báo cho đối tác
+      const notification = await Notification.create({
+        userId: request.userId,
+        type: 'payment_approved',
+        title: '✅ Gia hạn tự động thành công qua VietQR',
+        message: `Hệ thống đã nhận được số tiền ${amount.toLocaleString()}đ chuyển khoản qua VietQR. Cửa hàng "${restaurant.name}" đã được gia hạn thêm 30 ngày. Hạn mới: ${newExpiry.toLocaleDateString('vi-VN')}`,
+        data: {
+          restaurantId: restaurant._id,
+          restaurantName: restaurant.name,
+          amount: amount,
+          subscriptionExpiry: restaurant.subscriptionExpiry
+        }
+      });
+      
+      // Gửi real-time notifications
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user-${request.userId}`).emit('new-notification', notification);
+        io.to(`user-${request.userId}`).emit('payment-approved', { 
+          restaurantId: restaurant._id,
+          subscriptionExpiry: restaurant.subscriptionExpiry 
+        });
+      }
+      
+      // Tạo thông báo cho Admin biết có thanh toán tự động mới
+      const admins = await User.find({ role: 'admin' });
+      for (const admin of admins) {
+        const adminNotification = await Notification.create({
+          userId: admin._id,
+          type: 'payment_approved',
+          title: '💳 Thanh toán tự động QR mới',
+          message: `${restaurant.name} đã hoàn tất thanh toán phí duy trì ${amount.toLocaleString()}đ qua VietQR`,
+          data: {
+            restaurantId: restaurant._id,
+            restaurantName: restaurant.name,
+            amount: amount,
+            requestId: request._id
+          }
+        });
+        if (io) {
+          io.to(`user-${admin._id}`).emit('new-notification', adminNotification);
+        }
+      }
+    }
+    
+    res.json({ success: true, message: 'Webhook processed successfully' });
+  } catch (error) {
+    console.error('PayOS Webhook error:', error);
+    res.status(500).json({ message: 'Lỗi xử lý webhook PayOS' });
   }
 });
 
