@@ -373,12 +373,23 @@ router.post('/:id/renew-subscription', async (req, res) => {
   }
 });
 
-// Gửi yêu cầu thanh toán (chờ admin duyệt)
+// Gửi yêu cầu thanh toán (tự động duyệt luôn theo yêu cầu)
 router.post('/:id/request-payment', async (req, res) => {
   try {
     const { paymentMethod, amount, userId, restaurantName } = req.body;
     const restaurant = await Restaurant.findById(req.params.id);
     if (!restaurant) return res.status(404).json({ message: 'Không tìm thấy nhà hàng' });
+
+    // Gia hạn nhà hàng
+    const currentExpiry = restaurant.subscriptionExpiry && new Date(restaurant.subscriptionExpiry) > new Date()
+      ? new Date(restaurant.subscriptionExpiry)
+      : new Date();
+    const newExpiry = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
+    restaurant.subscriptionExpiry = newExpiry;
+
+    if (restaurant.isActive === false) {
+      restaurant.isActive = true;
+    }
 
     // Tạo yêu cầu thanh toán
     const paymentRequest = {
@@ -388,9 +399,11 @@ router.post('/:id/request-payment', async (req, res) => {
       userId: userId,
       amount: amount,
       paymentMethod: paymentMethod,
-      status: 'pending',
+      status: 'approved',
+      approvedBy: 'system',
+      approvedAt: new Date(),
       createdAt: new Date(),
-      note: `Yêu cầu gia hạn phí duy trì cho ${restaurantName}`
+      note: `Yêu cầu gia hạn phí duy trì cho ${restaurantName} (Tự động duyệt)`
     };
 
     // Lưu vào restaurant
@@ -398,18 +411,57 @@ router.post('/:id/request-payment', async (req, res) => {
       restaurant.paymentRequests = [];
     }
     restaurant.paymentRequests.push(paymentRequest);
+
+    // Lưu lịch sử thanh toán
+    if (!restaurant.paymentHistory) {
+      restaurant.paymentHistory = [];
+    }
+    restaurant.paymentHistory.push({
+      _id: new Date().getTime().toString(),
+      amount: amount,
+      paymentMethod: 'bank_transfer',
+      status: 'completed',
+      paidAt: new Date(),
+      periodStart: currentExpiry,
+      periodEnd: newExpiry,
+      transactionNote: `Thanh toán phí duy trì tự động qua QR Ngân hàng`,
+      approvedBy: 'system'
+    });
+
     await restaurant.save();
+
+    // Tạo thông báo cho nhà hàng
+    const notification = await Notification.create({
+      userId: userId,
+      type: 'payment_approved',
+      title: '✅ Gia hạn thành công bằng QR',
+      message: `Cửa hàng "${restaurant.name}" đã được gia hạn thêm 30 ngày qua thanh toán QR. Hạn mới: ${newExpiry.toLocaleDateString('vi-VN')}`,
+      data: {
+        restaurantId: restaurant._id,
+        restaurantName: restaurant.name,
+        amount: amount,
+        subscriptionExpiry: restaurant.subscriptionExpiry
+      }
+    });
+
+    // Gửi real-time notification cho nhà hàng
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user-${userId}`).emit('new-notification', notification);
+      io.to(`user-${userId}`).emit('payment-approved', { 
+        restaurantId: restaurant._id,
+        subscriptionExpiry: restaurant.subscriptionExpiry 
+      });
+    }
 
     // Tạo thông báo cho tất cả admin
     const admins = await User.find({ role: 'admin' });
-    const io = req.app.get('io');
-    
     for (const admin of admins) {
-      const notification = await Notification.create({
+      const adminNotification = await Notification.create({
         userId: admin._id,
-        type: 'payment_request',
-        title: '💳 Yêu cầu thanh toán mới',
-        message: `${restaurantName} đã gửi yêu cầu thanh toán phí duy trì ${amount.toLocaleString()}đ`,
+        type: 'payment_approved',
+        title: '💳 Thanh toán tự động QR mới',
+        message: `${restaurantName} đã tự động thanh toán & duyệt phí duy trì ${amount.toLocaleString()}đ`,
         data: {
           restaurantId: req.params.id,
           restaurantName: restaurantName,
@@ -417,18 +469,18 @@ router.post('/:id/request-payment', async (req, res) => {
           requestId: paymentRequest._id
         }
       });
-      
-      // Gửi real-time notification
-      io.to(`user-${admin._id}`).emit('new-notification', notification);
+      if (io) {
+        io.to(`user-${admin._id}`).emit('new-notification', adminNotification);
+      }
     }
 
     res.json({
-      message: 'Đã gửi yêu cầu thanh toán! Admin sẽ xác nhận trong vòng 24h.',
-      requestId: paymentRequest._id
+      message: 'Thanh toán thành công! Cửa hàng đã được gia hạn tự động.',
+      subscriptionExpiry: restaurant.subscriptionExpiry
     });
   } catch (error) {
     console.error('Request payment error:', error);
-    res.status(500).json({ message: 'Lỗi server khi gửi yêu cầu thanh toán' });
+    res.status(500).json({ message: 'Lỗi server khi xử lý thanh toán' });
   }
 });
 

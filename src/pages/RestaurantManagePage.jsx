@@ -322,8 +322,8 @@ export default function RestaurantManagePage() {
         return
       }
       if (method === 'qr_payment') {
-        // Gửi yêu cầu thanh toán chờ admin duyệt
-        const res = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}/request-payment`, {
+        // Gửi yêu cầu thanh toán và tự động duyệt luôn
+        const res = await fetch(`/api/restaurants/${restaurant._id}/request-payment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -336,12 +336,17 @@ export default function RestaurantManagePage() {
         })
         const data = await res.json()
         if (res.ok) {
-          toast.success('Đã gửi yêu cầu thanh toán! Admin sẽ xác nhận trong vòng 24h.', { 
-            icon: '⏳',
-            duration: 5000 
-          })
-          setShowPaymentModal(false)
-          setQrStep(0)
+          setQrStep(2)
+          toast.success(data.message || 'Thanh toán thành công! Cửa hàng đã được gia hạn tự động.', { icon: '🎉' })
+          setRestaurant(prev => ({ 
+            ...prev, 
+            isActive: true, 
+            subscriptionExpiry: data.subscriptionExpiry 
+          }))
+          setTimeout(() => {
+            setShowPaymentModal(false)
+            setQrStep(0)
+          }, 2000)
         } else {
           toast.error(data.message || 'Lỗi gửi yêu cầu thanh toán')
         }
@@ -350,7 +355,7 @@ export default function RestaurantManagePage() {
       }
       
       // Xử lý thanh toán bằng xu (tự động)
-      const res = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}/renew-subscription`, {
+      const res = await fetch(`/api/restaurants/${restaurant._id}/renew-subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentMethod: method, userId: user._id || user.id })
