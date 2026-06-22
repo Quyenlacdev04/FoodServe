@@ -1357,9 +1357,9 @@ export default function RestaurantManagePage() {
                         <div className="flex items-center gap-3">
                           <span className="text-2xl">📱</span>
                           <div>
-                            <p className="font-bold text-primary-500 text-sm">Chuyển khoản / Quét mã QR</p>
+                            <p className="font-bold text-primary-500 text-sm">Thanh toán QR</p>
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {customQRCode ? 'Sử dụng QR code của bạn' : 'Thanh toán demo (chờ duyệt)'}
+                              {customQRCode ? 'Sử dụng QR code của bạn' : 'Chuyển khoản ngân hàng (chờ duyệt)'}
                             </p>
                           </div>
                         </div>
