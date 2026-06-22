@@ -397,13 +397,17 @@ export default function RestaurantManagePage() {
               <div className="flex-1">
                 <h3 className={`font-bold ${isSubscriptionExpired ? 'text-red-700 dark:text-red-400' : 'text-yellow-700 dark:text-yellow-400'}`}>
                   {isSubscriptionExpired 
-                    ? '⚠️ Cửa hàng đã bị tạm khóa do hết hạn phí duy trì!' 
+                    ? (!restaurant.paymentHistory || restaurant.paymentHistory.length === 0 
+                        ? '⚠️ Cửa hàng cần đóng phí duy trì để kích hoạt!' 
+                        : '⚠️ Cửa hàng đã bị tạm khóa do hết hạn phí duy trì!')
                     : `⏰ Cảnh báo: Còn ${daysUntilExpiry} ngày nữa hết hạn!`
                   }
                 </h3>
                 <p className={`text-sm mt-1 ${isSubscriptionExpired ? 'text-red-600 dark:text-red-300' : 'text-yellow-600 dark:text-yellow-300'}`}>
                   {isSubscriptionExpired
-                    ? 'Khách hàng không thể xem hoặc đặt hàng từ cửa hàng của bạn. Vui lòng gia hạn ngay để mở lại.'
+                    ? (!restaurant.paymentHistory || restaurant.paymentHistory.length === 0
+                        ? 'Cửa hàng của bạn mới được phê duyệt. Vui lòng đóng phí duy trì lần đầu để kích hoạt hoạt động và hiển thị trên ứng dụng.'
+                        : 'Khách hàng không thể xem hoặc đặt hàng từ cửa hàng của bạn. Vui lòng gia hạn ngay để mở lại.')
                     : `Phí duy trì sẽ hết hạn vào ${new Date(restaurant.subscriptionExpiry).toLocaleDateString('vi-VN')}. Gia hạn ngay để tránh gián đoạn kinh doanh.`
                   }
                 </p>

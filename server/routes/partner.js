@@ -174,7 +174,9 @@ router.patch('/requests/:id', async (req, res) => {
         categories: request.cuisineTypes,
         address: request.restaurantAddress,
         description: request.description || `Nhà hàng đối tác ${request.restaurantName}`,
-        ownerId: user ? user._id : null
+        ownerId: user ? user._id : null,
+        isActive: false, // Mới đăng ký cần đóng phí duy trì để kích hoạt
+        subscriptionExpiry: new Date(0) // Hết hạn ngay lập tức để yêu cầu đóng phí
       });
       await newRestaurant.save();
       
