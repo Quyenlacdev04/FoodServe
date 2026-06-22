@@ -1307,31 +1307,31 @@ export default function RestaurantManagePage() {
                 {qrStep === 1 && (
                   <div className="text-center py-6 space-y-4">
                     <div className="relative w-64 h-64 mx-auto bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-center shadow-md">
-                      {systemSettings?.adminPaymentQR ? (
-                        <img 
-                          src={systemSettings.adminPaymentQR} 
-                          alt="QR Code thanh toán Admin" 
-                          className="w-full h-full object-contain rounded-lg"
-                        />
-                      ) : (
-                        /* Fake QR code nếu admin chưa cấu hình */
-                        <svg className="w-full h-full text-gray-800" viewBox="0 0 100 100">
-                          <path d="M5,5 h30 v30 h-30 z M10,10 h20 v20 h-20 z M15,15 h10 v10 h-10 z" fill="currentColor"/>
-                          <path d="M65,5 h30 v30 h-30 z M70,10 h20 v20 h-20 z M75,15 h10 v10 h-10 z" fill="currentColor"/>
-                          <path d="M5,65 h30 v30 h-30 z M10,70 h20 v20 h-20 z M15,75 h10 v10 h-10 z" fill="currentColor"/>
-                          <path d="M45,15 h10 v10 h-10 z M55,5 h5 v5 h-5 z M45,30 h5 v10 h-5 z M60,30 h5 v5 h-5 z M45,45 h15 v5 h-15 z M5,45 h5 v15 h-5 z M20,45 h10 v5 h-10 z M30,55 h10 v10 h-10 z M45,55 h20 v5 h-20 z M80,45 h15 v5 h-15 z M70,55 h10 v10 h-10 z M85,65 h10 v20 h-10 z M55,75 h25 v5 h-25 z M45,85 h35 v10 h-35 z" fill="currentColor"/>
-                        </svg>
-                      )}
+                      {(() => {
+                        let qrUrl = systemSettings?.adminPaymentQR;
+                        if (!qrUrl || qrUrl.includes('localhost') || qrUrl.includes('/uploads/')) {
+                          const bankId = systemSettings?.adminBankName === 'Techcombank' ? 'TCB' : systemSettings?.adminBankName || 'TCB';
+                          const accountNo = systemSettings?.adminAccountNumber || '509868686868';
+                          const accountName = encodeURIComponent(systemSettings?.adminAccountName || 'VU VAN QUYEN');
+                          const amount = monthlyFee;
+                          const description = encodeURIComponent(`Phi ${restaurant?.name || 'FoodServe'}`);
+                          qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${description}&accountName=${accountName}`;
+                        }
+                        return (
+                          <img 
+                            src={qrUrl} 
+                            alt="QR Code thanh toán Admin" 
+                            className="w-full h-full object-contain rounded-lg"
+                          />
+                        );
+                      })()}
                     </div>
                     <div>
                       <h4 className="font-bold dark:text-white">
-                        {systemSettings?.adminPaymentQR ? 'Quét mã QR để thanh toán phí duy trì' : 'Mã QR demo - Admin chưa cấu hình'}
+                        Quét mã QR để thanh toán phí duy trì
                       </h4>
                       <p className="text-xs text-gray-400 mt-1">
-                        {systemSettings?.adminPaymentQR 
-                          ? 'Chuyển khoản phí duy trì cho FoodServe' 
-                          : 'Admin cần cấu hình QR code trong hệ thống'
-                        }
+                        Chuyển khoản phí duy trì cho FoodServe
                       </p>
                     </div>
                     
