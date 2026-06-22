@@ -17,7 +17,10 @@ export default function AdminSettings() {
     adminPaymentQR: '',
     adminBankName: 'Techcombank',
     adminAccountName: 'VU VAN QUYEN',
-    adminAccountNumber: '509868686868'
+    adminAccountNumber: '509868686868',
+    payosClientId: '',
+    payosApiKey: '',
+    payosChecksumKey: ''
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -253,10 +256,10 @@ export default function AdminSettings() {
 
         </div>
 
-        {/* Cấu hình thanh toán Admin */}
+        {/* Cấu hình thanh toán Admin & API PayOS */}
         <div className="border-t border-gray-100 dark:border-gray-800 pt-8">
           <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-6">
-            <FiCreditCard className="text-green-500" /> Cấu hình thanh toán Admin (Nhận phí từ cửa hàng)
+            <FiCreditCard className="text-green-500" /> Cấu hình thanh toán Admin (Nhận phí tự động VietQR)
           </h4>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -296,17 +299,56 @@ export default function AdminSettings() {
               </div>
             </div>
 
-            {/* QR Code */}
-            <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase mb-3">Mã QR thanh toán Admin</label>
-              <ImageUpload
-                value={settings.adminPaymentQR}
-                onChange={(url) => setSettings({...settings, adminPaymentQR: url})}
-                placeholder="Upload QR Techcombank của bạn"
-              />
-              <p className="text-[10px] text-gray-400 mt-2">
-                💡 Khi cửa hàng đóng phí duy trì, họ sẽ chuyển khoản vào QR này
-              </p>
+            {/* QR Code & PayOS API */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-3">Mã QR thanh toán Admin (Chuyển khoản thủ công)</label>
+                <ImageUpload
+                  value={settings.adminPaymentQR}
+                  onChange={(url) => setSettings({...settings, adminPaymentQR: url})}
+                  placeholder="Upload QR Techcombank của bạn"
+                />
+              </div>
+
+              {/* PayOS API Keys */}
+              <div className="bg-gray-50 dark:bg-dark-200/40 rounded-2xl p-4 border border-gray-150 dark:border-gray-800 space-y-3">
+                <p className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                  🔑 API Cổng PayOS (Để tự động duyệt qua Ngân hàng thật)
+                </p>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">PayOS Client ID</label>
+                  <input
+                    type="text"
+                    value={settings.payosClientId || ''}
+                    onChange={(e) => setSettings({...settings, payosClientId: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-750 bg-white dark:bg-dark-250 text-gray-950 dark:text-white outline-none focus:ring-1.5 focus:ring-primary-500 text-xs font-mono"
+                    placeholder="Nhập Client ID từ my.payos.vn"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">PayOS API Key</label>
+                  <input
+                    type="text"
+                    value={settings.payosApiKey || ''}
+                    onChange={(e) => setSettings({...settings, payosApiKey: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-750 bg-white dark:bg-dark-250 text-gray-950 dark:text-white outline-none focus:ring-1.5 focus:ring-primary-500 text-xs font-mono"
+                    placeholder="Nhập API Key từ my.payos.vn"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">PayOS Checksum Key</label>
+                  <input
+                    type="text"
+                    value={settings.payosChecksumKey || ''}
+                    onChange={(e) => setSettings({...settings, payosChecksumKey: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-750 bg-white dark:bg-dark-250 text-gray-950 dark:text-white outline-none focus:ring-1.5 focus:ring-primary-500 text-xs font-mono"
+                    placeholder="Nhập Checksum Key từ my.payos.vn"
+                  />
+                </div>
+                <p className="text-[9px] text-gray-400 leading-normal">
+                  💡 Đăng ký tài khoản và kết nối ngân hàng của bạn miễn phí tại <a href="https://payos.vn" target="_blank" rel="noreferrer" className="text-primary-500 underline font-semibold">payos.vn</a> để lấy các khóa API này. Nếu để trống, hệ thống sẽ chạy ở chế độ giả lập Demo.
+                </p>
+              </div>
             </div>
           </div>
         </div>

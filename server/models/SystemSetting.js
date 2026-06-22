@@ -14,7 +14,12 @@ const systemSettingSchema = new mongoose.Schema({
   adminPaymentQR: { type: String, default: '' }, // QR code admin
   adminBankName: { type: String, default: 'Techcombank' }, // Tên ngân hàng admin
   adminAccountName: { type: String, default: 'VU VAN QUYEN' }, // Tên chủ tài khoản admin
-  adminAccountNumber: { type: String, default: '509868686868' } // Số tài khoản admin
+  adminAccountNumber: { type: String, default: '509868686868' }, // Số tài khoản admin
+
+  // Cấu hình API PayOS của riêng admin
+  payosClientId: { type: String, default: '' },
+  payosApiKey: { type: String, default: '' },
+  payosChecksumKey: { type: String, default: '' }
 }, { timestamps: true });
 
 export default mongoose.model('SystemSetting', systemSettingSchema);

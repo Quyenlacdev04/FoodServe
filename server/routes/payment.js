@@ -6,6 +6,7 @@ import Order from '../models/Order.js';
 import User from '../models/User.js';
 import Restaurant from '../models/Restaurant.js';
 import Notification from '../models/Notification.js';
+import SystemSetting from '../models/SystemSetting.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -539,12 +540,23 @@ router.post('/coins/pay', async (req, res) => {
 
 // ===== PAYOS: Tích hợp thanh toán QR tự động qua PayOS =====
 
-// Khởi tạo PayOS instance với cấu hình mặc định (Sandbox) nếu env trống
-const payOS = new PayOS({
-  clientId: process.env.PAYOS_CLIENT_ID || 'c341cb8d-e5cf-4df5-be23-5e741f02271a',
-  apiKey: process.env.PAYOS_API_KEY || '6791eb08-59c4-42b7-a36c-9457221cf3e6',
-  checksumKey: process.env.PAYOS_CHECKSUM_KEY || '5b357e62a191f681a590680caebbf006f1577bd76722d56a31c5cf15a3bc2e2a'
-});
+// Helper to get PayOS instance configured via database settings or environment variables
+async function getPayOSInstance() {
+  try {
+    const settings = await SystemSetting.findOne();
+    const clientId = settings?.payosClientId || process.env.PAYOS_CLIENT_ID;
+    const apiKey = settings?.payosApiKey || process.env.PAYOS_API_KEY;
+    const checksumKey = settings?.payosChecksumKey || process.env.PAYOS_CHECKSUM_KEY;
+
+    if (clientId && apiKey && checksumKey) {
+      return new PayOS({ clientId, apiKey, checksumKey });
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching PayOS configuration from DB:', error);
+    return null;
+  }
+}
 
 // Route tạo link thanh toán PayOS
 router.post('/payos/create-subscription-payment', async (req, res) => {
@@ -559,8 +571,13 @@ router.post('/payos/create-subscription-payment', async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy nhà hàng' });
     }
 
-    // Kiểm tra cấu hình PayOS của riêng người dùng
-    const hasPayOSConfig = process.env.PAYOS_CLIENT_ID && process.env.PAYOS_API_KEY && process.env.PAYOS_CHECKSUM_KEY;
+    // Lấy cấu hình hệ thống từ DB hoặc Env
+    const settings = await SystemSetting.findOne();
+    const clientId = settings?.payosClientId || process.env.PAYOS_CLIENT_ID;
+    const apiKey = settings?.payosApiKey || process.env.PAYOS_API_KEY;
+    const checksumKey = settings?.payosChecksumKey || process.env.PAYOS_CHECKSUM_KEY;
+
+    const hasPayOSConfig = clientId && apiKey && checksumKey;
 
     if (!hasPayOSConfig) {
       console.log('⚠️ [PayOS] Chưa cấu hình API Keys. Chuyển sang chế độ GIẢ LẬP ĐỂ DEMO.');
@@ -642,7 +659,9 @@ router.post('/payos/create-subscription-payment', async (req, res) => {
         message: 'Thanh toán VietQR giả lập thành công! Cửa hàng đã được gia hạn tự động.',
         subscriptionExpiry: restaurant.subscriptionExpiry
       });
-    }    // Tự động thiết lập redirect URL
+    }
+
+    // Tự động thiết lập redirect URL
     const serverOrigin = `${req.protocol}://${req.get('host')}`;
     const frontendUrl = serverOrigin.includes('localhost')
       ? 'http://localhost:3000'
@@ -694,7 +713,8 @@ router.post('/payos/create-subscription-payment', async (req, res) => {
     };
 
     console.log('📌 Tạo cổng thanh toán PayOS:', paymentData);
-    const paymentLinkRes = await payOS.paymentRequests.create(paymentData);
+    const payOSInstance = new PayOS({ clientId, apiKey, checksumKey });
+    const paymentLinkRes = await payOSInstance.paymentRequests.create(paymentData);
     
     res.json({
       message: 'Tạo liên kết thanh toán PayOS thành công',
@@ -717,8 +737,15 @@ router.post('/payos/webhook', async (req, res) => {
       return res.json({ success: true, message: 'Webhook confirmed' });
     }
 
+    // Khởi tạo dynamic PayOS instance
+    const payOSInstance = await getPayOSInstance();
+    if (!payOSInstance) {
+      console.error('[PayOS Webhook] Không tìm thấy cấu hình PayOS trong DB hoặc Env');
+      return res.status(400).json({ message: 'PayOS not configured' });
+    }
+
     // Xác thực chữ ký webhook để đảm bảo an toàn
-    const webhookData = payOS.webhooks.verify(req.body);
+    const webhookData = payOSInstance.webhooks.verify(req.body);
     
     if (webhookData && webhookData.code === '00') {
       const orderCode = webhookData.orderCode;
@@ -787,7 +814,7 @@ router.post('/payos/webhook', async (req, res) => {
         title: '✅ Gia hạn tự động thành công qua VietQR',
         message: `Hệ thống đã nhận được số tiền ${amount.toLocaleString()}đ chuyển khoản qua VietQR. Cửa hàng "${restaurant.name}" đã được gia hạn thêm 30 ngày. Hạn mới: ${newExpiry.toLocaleDateString('vi-VN')}`,
         data: {
-          restaurantId: restaurant._id,
+          restaurantId: restaurant.ownerId, // Lưu thông tin ownerId hoặc user
           restaurantName: restaurant.name,
           amount: amount,
           subscriptionExpiry: restaurant.subscriptionExpiry
