@@ -97,7 +97,7 @@ export default function PaymentResultPage() {
     // Nếu MoMo redirect thẳng về (không qua backend), gọi backend cập nhật order
     if (hasMomoRaw && momoResultCode === '0' && orderId) {
       setResolving(true);
-      fetch(`http://localhost:5000/api/payment/momo/confirm-direct`, {
+      fetch(`/api/payment/momo/confirm-direct`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId, transId: transactionId, amount })

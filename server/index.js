@@ -49,6 +49,8 @@ if (fs.existsSync(distPath)) {
 }
 
 const app = express()
+// Trust proxy (Render, Heroku, etc.) để req.protocol trả về 'https' đúng
+app.set('trust proxy', 1)
 const httpServer = createServer(app)
 const allowedOrigins = process.env.NODE_ENV === 'production'
   ? [process.env.FRONTEND_URL || '*']

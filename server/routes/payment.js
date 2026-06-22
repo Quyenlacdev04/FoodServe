@@ -37,6 +37,15 @@ router.post('/momo/create-payment', async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
     }
 
+    // Tự động detect server URL từ request nếu env chưa set đúng
+    const serverOrigin = `${req.protocol}://${req.get('host')}`;
+    const redirectUrl = momoConfig.redirectUrl.includes('localhost')
+      ? `${serverOrigin}/api/payment/momo/return`
+      : momoConfig.redirectUrl;
+    const ipnUrl = momoConfig.ipnUrl.includes('localhost')
+      ? `${serverOrigin}/api/payment/momo/ipn`
+      : momoConfig.ipnUrl;
+
     const requestId = momoConfig.partnerCode + Date.now();
     const orderInfo = 'Thanh toan don hang FoodServe';
     const requestType = 'payWithMethod';
@@ -48,11 +57,11 @@ router.post('/momo/create-payment', async (req, res) => {
       'accessKey=' + momoConfig.accessKey +
       '&amount=' + amount +
       '&extraData=' + extraData +
-      '&ipnUrl=' + momoConfig.ipnUrl +
+      '&ipnUrl=' + ipnUrl +
       '&orderId=' + requestId +
       '&orderInfo=' + orderInfo +
       '&partnerCode=' + momoConfig.partnerCode +
-      '&redirectUrl=' + momoConfig.redirectUrl +
+      '&redirectUrl=' + redirectUrl +
       '&requestId=' + requestId +
       '&requestType=' + requestType;
 
@@ -69,8 +78,8 @@ router.post('/momo/create-payment', async (req, res) => {
       amount: amount,
       orderId: requestId,
       orderInfo: orderInfo,
-      redirectUrl: momoConfig.redirectUrl,
-      ipnUrl: momoConfig.ipnUrl,
+      redirectUrl: redirectUrl,
+      ipnUrl: ipnUrl,
       lang: lang,
       requestType: requestType,
       autoCapture: autoCapture,
@@ -101,6 +110,8 @@ router.post('/momo/create-payment', async (req, res) => {
     });
 
     console.log('✅ MoMo response:', momoRes);
+    console.log('📌 MoMo redirectUrl used:', redirectUrl);
+    console.log('📌 MoMo ipnUrl used:', ipnUrl);
 
     if (momoRes.resultCode === 0) {
       // Lưu requestId vào order để đối chiếu sau
@@ -195,6 +206,19 @@ router.post('/momo/confirm-direct', async (req, res) => {
 router.get('/momo/return', async (req, res) => {
   const { resultCode, orderId, amount, transId } = req.query;
 
+  // Tự động detect frontend URL: ưu tiên env var, fallback dùng request origin
+  const getFrontendUrl = () => {
+    const envUrl = process.env.FRONTEND_URL;
+    if (envUrl) return envUrl;
+    // Trên production (Render), frontend và backend cùng origin
+    const host = req.get('host');
+    // Nếu đang chạy local dev, frontend ở port 3000 (Vite dev server)
+    if (host && host.includes('localhost:5000')) {
+      return 'http://localhost:3000';
+    }
+    return `${req.protocol}://${host}`;
+  };
+
   try {
     // resultCode từ query param là string, '0' = thành công
     if (String(resultCode) === '0') {
@@ -218,21 +242,22 @@ router.get('/momo/return', async (req, res) => {
       }
 
       const realOrderId = order ? order._id : orderId;
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+      const frontendUrl = getFrontendUrl();
+      console.log('📌 MoMo return - redirecting to:', frontendUrl);
       res.redirect(
         `${frontendUrl}/payment-result?success=true&orderId=${realOrderId}&amount=${amount || ''}&transactionId=${transId || ''}`
       );
     } else {
       const order = await Order.findOne({ transactionId: orderId });
       const realOrderId = order ? order._id : '';
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+      const frontendUrl = getFrontendUrl();
       res.redirect(
         `${frontendUrl}/payment-result?success=false&orderId=${realOrderId}&responseCode=${resultCode}`
       );
     }
   } catch (error) {
     console.error('MoMo return error:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+    const frontendUrl = getFrontendUrl();
     res.redirect(`${frontendUrl}/payment-result?success=false&responseCode=99`);
   }
 });
