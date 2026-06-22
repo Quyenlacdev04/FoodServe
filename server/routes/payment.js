@@ -554,13 +554,95 @@ router.post('/payos/create-subscription-payment', async (req, res) => {
     if (!restaurantId || !amount) {
       return res.status(400).json({ message: 'Thiếu restaurantId hoặc amount' });
     }
-
     const restaurant = await Restaurant.findById(restaurantId);
     if (!restaurant) {
       return res.status(404).json({ message: 'Không tìm thấy nhà hàng' });
     }
 
-    // Tự động thiết lập redirect URL
+    // Kiểm tra cấu hình PayOS của riêng người dùng
+    const hasPayOSConfig = process.env.PAYOS_CLIENT_ID && process.env.PAYOS_API_KEY && process.env.PAYOS_CHECKSUM_KEY;
+
+    if (!hasPayOSConfig) {
+      console.log('⚠️ [PayOS] Chưa cấu hình API Keys. Chuyển sang chế độ GIẢ LẬP ĐỂ DEMO.');
+
+      // 1. Gia hạn nhà hàng ngay lập tức
+      const currentExpiry = restaurant.subscriptionExpiry && new Date(restaurant.subscriptionExpiry) > new Date()
+        ? new Date(restaurant.subscriptionExpiry)
+        : new Date();
+      const newExpiry = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
+      restaurant.subscriptionExpiry = newExpiry;
+      restaurant.isActive = true;
+
+      // 2. Tạo yêu cầu thanh toán đã duyệt
+      const orderCode = Number(String(Date.now()).slice(-8) + Math.floor(10 + Math.random() * 90));
+      const paymentRequest = {
+        _id: orderCode.toString(),
+        orderCode: orderCode,
+        restaurantId: restaurant._id,
+        restaurantName: restaurant.name,
+        userId: restaurant.ownerId,
+        amount: Number(amount),
+        paymentMethod: 'bank_transfer',
+        status: 'approved',
+        approvedBy: 'system_demo',
+        approvedAt: new Date(),
+        createdAt: new Date(),
+        note: `Gia hạn phí duy trì (Giả lập Demo VietQR do chưa cấu hình API)`
+      };
+
+      if (!restaurant.paymentRequests) {
+        restaurant.paymentRequests = [];
+      }
+      restaurant.paymentRequests.push(paymentRequest);
+
+      // 3. Ghi nhận lịch sử giao dịch thành công
+      if (!restaurant.paymentHistory) {
+        restaurant.paymentHistory = [];
+      }
+      restaurant.paymentHistory.push({
+        _id: orderCode.toString(),
+        amount: amount,
+        paymentMethod: 'bank_transfer',
+        status: 'completed',
+        paidAt: new Date(),
+        periodStart: currentExpiry,
+        periodEnd: newExpiry,
+        transactionNote: `Thanh toán phí duy trì tự động VietQR (Giả lập Demo)`,
+        approvedBy: 'system_demo'
+      });
+
+      await restaurant.save();
+
+      // 4. Tạo thông báo cho đối tác
+      const notification = await Notification.create({
+        userId: restaurant.ownerId,
+        type: 'payment_approved',
+        title: '✅ Gia hạn thành công VietQR (Demo)',
+        message: `Cửa hàng "${restaurant.name}" đã được gia hạn thêm 30 ngày (Chế độ giả lập VietQR). Hạn mới: ${newExpiry.toLocaleDateString('vi-VN')}`,
+        data: {
+          restaurantId: restaurant._id,
+          restaurantName: restaurant.name,
+          amount: amount,
+          subscriptionExpiry: restaurant.subscriptionExpiry
+        }
+      });
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user-${restaurant.ownerId}`).emit('new-notification', notification);
+        io.to(`user-${restaurant.ownerId}`).emit('payment-approved', { 
+          restaurantId: restaurant._id,
+          subscriptionExpiry: restaurant.subscriptionExpiry 
+        });
+      }
+
+      return res.json({
+        success: true,
+        isDemo: true,
+        message: 'Thanh toán VietQR giả lập thành công! Cửa hàng đã được gia hạn tự động.',
+        subscriptionExpiry: restaurant.subscriptionExpiry
+      });
+    }    // Tự động thiết lập redirect URL
     const serverOrigin = `${req.protocol}://${req.get('host')}`;
     const frontendUrl = serverOrigin.includes('localhost')
       ? 'http://localhost:3000'

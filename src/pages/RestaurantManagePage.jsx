@@ -334,9 +334,30 @@ export default function RestaurantManagePage() {
           })
         })
         const data = await res.json()
-        if (res.ok && data.paymentUrl) {
-          toast.loading('Đang chuyển hướng tới cổng thanh toán VietQR (PayOS)...', { duration: 2000 })
-          window.location.href = data.paymentUrl
+        if (res.ok) {
+          if (data.isDemo) {
+            // Giả lập kiểm tra giao dịch trong 3 giây
+            toast.loading('Đang xác thực giao dịch chuyển khoản VietQR giả lập...', { id: 'demo-payment-toast', duration: 3000 })
+            setTimeout(() => {
+              toast.dismiss('demo-payment-toast')
+              setQrStep(2) // Hiển thị tích xanh
+              toast.success(data.message || 'Gia hạn thành công!', { icon: '🎉' })
+              setRestaurant(prev => ({ 
+                ...prev, 
+                isActive: true, 
+                subscriptionExpiry: data.subscriptionExpiry 
+              }))
+              setTimeout(() => {
+                setShowPaymentModal(false)
+                setQrStep(0)
+              }, 2000)
+            }, 3000)
+          } else if (data.paymentUrl) {
+            toast.loading('Đang chuyển hướng tới cổng thanh toán VietQR (PayOS)...', { duration: 2000 })
+            window.location.href = data.paymentUrl
+          } else {
+            toast.error(data.message || 'Lỗi kết nối cổng thanh toán PayOS')
+          }
         } else {
           toast.error(data.message || 'Lỗi kết nối cổng thanh toán PayOS')
         }
