@@ -612,7 +612,7 @@ router.post('/payos/create-subscription-payment', async (req, res) => {
     };
 
     console.log('📌 Tạo cổng thanh toán PayOS:', paymentData);
-    const paymentLinkRes = await payOS.createPaymentLink(paymentData);
+    const paymentLinkRes = await payOS.paymentRequests.create(paymentData);
     
     res.json({
       message: 'Tạo liên kết thanh toán PayOS thành công',
@@ -636,7 +636,7 @@ router.post('/payos/webhook', async (req, res) => {
     }
 
     // Xác thực chữ ký webhook để đảm bảo an toàn
-    const webhookData = payOS.verifyPaymentWebhookData(req.body);
+    const webhookData = payOS.webhooks.verify(req.body);
     
     if (webhookData && webhookData.code === '00') {
       const orderCode = webhookData.orderCode;
