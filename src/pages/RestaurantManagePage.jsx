@@ -1370,79 +1370,120 @@ export default function RestaurantManagePage() {
                 )}
 
                 {qrStep === 1 && (
-                  <div className="text-center py-6 space-y-4">
-                    <div className="relative w-64 h-64 mx-auto bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-center shadow-md">
-                      {(() => {
-                        let qrUrl = systemSettings?.adminPaymentQR;
-                        if (!qrUrl || qrUrl.includes('localhost') || qrUrl.includes('/uploads/')) {
-                          const bankId = systemSettings?.adminBankName === 'Techcombank' ? 'TCB' : systemSettings?.adminBankName || 'TCB';
-                          const accountNo = systemSettings?.adminAccountNumber || '509868686868';
-                          const accountName = encodeURIComponent(systemSettings?.adminAccountName || 'VU VAN QUYEN');
-                          const amount = monthlyFee;
-                          const description = encodeURIComponent(`Phi ${restaurant?.name || 'FoodServe'}`);
-                          qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${description}&accountName=${accountName}`;
-                        }
-                        return (
-                          <img 
-                            src={qrUrl} 
-                            alt="QR Code thanh toán Admin" 
-                            className="w-full h-full object-contain rounded-lg"
-                          />
-                        );
-                      })()}
-                    </div>
-                    <div>
-                      <h4 className="font-bold dark:text-white">
-                        Quét mã QR để thanh toán phí duy trì
-                      </h4>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Chuyển khoản phí duy trì cho FoodServe
-                      </p>
+                  <div className="space-y-5">
+                    {/* Header Banner với nút Trang trước và Avatar */}
+                    <div className="relative h-32 rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-300">
+                      <img 
+                        src={restaurant.cover || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80'} 
+                        alt="Banner" 
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/40" />
+                      
+                      {/* Nút Trang trước */}
+                      <button
+                        type="button"
+                        onClick={() => setQrStep(0)}
+                        className="absolute top-3 left-3 bg-black/55 hover:bg-black/75 backdrop-blur-md text-white text-xs font-bold py-1.5 px-3 rounded-full flex items-center gap-1 transition-all active:scale-95"
+                      >
+                        ❮ Trang trước
+                      </button>
+                      
+                      {/* Avatar đè lên giữa */}
+                      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 rounded-2xl border-2 border-white dark:border-dark-200 shadow-md overflow-hidden bg-white">
+                        <img 
+                          src={restaurant.image || 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=200'} 
+                          alt="Logo" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     </div>
                     
-                    {systemSettings?.adminPaymentQR ? (
-                      <div className="space-y-3">
-                        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-left">
-                          <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-3 text-center">
-                            💳 Chuyển khoản phí duy trì cho FoodServe
-                          </p>
-                          <div className="space-y-2 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-blue-600 dark:text-blue-300">Ngân hàng:</span>
-                              <strong className="text-blue-700 dark:text-blue-200">{systemSettings.adminBankName}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-blue-600 dark:text-blue-300">Chủ TK:</span>
-                              <strong className="text-blue-700 dark:text-blue-200">{systemSettings.adminAccountName}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-blue-600 dark:text-blue-300">Số TK:</span>
-                              <strong className="text-blue-700 dark:text-blue-200 font-mono">{systemSettings.adminAccountNumber}</strong>
-                            </div>
-                            <div className="flex justify-between border-t border-blue-200 dark:border-blue-700 pt-2">
-                              <span className="text-blue-600 dark:text-blue-300">Phí duy trì:</span>
-                              <strong className="text-blue-700 dark:text-blue-200 text-sm">{formatPrice(monthlyFee)}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-blue-600 dark:text-blue-300">Nội dung:</span>
-                              <strong className="text-blue-700 dark:text-blue-200">Phi {restaurant?.name}</strong>
-                            </div>
-                          </div>
+                    {/* Tên cửa hàng */}
+                    <div className="text-center pt-5">
+                      <h3 className="font-bold text-lg text-slate-800 dark:text-white leading-tight">
+                        {restaurant.name}
+                      </h3>
+                    </div>
+                    
+                    {/* Chi tiết thanh toán */}
+                    <div className="space-y-3 px-2 border-t border-b border-gray-100 dark:border-gray-800/80 py-4">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-400 font-semibold">Tổng cộng</span>
+                        <strong className="text-slate-800 dark:text-white font-bold">Phí duy trì (30 ngày)</strong>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-400 font-semibold">Giá</span>
+                        <strong className="text-primary-500 font-black text-base">{formatPrice(monthlyFee)}</strong>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-400 font-semibold">Phương thức thanh toán</span>
+                        <strong className="text-slate-800 dark:text-white font-bold">QR Pay</strong>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-400 font-semibold">Cửa hàng</span>
+                        <strong className="text-slate-800 dark:text-white font-bold">{restaurant.name}</strong>
+                      </div>
+                    </div>
+                    
+                    {/* QR Code và thông tin chuyển khoản */}
+                    <div className="bg-gray-50 dark:bg-dark-300/40 rounded-2xl p-4 border border-gray-100 dark:border-gray-800/60 flex flex-col items-center gap-4">
+                      <div className="relative w-44 h-44 bg-white p-2 rounded-2xl border border-gray-100 flex items-center justify-center shadow-md">
+                        {(() => {
+                          let qrUrl = systemSettings?.adminPaymentQR;
+                          if (!qrUrl || qrUrl.includes('localhost') || qrUrl.includes('/uploads/')) {
+                            const bankId = systemSettings?.adminBankName === 'Techcombank' ? 'TCB' : systemSettings?.adminBankName || 'TCB';
+                            const accountNo = systemSettings?.adminAccountNumber || '509868686868';
+                            const accountName = encodeURIComponent(systemSettings?.adminAccountName || 'VU VAN QUYEN');
+                            const amount = monthlyFee;
+                            const description = encodeURIComponent(`Phi ${restaurant?.name || 'FoodServe'}`);
+                            qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${description}&accountName=${accountName}`;
+                          }
+                          return (
+                            <img 
+                              src={qrUrl} 
+                              alt="QR Code" 
+                              className="w-full h-full object-contain rounded-lg"
+                            />
+                          );
+                        })()}
+                      </div>
+                      
+                      <div className="text-center">
+                        <p className="text-xs font-bold text-slate-800 dark:text-gray-200">Quét mã QR để chuyển khoản nhanh</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Vui lòng kiểm tra kỹ nội dung và số tiền trước khi quét</p>
+                      </div>
+                      
+                      {/* Chi tiết ngân hàng */}
+                      <div className="w-full bg-white dark:bg-dark-200 border border-gray-150 dark:border-gray-800 rounded-2xl p-4 space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400 font-medium">Ngân hàng:</span>
+                          <strong className="text-slate-800 dark:text-gray-200">{systemSettings?.adminBankName || 'Techcombank'}</strong>
                         </div>
-                        
-                        <button
-                          onClick={() => handleRenewSubscription('qr_payment')}
-                          disabled={paymentProcessing}
-                          className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold rounded-xl transition-colors"
-                        >
-                          {paymentProcessing ? 'Đang gửi yêu cầu...' : '📤 Gửi yêu cầu thanh toán (Chờ Admin duyệt)'}
-                        </button>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400 font-medium">Chủ tài khoản:</span>
+                          <strong className="text-slate-800 dark:text-gray-200">{systemSettings?.adminAccountName || 'VU VAN QUYEN'}</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400 font-medium">Số tài khoản:</span>
+                          <strong className="text-slate-800 dark:text-gray-200 font-mono">{systemSettings?.adminAccountNumber || '509868686868'}</strong>
+                        </div>
+                        <div className="flex justify-between border-t border-gray-100 dark:border-gray-800 pt-2">
+                          <span className="text-gray-400 font-medium">Nội dung chuyển khoản:</span>
+                          <strong className="text-primary-500 font-bold">Phi {restaurant.name}</strong>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-2 text-primary-500 text-xs font-semibold animate-pulse">
-                        <FiRefreshCw className="animate-spin" /> Kết nối với cổng thanh toán demo...
-                      </div>
-                    )}
+                    </div>
+                    
+                    {/* Nút hành động */}
+                    <button
+                      type="button"
+                      onClick={() => handleRenewSubscription('qr_payment')}
+                      disabled={paymentProcessing}
+                      className="w-full py-3.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-[0.98] text-sm uppercase tracking-wider"
+                    >
+                      {paymentProcessing ? 'Đang gửi yêu cầu...' : 'Xử lý thanh toán'}
+                    </button>
                   </div>
                 )}
 
