@@ -151,6 +151,27 @@ export default function CheckoutPage() {
         } else {
           throw new Error(paymentData.message || 'Không thể tạo URL thanh toán MoMo')
         }
+      } else if (paymentMethod === 'payos') {
+        // Thanh toán qua PayOS (VietQR chuyển khoản)
+        const paymentRes = await fetch('http://localhost:5000/api/payment/payos/create-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: newOrder._id,
+            amount: finalTotal
+          })
+        })
+        
+        const paymentData = await paymentRes.json()
+        
+        if (paymentData.success && paymentData.paymentUrl) {
+          // Redirect đến trang checkout PayOS
+          toast.loading('Đang chuyển hướng tới cổng thanh toán PayOS...', { duration: 2000 })
+          window.location.href = paymentData.paymentUrl
+          return
+        } else {
+          throw new Error(paymentData.message || 'Không thể tạo liên kết thanh toán PayOS')
+        }
       } else if (paymentMethod === 'coins') {
         // Thanh toán bằng Xu
         const coinsRes = await fetch('http://localhost:5000/api/payment/coins/pay', {

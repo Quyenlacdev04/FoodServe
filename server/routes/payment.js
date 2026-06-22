@@ -538,7 +538,128 @@ router.post('/coins/pay', async (req, res) => {
   }
 });
 
+// ===== PAYOS: Thanh toán đơn hàng khách qua PayOS (VietQR) =====
+router.post('/payos/create-payment', async (req, res) => {
+  try {
+    const { orderId, amount } = req.body;
+
+    if (!orderId || !amount) {
+      return res.status(400).json({ message: 'Thiếu orderId hoặc amount' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    }
+
+    const payOSInstance = await getPayOSInstance();
+    if (!payOSInstance) {
+      return res.status(400).json({ message: 'Cổng thanh toán PayOS chưa được cấu hình. Vui lòng liên hệ quản trị viên.' });
+    }
+
+    // Tạo mã orderCode duy nhất dạng số nguyên
+    const orderCode = Number(String(Date.now()).slice(-8) + Math.floor(10 + Math.random() * 90));
+
+    // Mô tả không dấu, max 25 ký tự
+    const description = `DH ${orderId.toString().slice(-6).toUpperCase()}`.slice(0, 25);
+
+    // Tự động detect URL
+    const serverOrigin = `${req.protocol}://${req.get('host')}`;
+    const frontendUrl = serverOrigin.includes('localhost')
+      ? 'http://localhost:3000'
+      : serverOrigin;
+
+    const returnUrl = `${frontendUrl}/payment-result?success=true&orderId=${orderId}&method=payos`;
+    const cancelUrl = `${frontendUrl}/payment-result?success=false&orderId=${orderId}&method=payos`;
+
+    const paymentData = {
+      orderCode: orderCode,
+      amount: Number(amount),
+      description: description,
+      returnUrl: returnUrl,
+      cancelUrl: cancelUrl
+    };
+
+    console.log('📌 [PayOS] Tạo thanh toán đơn hàng khách:', paymentData);
+    const paymentLinkRes = await payOSInstance.paymentRequests.create(paymentData);
+
+    // Lưu orderCode vào order để đối chiếu sau
+    order.transactionId = orderCode.toString();
+    order.paymentMethod = 'payos';
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Tạo liên kết thanh toán PayOS thành công',
+      paymentUrl: paymentLinkRes.checkoutUrl,
+      orderCode: orderCode
+    });
+  } catch (error) {
+    console.error('PayOS create order payment error:', error);
+    res.status(500).json({ message: 'Lỗi khi kết nối cổng thanh toán PayOS: ' + error.message });
+  }
+});
+
+// ===== PAYOS: Return URL cho đơn hàng khách =====
+router.get('/payos/return', async (req, res) => {
+  const { orderCode } = req.query;
+  
+  const serverOrigin = `${req.protocol}://${req.get('host')}`;
+  const frontendUrl = serverOrigin.includes('localhost')
+    ? 'http://localhost:3000'
+    : serverOrigin;
+
+  try {
+    if (!orderCode) {
+      return res.redirect(`${frontendUrl}/payment-result?success=false&responseCode=missing_orderCode`);
+    }
+
+    const payOSInstance = await getPayOSInstance();
+    if (!payOSInstance) {
+      return res.redirect(`${frontendUrl}/payment-result?success=false&responseCode=payos_not_configured`);
+    }
+
+    const paymentInfo = await payOSInstance.paymentRequests.get(Number(orderCode));
+    
+    if (paymentInfo.status === 'PAID') {
+      // Tìm và cập nhật order
+      const order = await Order.findOne({ transactionId: orderCode.toString() });
+      if (order && order.paymentStatus !== 'paid') {
+        order.paymentStatus = 'paid';
+        order.paymentMethod = 'payos';
+        order.paidAt = new Date();
+        await order.save();
+
+        // Emit thông báo real-time
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('payment-confirmed', {
+            orderId: order._id,
+            paymentMethod: 'VietQR (PayOS) 🏦',
+            amount: order.finalAmount,
+            message: `Khách hàng đã thanh toán qua VietQR (PayOS) 🏦`
+          });
+        }
+      }
+      
+      const realOrderId = order ? order._id : '';
+      res.redirect(`${frontendUrl}/payment-result?success=true&orderId=${realOrderId}&amount=${paymentInfo.amount}&transactionId=${orderCode}`);
+    } else {
+      const order = await Order.findOne({ transactionId: orderCode.toString() });
+      const realOrderId = order ? order._id : '';
+      res.redirect(`${frontendUrl}/payment-result?success=false&orderId=${realOrderId}&responseCode=${paymentInfo.status}`);
+    }
+  } catch (error) {
+    console.error('PayOS return error:', error);
+    res.redirect(`${frontendUrl}/payment-result?success=false&responseCode=99`);
+  }
+});
+
+
 // ===== PAYOS: Tích hợp thanh toán QR tự động qua PayOS =====
+
+// Bộ nhớ tạm để theo dõi số lần bấm kiểm tra thanh toán giả lập
+const demoCheckAttempts = new Map();
 
 // Helper to get PayOS instance configured via database settings or environment variables
 async function getPayOSInstance() {
@@ -579,97 +700,6 @@ router.post('/payos/create-subscription-payment', async (req, res) => {
 
     const hasPayOSConfig = clientId && apiKey && checksumKey;
 
-    if (!hasPayOSConfig) {
-      console.log('⚠️ [PayOS] Chưa cấu hình API Keys. Chuyển sang chế độ GIẢ LẬP ĐỂ DEMO.');
-
-      // 1. Gia hạn nhà hàng ngay lập tức
-      const currentExpiry = restaurant.subscriptionExpiry && new Date(restaurant.subscriptionExpiry) > new Date()
-        ? new Date(restaurant.subscriptionExpiry)
-        : new Date();
-      const newExpiry = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
-      restaurant.subscriptionExpiry = newExpiry;
-      restaurant.isActive = true;
-
-      // 2. Tạo yêu cầu thanh toán đã duyệt
-      const orderCode = Number(String(Date.now()).slice(-8) + Math.floor(10 + Math.random() * 90));
-      const paymentRequest = {
-        _id: orderCode.toString(),
-        orderCode: orderCode,
-        restaurantId: restaurant._id,
-        restaurantName: restaurant.name,
-        userId: restaurant.ownerId,
-        amount: Number(amount),
-        paymentMethod: 'bank_transfer',
-        status: 'approved',
-        approvedBy: 'system_demo',
-        approvedAt: new Date(),
-        createdAt: new Date(),
-        note: `Gia hạn phí duy trì (Giả lập Demo VietQR do chưa cấu hình API)`
-      };
-
-      if (!restaurant.paymentRequests) {
-        restaurant.paymentRequests = [];
-      }
-      restaurant.paymentRequests.push(paymentRequest);
-
-      // 3. Ghi nhận lịch sử giao dịch thành công
-      if (!restaurant.paymentHistory) {
-        restaurant.paymentHistory = [];
-      }
-      restaurant.paymentHistory.push({
-        _id: orderCode.toString(),
-        amount: amount,
-        paymentMethod: 'bank_transfer',
-        status: 'completed',
-        paidAt: new Date(),
-        periodStart: currentExpiry,
-        periodEnd: newExpiry,
-        transactionNote: `Thanh toán phí duy trì tự động VietQR (Giả lập Demo)`,
-        approvedBy: 'system_demo'
-      });
-
-      await restaurant.save();
-
-      // 4. Tạo thông báo cho đối tác
-      const notification = await Notification.create({
-        userId: restaurant.ownerId,
-        type: 'payment_approved',
-        title: '✅ Gia hạn thành công VietQR (Demo)',
-        message: `Cửa hàng "${restaurant.name}" đã được gia hạn thêm 30 ngày (Chế độ giả lập VietQR). Hạn mới: ${newExpiry.toLocaleDateString('vi-VN')}`,
-        data: {
-          restaurantId: restaurant._id,
-          restaurantName: restaurant.name,
-          amount: amount,
-          subscriptionExpiry: restaurant.subscriptionExpiry
-        }
-      });
-
-      const io = req.app.get('io');
-      if (io) {
-        io.to(`user-${restaurant.ownerId}`).emit('new-notification', notification);
-        io.to(`user-${restaurant.ownerId}`).emit('payment-approved', { 
-          restaurantId: restaurant._id,
-          subscriptionExpiry: restaurant.subscriptionExpiry 
-        });
-      }
-
-      return res.json({
-        success: true,
-        isDemo: true,
-        message: 'Thanh toán VietQR giả lập thành công! Cửa hàng đã được gia hạn tự động.',
-        subscriptionExpiry: restaurant.subscriptionExpiry
-      });
-    }
-
-    // Tự động thiết lập redirect URL
-    const serverOrigin = `${req.protocol}://${req.get('host')}`;
-    const frontendUrl = serverOrigin.includes('localhost')
-      ? 'http://localhost:3000'
-      : serverOrigin;
-      
-    const redirectUrl = `${frontendUrl}/restaurant-manage?success=true&tab=subscription&method=payos`;
-    const cancelUrl = `${frontendUrl}/restaurant-manage?success=false&tab=subscription&method=payos`;
-
     // Tạo mã orderCode ngẫu nhiên duy nhất dạng số nguyên
     const orderCode = Number(String(Date.now()).slice(-8) + Math.floor(10 + Math.random() * 90));
 
@@ -682,6 +712,66 @@ router.post('/payos/create-subscription-payment', async (req, res) => {
       .replace(/[^a-zA-Z0-9 ]/g, '')
       .slice(0, 15);
     const description = `Gia han ${cleanName}`.slice(0, 25);
+
+    if (!hasPayOSConfig) {
+      console.log('⚠️ [PayOS] Chưa cấu hình API Keys. Chuyển sang chế độ GIẢ LẬP ĐỂ DEMO.');
+
+      // Tạo yêu cầu thanh toán ở trạng thái pending
+      const paymentRequest = {
+        _id: orderCode.toString(),
+        orderCode: orderCode,
+        restaurantId: restaurant._id,
+        restaurantName: restaurant.name,
+        userId: restaurant.ownerId,
+        amount: Number(amount),
+        paymentMethod: 'bank_transfer',
+        status: 'pending',
+        createdAt: new Date(),
+        note: `Gia hạn phí duy trì (Giả lập Demo VietQR do chưa cấu hình API)`
+      };
+
+      if (!restaurant.paymentRequests) {
+        restaurant.paymentRequests = [];
+      }
+      restaurant.paymentRequests.push(paymentRequest);
+      await restaurant.save();
+
+      // Lấy thông tin tài khoản admin từ cài đặt hệ thống để hiển thị trên QR code
+      const adminBankName = settings?.adminBankName || 'Techcombank';
+      const adminAccountNumber = settings?.adminAccountNumber || '509868686868';
+      const adminAccountName = settings?.adminAccountName || 'VU VAN QUYEN';
+      const binMap = {
+        'Techcombank': '970407',
+        'Vietcombank': '970436',
+        'MBBank': '970422',
+        'VietinBank': '970415',
+        'BIDV': '970418',
+        'Agribank': '970405',
+        'ACB': '970416'
+      };
+      const bin = binMap[adminBankName] || '970407';
+
+      return res.json({
+        success: true,
+        isDemo: true,
+        message: 'Tạo yêu cầu thanh toán VietQR giả lập thành công! Vui lòng thực hiện chuyển khoản.',
+        orderCode: orderCode,
+        bin: bin,
+        accountNumber: adminAccountNumber,
+        accountName: adminAccountName,
+        amount: Number(amount),
+        description: `Phi ${cleanName}`.slice(0, 25)
+      });
+    }
+
+    // Tự động thiết lập redirect URL
+    const serverOrigin = `${req.protocol}://${req.get('host')}`;
+    const frontendUrl = serverOrigin.includes('localhost')
+      ? 'http://localhost:3000'
+      : serverOrigin;
+      
+    const redirectUrl = `${frontendUrl}/restaurant-manage?success=true&tab=subscription&method=payos`;
+    const cancelUrl = `${frontendUrl}/restaurant-manage?success=false&tab=subscription&method=payos`;
 
     // Lưu yêu cầu thanh toán ở trạng thái pending
     const paymentRequest = {
@@ -717,13 +807,249 @@ router.post('/payos/create-subscription-payment', async (req, res) => {
     const paymentLinkRes = await payOSInstance.paymentRequests.create(paymentData);
     
     res.json({
+      success: true,
+      isDemo: false,
       message: 'Tạo liên kết thanh toán PayOS thành công',
       paymentUrl: paymentLinkRes.checkoutUrl,
-      orderCode: orderCode
+      orderCode: orderCode,
+      qrCode: paymentLinkRes.qrCode,
+      accountNumber: paymentLinkRes.accountNumber,
+      accountName: paymentLinkRes.accountName,
+      bin: paymentLinkRes.bin,
+      amount: paymentLinkRes.amount,
+      description: paymentLinkRes.description
     });
   } catch (error) {
     console.error('PayOS create payment error:', error);
     res.status(500).json({ message: 'Lỗi khi kết nối với cổng thanh toán PayOS: ' + error.message });
+  }
+});
+
+// Route kiểm tra trạng thái thanh toán PayOS hoặc Demo
+router.get('/payos/check-status/:orderCode', async (req, res) => {
+  try {
+    const { orderCode } = req.params;
+
+    if (!orderCode) {
+      return res.status(400).json({ message: 'Thiếu mã orderCode' });
+    }
+
+    const restaurant = await Restaurant.findOne({
+      'paymentRequests.orderCode': Number(orderCode)
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ message: 'Không tìm thấy yêu cầu thanh toán phù hợp.' });
+    }
+
+    const request = restaurant.paymentRequests.find(r => r.orderCode === Number(orderCode));
+    if (!request) {
+      return res.status(404).json({ message: 'Không tìm thấy yêu cầu thanh toán.' });
+    }
+
+    // Nếu yêu cầu thanh toán đã được duyệt (qua webhook hoặc check trước đó)
+    if (request.status === 'approved') {
+      return res.json({
+        success: true,
+        paid: true,
+        message: 'Thanh toán của bạn đã được xác nhận thành công!',
+        subscriptionExpiry: restaurant.subscriptionExpiry
+      });
+    }
+
+    // Lấy cấu hình hệ thống
+    const settings = await SystemSetting.findOne();
+    const clientId = settings?.payosClientId || process.env.PAYOS_CLIENT_ID;
+    const apiKey = settings?.payosApiKey || process.env.PAYOS_API_KEY;
+    const checksumKey = settings?.payosChecksumKey || process.env.PAYOS_CHECKSUM_KEY;
+
+    const hasPayOSConfig = clientId && apiKey && checksumKey;
+
+    if (!hasPayOSConfig) {
+      // ===== LOGIC KIỂM TRA GIẢ LẬP (DEMO) =====
+      let checks = demoCheckAttempts.get(orderCode) || 0;
+      checks += 1;
+      demoCheckAttempts.set(orderCode, checks);
+
+      if (checks < 2) {
+        return res.json({
+          success: true,
+          paid: false,
+          message: 'Bạn chưa thanh toán. Vui lòng chuyển khoản đúng số tiền và nội dung.'
+        });
+      }
+
+      // Đã ấn kiểm tra lần 2 -> Kích hoạt duyệt tự động
+      request.status = 'approved';
+      request.approvedBy = 'system_demo_check';
+      request.approvedAt = new Date();
+
+      const currentExpiry = restaurant.subscriptionExpiry && new Date(restaurant.subscriptionExpiry) > new Date()
+        ? new Date(restaurant.subscriptionExpiry)
+        : new Date();
+      const newExpiry = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
+      restaurant.subscriptionExpiry = newExpiry;
+      restaurant.isActive = true;
+
+      if (!restaurant.paymentHistory) {
+        restaurant.paymentHistory = [];
+      }
+      restaurant.paymentHistory.push({
+        _id: orderCode.toString(),
+        amount: request.amount,
+        paymentMethod: 'bank_transfer',
+        status: 'completed',
+        paidAt: new Date(),
+        periodStart: currentExpiry,
+        periodEnd: newExpiry,
+        transactionNote: `Thanh toán phí duy trì qua VietQR (Giả lập Demo Check)`,
+        approvedBy: 'system_demo_check'
+      });
+
+      await restaurant.save();
+
+      // Gửi real-time notifications
+      const io = req.app.get('io');
+      const notification = await Notification.create({
+        userId: restaurant.ownerId,
+        type: 'payment_approved',
+        title: '✅ Gia hạn thành công VietQR (Demo Check)',
+        message: `Cửa hàng "${restaurant.name}" đã được gia hạn thêm 30 ngày (Chế độ giả lập). Hạn mới: ${newExpiry.toLocaleDateString('vi-VN')}`,
+        data: {
+          restaurantId: restaurant._id,
+          restaurantName: restaurant.name,
+          amount: request.amount,
+          subscriptionExpiry: restaurant.subscriptionExpiry
+        }
+      });
+
+      if (io) {
+        io.to(`user-${restaurant.ownerId}`).emit('new-notification', notification);
+        io.to(`user-${restaurant.ownerId}`).emit('payment-approved', { 
+          restaurantId: restaurant._id,
+          subscriptionExpiry: restaurant.subscriptionExpiry 
+        });
+      }
+
+      // Xóa bộ nhớ tạm
+      demoCheckAttempts.delete(orderCode);
+
+      return res.json({
+        success: true,
+        paid: true,
+        message: 'Thanh toán VietQR giả lập thành công!',
+        subscriptionExpiry: newExpiry
+      });
+    }
+
+    // ===== LOGIC CHẠY THẬT QUA PAYOS =====
+    const payOSInstance = new PayOS({ clientId, apiKey, checksumKey });
+    console.log(`[PayOS Check] Đang kiểm tra giao dịch qua PayOS: ${orderCode}`);
+    const paymentLinkInfo = await payOSInstance.paymentRequests.get(Number(orderCode));
+    console.log(`[PayOS Check] Trạng thái PayOS: ${paymentLinkInfo.status} cho mã ${orderCode}`);
+
+    if (paymentLinkInfo.status === 'PAID') {
+      request.status = 'approved';
+      request.approvedBy = 'system_payos_check';
+      request.approvedAt = new Date();
+
+      const currentExpiry = restaurant.subscriptionExpiry && new Date(restaurant.subscriptionExpiry) > new Date()
+        ? new Date(restaurant.subscriptionExpiry)
+        : new Date();
+      const newExpiry = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
+      restaurant.subscriptionExpiry = newExpiry;
+      restaurant.isActive = true;
+
+      if (!restaurant.paymentHistory) {
+        restaurant.paymentHistory = [];
+      }
+      restaurant.paymentHistory.push({
+        _id: orderCode.toString(),
+        amount: paymentLinkInfo.amount,
+        paymentMethod: 'bank_transfer',
+        status: 'completed',
+        paidAt: new Date(),
+        periodStart: currentExpiry,
+        periodEnd: newExpiry,
+        transactionNote: `Thanh toán phí duy trì tự động qua VietQR (PayOS Check)`,
+        approvedBy: 'system_payos_check'
+      });
+
+      await restaurant.save();
+
+      // Gửi notifications
+      const io = req.app.get('io');
+      const notification = await Notification.create({
+        userId: request.userId,
+        type: 'payment_approved',
+        title: '✅ Gia hạn thành công qua VietQR (PayOS Check)',
+        message: `Hệ thống đã xác nhận số tiền chuyển khoản qua VietQR. Cửa hàng "${restaurant.name}" đã được gia hạn thêm 30 ngày. Hạn mới: ${newExpiry.toLocaleDateString('vi-VN')}`,
+        data: {
+          restaurantId: restaurant.ownerId,
+          restaurantName: restaurant.name,
+          amount: paymentLinkInfo.amount,
+          subscriptionExpiry: restaurant.subscriptionExpiry
+        }
+      });
+
+      if (io) {
+        io.to(`user-${request.userId}`).emit('new-notification', notification);
+        io.to(`user-${request.userId}`).emit('payment-approved', { 
+          restaurantId: restaurant._id,
+          subscriptionExpiry: restaurant.subscriptionExpiry 
+        });
+      }
+
+      // Thông báo cho admin
+      const admins = await User.find({ role: 'admin' });
+      for (const admin of admins) {
+        const adminNotification = await Notification.create({
+          userId: admin._id,
+          type: 'payment_approved',
+          title: '💳 Thanh toán tự động QR mới (Check)',
+          message: `${restaurant.name} đã hoàn tất thanh toán phí duy trì ${paymentLinkInfo.amount.toLocaleString()}đ qua VietQR`,
+          data: {
+            restaurantId: restaurant._id,
+            restaurantName: restaurant.name,
+            amount: paymentLinkInfo.amount,
+            requestId: request._id
+          }
+        });
+        if (io) {
+          io.to(`user-${admin._id}`).emit('new-notification', adminNotification);
+        }
+      }
+
+      return res.json({
+        success: true,
+        paid: true,
+        message: 'Thanh toán thành công qua VietQR!',
+        subscriptionExpiry: newExpiry
+      });
+    } else if (paymentLinkInfo.status === 'PENDING') {
+      return res.json({
+        success: true,
+        paid: false,
+        message: 'Bạn chưa thanh toán. Vui lòng chuyển khoản đúng số tiền và nội dung.'
+      });
+    } else {
+      // Giao dịch thất bại / hết hạn / bị hủy
+      request.status = 'rejected';
+      request.rejectedBy = 'system_payos_check';
+      request.rejectedAt = new Date();
+      request.rejectReason = `Trạng thái PayOS: ${paymentLinkInfo.status}`;
+      await restaurant.save();
+
+      return res.json({
+        success: true,
+        paid: false,
+        status: paymentLinkInfo.status,
+        message: `Giao dịch thất bại, hết hạn hoặc đã bị hủy (Trạng thái: ${paymentLinkInfo.status})`
+      });
+    }
+  } catch (error) {
+    console.error('PayOS check status error:', error);
+    res.status(500).json({ message: 'Lỗi khi kiểm tra trạng thái thanh toán: ' + error.message });
   }
 });
 
@@ -753,13 +1079,37 @@ router.post('/payos/webhook', async (req, res) => {
       
       console.log(`[PayOS Webhook] Giao dịch thành công. OrderCode: ${orderCode}, Số tiền: ${amount}`);
 
-      // Tìm nhà hàng
+      // Tìm nhà hàng (thanh toán phí duy trì)
       const restaurant = await Restaurant.findOne({
         'paymentRequests.orderCode': orderCode
       });
       
       if (!restaurant) {
-        console.error(`[PayOS Webhook] Không tìm thấy nhà hàng có orderCode: ${orderCode}`);
+        // Kiểm tra xem có phải đơn hàng khách không
+        const customerOrder = await Order.findOne({ transactionId: orderCode.toString() });
+        if (customerOrder && customerOrder.paymentStatus !== 'paid') {
+          customerOrder.paymentStatus = 'paid';
+          customerOrder.paymentMethod = 'payos';
+          customerOrder.paidAt = new Date();
+          await customerOrder.save();
+          
+          console.log(`✅ [PayOS Webhook] Đã xác nhận thanh toán đơn hàng khách: ${customerOrder._id}`);
+          
+          // Emit thông báo real-time
+          const io = req.app.get('io');
+          if (io) {
+            io.emit('payment-confirmed', {
+              orderId: customerOrder._id,
+              paymentMethod: 'VietQR (PayOS) 🏦',
+              amount: customerOrder.finalAmount,
+              message: `Khách hàng đã thanh toán qua VietQR (PayOS) 🏦`
+            });
+          }
+          
+          return res.json({ success: true, message: 'Customer order payment processed' });
+        }
+        
+        console.error(`[PayOS Webhook] Không tìm thấy nhà hàng hoặc đơn hàng có orderCode: ${orderCode}`);
         return res.status(404).json({ message: 'Không tìm thấy yêu cầu thanh toán' });
       }
       

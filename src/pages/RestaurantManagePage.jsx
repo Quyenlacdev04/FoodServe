@@ -67,6 +67,8 @@ export default function RestaurantManagePage() {
     accountName: '',
     accountNumber: ''
   }) // Thông tin ngân hàng
+  const [qrGenerated, setQrGenerated] = useState(false)
+  const [qrGeneratedData, setQrGeneratedData] = useState(null)
 
   // Validate Merchant Access
   useEffect(() => {
@@ -320,11 +322,13 @@ export default function RestaurantManagePage() {
       }
       if (method === 'mockPayment') {
         setQrStep(1)
-        // Không tự động chuyển sang bước 2, chờ user click "Đã chuyển khoản"
+        setQrGenerated(false)
+        setQrGeneratedData(null)
+        setPaymentProcessing(false)
         return
       }
       if (method === 'qr_payment') {
-        // Tạo link thanh toán VietQR qua PayOS
+        // Tạo link thanh toán VietQR qua PayOS hoặc Demo
         const res = await fetch('/api/payment/payos/create-subscription-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -334,30 +338,17 @@ export default function RestaurantManagePage() {
           })
         })
         const data = await res.json()
-        if (res.ok) {
-          if (data.isDemo) {
-            // Giả lập kiểm tra giao dịch trong 3 giây
-            toast.loading('Đang xác thực giao dịch chuyển khoản VietQR giả lập...', { id: 'demo-payment-toast', duration: 3000 })
-            setTimeout(() => {
-              toast.dismiss('demo-payment-toast')
-              setQrStep(2) // Hiển thị tích xanh
-              toast.success(data.message || 'Gia hạn thành công!', { icon: '🎉' })
-              setRestaurant(prev => ({ 
-                ...prev, 
-                isActive: true, 
-                subscriptionExpiry: data.subscriptionExpiry 
-              }))
-              setTimeout(() => {
-                setShowPaymentModal(false)
-                setQrStep(0)
-              }, 2000)
-            }, 3000)
-          } else if (data.paymentUrl) {
-            toast.loading('Đang chuyển hướng tới cổng thanh toán VietQR (PayOS)...', { duration: 2000 })
+        if (res.ok && data.success) {
+          // Nếu PayOS thật trả về paymentUrl → redirect đến trang checkout PayOS
+          if (!data.isDemo && data.paymentUrl) {
+            toast.loading('Đang chuyển hướng tới cổng thanh toán PayOS...', { duration: 2000 })
             window.location.href = data.paymentUrl
-          } else {
-            toast.error(data.message || 'Lỗi kết nối cổng thanh toán PayOS')
+            return
           }
+          // Chế độ demo hoặc PayOS thật nhưng không có paymentUrl → hiển thị QR
+          setQrGeneratedData(data)
+          setQrGenerated(true)
+          toast.success(data.message || 'Khởi tạo thông tin chuyển khoản thành công!')
         } else {
           toast.error(data.message || 'Lỗi kết nối cổng thanh toán PayOS')
         }
@@ -391,6 +382,51 @@ export default function RestaurantManagePage() {
     } catch (err) {
       toast.error('Lỗi kết nối máy chủ')
       setQrStep(0)
+    } finally {
+      setPaymentProcessing(false)
+    }
+  }
+
+  // Kiểm tra trạng thái thanh toán VietQR / PayOS
+  const handleCheckPaymentStatus = async (orderCode) => {
+    try {
+      setPaymentProcessing(true)
+      const toastId = toast.loading('Đang kiểm tra trạng thái thanh toán trên hệ thống...')
+
+      const res = await fetch(`/api/payment/payos/check-status/${orderCode}`)
+      const data = await res.json()
+
+      toast.dismiss(toastId)
+
+      if (res.ok) {
+        if (data.paid) {
+          toast.success(data.message || 'Gia hạn thành công!', { icon: '🎉', duration: 4000 })
+          setQrStep(2) // Hiển thị tích xanh thành công
+
+          // Cập nhật ngày hết hạn của nhà hàng trong state
+          setRestaurant(prev => ({
+            ...prev,
+            isActive: true,
+            subscriptionExpiry: data.subscriptionExpiry
+          }))
+
+          // Tự động đóng modal sau 2 giây
+          setTimeout(() => {
+            setShowPaymentModal(false)
+            setQrStep(0)
+            setQrGenerated(false)
+            setQrGeneratedData(null)
+          }, 2000)
+        } else {
+          toast.error(data.message || 'Bạn chưa thanh toán. Vui lòng chuyển khoản đúng số tiền và nội dung.', {
+            duration: 4000
+          })
+        }
+      } else {
+        toast.error(data.message || 'Lỗi khi kiểm tra trạng thái thanh toán.')
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối máy chủ khi kiểm tra thanh toán.')
     } finally {
       setPaymentProcessing(false)
     }
@@ -1396,14 +1432,16 @@ export default function RestaurantManagePage() {
                       />
                       <div className="absolute inset-0 bg-black/40" />
                       
-                      {/* Nút Trang trước */}
-                      <button
-                        type="button"
-                        onClick={() => setQrStep(0)}
-                        className="absolute top-3 left-3 bg-black/55 hover:bg-black/75 backdrop-blur-md text-white text-xs font-bold py-1.5 px-3 rounded-full flex items-center gap-1 transition-all active:scale-95"
-                      >
-                        ❮ Trang trước
-                      </button>
+                      {/* Nút Trang trước - Chỉ hiện khi chưa gen QR để tránh hủy giữa chừng */}
+                      {!qrGenerated && (
+                        <button
+                          type="button"
+                          onClick={() => setQrStep(0)}
+                          className="absolute top-3 left-3 bg-black/55 hover:bg-black/75 backdrop-blur-md text-white text-xs font-bold py-1.5 px-3 rounded-full flex items-center gap-1 transition-all active:scale-95"
+                        >
+                          ❮ Trang trước
+                        </button>
+                      )}
                       
                       {/* Avatar đè lên giữa */}
                       <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 rounded-2xl border-2 border-white dark:border-dark-200 shadow-md overflow-hidden bg-white">
@@ -1420,6 +1458,11 @@ export default function RestaurantManagePage() {
                       <h3 className="font-bold text-lg text-slate-800 dark:text-white leading-tight">
                         {restaurant.name}
                       </h3>
+                      {qrGenerated && qrGeneratedData?.isDemo && (
+                        <span className="inline-block mt-1 bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Chế độ Giả lập (Demo)
+                        </span>
+                      )}
                     </div>
                     
                     {/* Chi tiết thanh toán */}
@@ -1434,72 +1477,126 @@ export default function RestaurantManagePage() {
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-400 font-semibold">Phương thức thanh toán</span>
-                        <strong className="text-slate-800 dark:text-white font-bold">QR Pay</strong>
+                        <strong className="text-slate-800 dark:text-white font-bold">QR Pay (VietQR)</strong>
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-400 font-semibold">Cửa hàng</span>
-                        <strong className="text-slate-800 dark:text-white font-bold">{restaurant.name}</strong>
+                        <span className="text-gray-400 font-semibold">Trạng thái</span>
+                        <strong className={`font-bold ${qrGenerated ? 'text-amber-500' : 'text-gray-500'}`}>
+                          {qrGenerated ? 'Chờ thanh toán...' : 'Chờ khởi tạo'}
+                        </strong>
                       </div>
                     </div>
-                    
-                    {/* QR Code và thông tin chuyển khoản */}
-                    <div className="bg-gray-50 dark:bg-dark-300/40 rounded-2xl p-4 border border-gray-100 dark:border-gray-800/60 flex flex-col items-center gap-4">
-                      <div className="relative w-44 h-44 bg-white p-2 rounded-2xl border border-gray-100 flex items-center justify-center shadow-md">
-                        {(() => {
-                          let qrUrl = systemSettings?.adminPaymentQR;
-                          if (!qrUrl || qrUrl.includes('localhost') || qrUrl.includes('/uploads/')) {
-                            const bankId = systemSettings?.adminBankName === 'Techcombank' ? 'TCB' : systemSettings?.adminBankName || 'TCB';
-                            const accountNo = systemSettings?.adminAccountNumber || '509868686868';
-                            const accountName = encodeURIComponent(systemSettings?.adminAccountName || 'VU VAN QUYEN');
-                            const amount = monthlyFee;
-                            const description = encodeURIComponent(`Phi ${restaurant?.name || 'FoodServe'}`);
-                            qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${description}&accountName=${accountName}`;
-                          }
-                          return (
-                            <img 
-                              src={qrUrl} 
-                              alt="QR Code" 
-                              className="w-full h-full object-contain rounded-lg"
-                            />
-                          );
-                        })()}
+
+                    {!qrGenerated ? (
+                      /* BƯỚC 1A: CHƯA XỬ LÝ THANH TOÁN -> CHỈ HIỆN PREVIEW HÓA ĐƠN */
+                      <div className="space-y-4">
+                        <div className="p-4 bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/30 rounded-2xl text-center space-y-2">
+                          <span className="text-3xl block">📋</span>
+                          <h4 className="font-bold text-slate-800 dark:text-gray-200 text-sm">Xác nhận thông tin hóa đơn</h4>
+                          <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+                            Bấm nút **"Xử lý thanh toán"** bên dưới để khởi tạo mã chuyển khoản VietQR tự động.
+                          </p>
+                        </div>
+
+                        {/* Nút hành động */}
+                        <button
+                          type="button"
+                          onClick={() => handleRenewSubscription('qr_payment')}
+                          disabled={paymentProcessing}
+                          className="w-full py-3.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-[0.98] text-sm uppercase tracking-wider flex items-center justify-center gap-2"
+                        >
+                          {paymentProcessing ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Đang khởi tạo...
+                            </>
+                          ) : 'Xử lý thanh toán'}
+                        </button>
                       </div>
-                      
-                      <div className="text-center">
-                        <p className="text-xs font-bold text-slate-800 dark:text-gray-200">Quét mã QR để chuyển khoản nhanh</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">Vui lòng kiểm tra kỹ nội dung và số tiền trước khi quét</p>
+                    ) : (
+                      /* BƯỚC 1B: ĐÃ XỬ LÝ THANH TOÁN -> HIỂN THỊ MÃ QR ĐỘNG VÀ NÚT KIỂM TRA */
+                      <div className="space-y-4">
+                        {/* QR Code và thông tin chuyển khoản */}
+                        <div className="bg-gray-50 dark:bg-dark-300/40 rounded-2xl p-4 border border-gray-100 dark:border-gray-800/60 flex flex-col items-center gap-4 animate-fadeIn">
+                          <div className="relative w-44 h-44 bg-white p-2 rounded-2xl border border-gray-100 flex items-center justify-center shadow-md">
+                            {(() => {
+                              const bin = qrGeneratedData?.bin || '970407';
+                              const accountNo = qrGeneratedData?.accountNumber || '509868686868';
+                              const accountName = encodeURIComponent(qrGeneratedData?.accountName || 'VU VAN QUYEN');
+                              const amount = qrGeneratedData?.amount || monthlyFee;
+                              const description = encodeURIComponent(qrGeneratedData?.description || `Phi ${restaurant.name}`);
+                              
+                              const qrUrl = `https://img.vietqr.io/image/${bin}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${description}&accountName=${accountName}`;
+                              
+                              return (
+                                <img 
+                                  src={qrUrl} 
+                                  alt="VietQR Code" 
+                                  className="w-full h-full object-contain rounded-lg"
+                                />
+                              );
+                            })()}
+                          </div>
+                          
+                          <div className="text-center">
+                            <p className="text-xs font-bold text-slate-800 dark:text-gray-200">Quét mã QR để chuyển khoản nhanh</p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">Hệ thống tự động duyệt sau khi nhận đủ tiền</p>
+                          </div>
+                          
+                          {/* Chi tiết ngân hàng */}
+                          <div className="w-full bg-white dark:bg-dark-200 border border-gray-150 dark:border-gray-800 rounded-2xl p-4 space-y-2 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 font-medium">Ngân hàng:</span>
+                              <strong className="text-slate-800 dark:text-gray-200">
+                                {(() => {
+                                  const binMap = {
+                                    '970407': 'Techcombank',
+                                    '970436': 'Vietcombank',
+                                    '970422': 'MBBank',
+                                    '970415': 'VietinBank',
+                                    '970418': 'BIDV',
+                                    '970405': 'Agribank',
+                                    '970416': 'ACB'
+                                  };
+                                  return binMap[qrGeneratedData?.bin] || `Mã BIN: ${qrGeneratedData?.bin || 'Techcombank'}`;
+                                })()}
+                              </strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 font-medium">Chủ tài khoản:</span>
+                              <strong className="text-slate-800 dark:text-gray-200">{qrGeneratedData?.accountName || 'VU VAN QUYEN'}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 font-medium">Số tài khoản:</span>
+                              <strong className="text-slate-800 dark:text-gray-200 font-mono select-all cursor-pointer" title="Click để copy">
+                                {qrGeneratedData?.accountNumber || '509868686868'}
+                              </strong>
+                            </div>
+                            <div className="flex justify-between border-t border-gray-100 dark:border-gray-800 pt-2">
+                              <span className="text-gray-400 font-medium">Nội dung chuyển khoản:</span>
+                              <strong className="text-primary-500 font-bold select-all cursor-pointer" title="Click để copy">
+                                {qrGeneratedData?.description || `Phi ${restaurant.name}`}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Nút hành động */}
+                        <button
+                          type="button"
+                          onClick={() => handleCheckPaymentStatus(qrGeneratedData.orderCode)}
+                          disabled={paymentProcessing}
+                          className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-[0.98] text-sm uppercase tracking-wider flex items-center justify-center gap-2"
+                        >
+                          {paymentProcessing ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Đang kiểm tra...
+                            </>
+                          ) : 'Kiểm tra thanh toán'}
+                        </button>
                       </div>
-                      
-                      {/* Chi tiết ngân hàng */}
-                      <div className="w-full bg-white dark:bg-dark-200 border border-gray-150 dark:border-gray-800 rounded-2xl p-4 space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-gray-400 font-medium">Ngân hàng:</span>
-                          <strong className="text-slate-800 dark:text-gray-200">{systemSettings?.adminBankName || 'Techcombank'}</strong>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400 font-medium">Chủ tài khoản:</span>
-                          <strong className="text-slate-800 dark:text-gray-200">{systemSettings?.adminAccountName || 'VU VAN QUYEN'}</strong>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400 font-medium">Số tài khoản:</span>
-                          <strong className="text-slate-800 dark:text-gray-200 font-mono">{systemSettings?.adminAccountNumber || '509868686868'}</strong>
-                        </div>
-                        <div className="flex justify-between border-t border-gray-100 dark:border-gray-800 pt-2">
-                          <span className="text-gray-400 font-medium">Nội dung chuyển khoản:</span>
-                          <strong className="text-primary-500 font-bold">Phi {restaurant.name}</strong>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Nút hành động */}
-                    <button
-                      type="button"
-                      onClick={() => handleRenewSubscription('qr_payment')}
-                      disabled={paymentProcessing}
-                      className="w-full py-3.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-[0.98] text-sm uppercase tracking-wider"
-                    >
-                      {paymentProcessing ? 'Đang gửi yêu cầu...' : 'Xử lý thanh toán'}
-                    </button>
+                    )}
                   </div>
                 )}
 

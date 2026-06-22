@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { FiCreditCard, FiDollarSign } from 'react-icons/fi';
 import { FaCoins } from 'react-icons/fa';
+import { BsQrCode } from 'react-icons/bs';
 
 export default function PaymentMethodSelector({ onSelect, selectedMethod, userCoins = 0, totalAmount = 0 }) {
   const coinsRequired = Math.ceil(totalAmount / 1000); // 1 Xu = 1.000đ
@@ -24,6 +25,15 @@ export default function PaymentMethodSelector({ onSelect, selectedMethod, userCo
       color: 'pink',
       available: true,
       badge: '🔒 An toàn'
+    },
+    {
+      id: 'payos',
+      name: 'Chuyển khoản (VietQR)',
+      icon: BsQrCode,
+      description: 'Quét mã QR chuyển khoản ngân hàng',
+      color: 'blue',
+      available: true,
+      badge: '🏦 Tự động'
     },
     {
       id: 'coins',
@@ -154,6 +164,24 @@ export default function PaymentMethodSelector({ onSelect, selectedMethod, userCo
             <li>Bạn sẽ được chuyển đến trang thanh toán MoMo</li>
             <li>Hỗ trợ ví MoMo, ATM, Visa, MasterCard, QR Code</li>
             <li>Giao dịch được bảo mật</li>
+          </ul>
+        </motion.div>
+      )}
+
+      {/* PayOS Note */}
+      {selectedMethod === 'payos' && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800"
+        >
+          <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+            🏦 <strong>Thanh toán chuyển khoản VietQR:</strong>
+          </p>
+          <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1 ml-5 list-disc">
+            <li>Bạn sẽ được chuyển đến trang thanh toán PayOS</li>
+            <li>Quét mã QR bằng app ngân hàng bất kỳ</li>
+            <li>Hệ thống tự động xác nhận sau khi chuyển khoản thành công</li>
           </ul>
         </motion.div>
       )}
