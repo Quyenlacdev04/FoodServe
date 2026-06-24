@@ -1,3 +1,4 @@
+import { API_BASE_URL, SOCKET_URL } from '../../config/api.js'
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiMapPin, FiClock, FiPackage, FiBell, FiX, FiZap, FiNavigation } from 'react-icons/fi';
@@ -228,7 +229,7 @@ export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline, 
 
   const fetchAvailableOrders = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/orders/shipper/available');
+      const res = await fetch(`${API_BASE_URL}/api/orders/shipper/available`);
       const data = await res.json();
       // Lọc ngay đơn đã quá 2 phút
       const fresh = (Array.isArray(data) ? data : []).filter(o => getSecondsLeft(o.createdAt) > 0);
@@ -246,7 +247,7 @@ export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline, 
     fetchAvailableOrders();
     const interval = setInterval(fetchAvailableOrders, 30000);
 
-    const socket = io('http://localhost:5000');
+    const socket = io(SOCKET_URL);
     socketRef.current = socket;
 
     socket.on('new-order', (order) => {
@@ -294,7 +295,7 @@ export default function AvailableOrders({ shipperId, onOrderAccepted, isOnline, 
   const handleAcceptOrder = async (orderId) => {
     setAccepting(orderId);
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/accept-shipper`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/accept-shipper`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shipperId })

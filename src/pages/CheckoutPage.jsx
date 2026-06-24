@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
@@ -48,7 +49,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const checkMaintenance = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/settings')
+        const res = await fetch(`${API_BASE_URL}/api/settings`)
         if (res.ok) {
           const data = await res.json()
           setIsMaintenance(!!data.maintenanceMode)
@@ -82,7 +83,7 @@ export default function CheckoutPage() {
     const timer = setTimeout(async () => {
       setFeeLoading(true)
       try {
-        const res = await fetch('http://localhost:5000/api/restaurants/calculate-fee', {
+        const res = await fetch(`${API_BASE_URL}/api/restaurants/calculate-fee`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ restaurantId, deliveryAddress: formData.address })
@@ -140,7 +141,7 @@ export default function CheckoutPage() {
         note: formData.note
       }
 
-      const res = await fetch('http://localhost:5000/api/orders', {
+      const res = await fetch(`${API_BASE_URL}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData)
@@ -153,7 +154,7 @@ export default function CheckoutPage() {
       // Xử lý theo phương thức thanh toán
       if (paymentMethod === 'momo') {
         // Thanh toán MoMo
-        const paymentRes = await fetch('http://localhost:5000/api/payment/momo/create-payment', {
+        const paymentRes = await fetch(`${API_BASE_URL}/api/payment/momo/create-payment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -173,7 +174,7 @@ export default function CheckoutPage() {
         }
       } else if (paymentMethod === 'payos') {
         // Thanh toán qua PayOS (VietQR chuyển khoản)
-        const paymentRes = await fetch('http://localhost:5000/api/payment/payos/create-payment', {
+        const paymentRes = await fetch(`${API_BASE_URL}/api/payment/payos/create-payment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -194,7 +195,7 @@ export default function CheckoutPage() {
         }
       } else if (paymentMethod === 'coins') {
         // Thanh toán bằng Xu
-        const coinsRes = await fetch('http://localhost:5000/api/payment/coins/pay', {
+        const coinsRes = await fetch(`${API_BASE_URL}/api/payment/coins/pay`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

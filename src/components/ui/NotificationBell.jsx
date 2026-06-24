@@ -1,3 +1,4 @@
+import { API_BASE_URL, SOCKET_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
@@ -89,7 +90,7 @@ export default function NotificationBell() {
     fetchNotifications()
 
     // Setup Socket.io
-    const socket = io('http://localhost:5000')
+    const socket = io(SOCKET_URL)
     socket.emit('join-user', user._id || user.id)
 
     socket.on('new-notification', (notification) => {
@@ -118,7 +119,7 @@ export default function NotificationBell() {
     if (!user) return
     try {
       setLoading(true)
-      const res = await fetch(`http://localhost:5000/api/notifications/user/${user._id || user.id}`)
+      const res = await fetch(`${API_BASE_URL}/api/notifications/user/${user._id || user.id}`)
       if (res.ok) {
         const data = await res.json()
         setNotifications(data.notifications)
@@ -133,7 +134,7 @@ export default function NotificationBell() {
 
   const markAsRead = async (notificationId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}/read`, {
         method: 'PATCH'
       })
       if (res.ok) {
@@ -149,7 +150,7 @@ export default function NotificationBell() {
 
   const markAllAsRead = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/notifications/user/${user._id || user.id}/read-all`, {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/user/${user._id || user.id}/read-all`, {
         method: 'PATCH'
       })
       if (res.ok) {
@@ -164,7 +165,7 @@ export default function NotificationBell() {
 
   const deleteNotification = async (notificationId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
         method: 'DELETE'
       })
       if (res.ok) {

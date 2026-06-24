@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -15,7 +16,7 @@ export default function MenuItemList() {
   const loadDiscountMenuItems = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`http://localhost:5000/api/restaurants?limit=100`)
+      const response = await fetch(`${API_BASE_URL}/api/restaurants?limit=100`)
       const restaurantsData = await response.json()
       const restaurants = restaurantsData.restaurants || []
       const discountRestaurants = restaurants.filter(r => r.discount > 0)
@@ -23,7 +24,7 @@ export default function MenuItemList() {
       const discountMenuItems = []
       for (const restaurant of discountRestaurants) {
         try {
-          const menuResponse = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}`)
+          const menuResponse = await fetch(`${API_BASE_URL}/api/restaurants/${restaurant._id}`)
           const menuData = await menuResponse.json()
           if (menuData.menuItems && menuData.menuItems.length > 0) {
             const items = menuData.menuItems.slice(0, 2)

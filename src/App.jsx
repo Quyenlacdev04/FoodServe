@@ -1,3 +1,4 @@
+import { API_BASE_URL } from './config/api.js'
 import { useEffect, useState } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
@@ -40,7 +41,7 @@ function App() {
   useEffect(() => {
     const checkMaintenance = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/settings')
+        const res = await fetch(`${API_BASE_URL}/api/settings`)
         if (res.ok) {
           const data = await res.json()
           setIsMaintenance(!!data.maintenanceMode)

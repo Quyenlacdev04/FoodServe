@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 
@@ -40,7 +41,7 @@ export default function useUserCapabilities() {
       setLoading(true)
       try {
         const res = await fetch(
-          `http://localhost:5000/api/auth/capabilities?userId=${user._id}`
+          `${API_BASE_URL}/api/auth/capabilities?userId=${user._id}`
         )
         if (res.ok && !cancelled) {
           const data = await res.json()

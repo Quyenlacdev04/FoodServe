@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiPlus, FiEdit2, FiTrash2, FiSend, FiX, FiTag, FiToggleLeft, FiToggleRight, FiSearch, FiFilter, FiCopy, FiEye, FiDownload, FiUsers } from 'react-icons/fi'
@@ -53,7 +54,7 @@ export default function AdminVouchers({ adminId }) {
   const fetchVouchers = async () => {
     try {
       setLoading(true)
-      const res = await fetch('http://localhost:5000/api/vouchers')
+      const res = await fetch(`${API_BASE_URL}/api/vouchers`)
       if (res.ok) {
         const data = await res.json()
         setVouchers(data)
@@ -94,7 +95,7 @@ export default function AdminVouchers({ adminId }) {
     setSaving(true)
     try {
       const body = { ...form, value: Number(form.value), minOrder: Number(form.minOrder), maxDiscount: Number(form.maxDiscount), usageLimit: Number(form.usageLimit), expiresAt: form.expiresAt || null, createdBy: adminId }
-      const url = editingId ? `http://localhost:5000/api/vouchers/${editingId}` : 'http://localhost:5000/api/vouchers'
+      const url = editingId ? `${API_BASE_URL}/api/vouchers/${editingId}` : `${API_BASE_URL}/api/vouchers`
       const method = editingId ? 'PUT' : 'POST'
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
@@ -110,14 +111,14 @@ export default function AdminVouchers({ adminId }) {
   const handleDelete = async (id, code) => {
     if (!window.confirm(`Xóa voucher "${code}"?`)) return
     try {
-      const res = await fetch(`http://localhost:5000/api/vouchers/${id}`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE_URL}/api/vouchers/${id}`, { method: 'DELETE' })
       if (res.ok) { toast.success('Đã xóa voucher'); fetchVouchers() }
     } catch { toast.error('Lỗi kết nối') }
   }
 
   const handleToggle = async (v) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/vouchers/${v._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/vouchers/${v._id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !v.isActive })
       })
@@ -130,7 +131,7 @@ export default function AdminVouchers({ adminId }) {
     if (!window.confirm(`Phát voucher "${v.code}" cho ${roleText}?`)) return
     setBroadcasting(v._id)
     try {
-      const res = await fetch(`http://localhost:5000/api/vouchers/${v._id}/broadcast`, {
+      const res = await fetch(`${API_BASE_URL}/api/vouchers/${v._id}/broadcast`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetRole: role })
       })

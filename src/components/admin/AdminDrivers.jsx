@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiSearch, FiEdit2, FiTrash2, FiToggleLeft, FiToggleRight, FiStar, FiTruck, FiX, FiPhone, FiMail, FiEye, FiGift } from 'react-icons/fi'
@@ -36,7 +37,7 @@ export default function AdminDrivers() {
   const fetchDrivers = async () => {
     try {
       setLoading(true)
-      const res = await fetch('http://localhost:5000/api/auth/users')
+      const res = await fetch(`${API_BASE_URL}/api/auth/users`)
       if (res.ok) {
         const data = await res.json()
         setDrivers(data.filter(u => u.isShipper || u.role === 'shipper'))
@@ -48,7 +49,7 @@ export default function AdminDrivers() {
   const fetchDriverOrders = async (driverId) => {
     setOrdersLoading(true)
     try {
-      const res = await fetch(`http://localhost:5000/api/orders?shipperId=${driverId}`)
+      const res = await fetch(`${API_BASE_URL}/api/orders?shipperId=${driverId}`)
       if (res.ok) setDriverOrders(await res.json())
     } catch {} finally { setOrdersLoading(false) }
   }
@@ -70,7 +71,7 @@ export default function AdminDrivers() {
   const handleSaveEdit = async (e) => {
     e.preventDefault(); setEditLoading(true)
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/users/${editDriver._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/users/${editDriver._id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editForm.name, phone: editForm.phone, email: editForm.email,
@@ -85,7 +86,7 @@ export default function AdminDrivers() {
 
   const handleToggleStatus = async (driver) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/users/${driver._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/users/${driver._id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: driver.isShipper ? 'user' : 'shipper', isShipper: !driver.isShipper })
       })
@@ -96,7 +97,7 @@ export default function AdminDrivers() {
   const handleDelete = async (driver) => {
     if (!window.confirm(`Xóa tài xế ${driver.name}?`)) return
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/users/${driver._id}`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE_URL}/api/auth/users/${driver._id}`, { method: 'DELETE' })
       if (res.ok) { toast.success('Đã xóa tài xế'); fetchDrivers(); if (selectedDriver?._id === driver._id) setSelectedDriver(null) }
     } catch { toast.error('Lỗi kết nối') }
   }
@@ -104,7 +105,7 @@ export default function AdminDrivers() {
   const handleAdjustCoins = async (driver, amount) => {
     try {
       const newCoins = Math.max(0, (driver.coins || 0) + amount)
-      const res = await fetch(`http://localhost:5000/api/auth/users/${driver._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/users/${driver._id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ coins: newCoins })
       })
@@ -125,7 +126,7 @@ export default function AdminDrivers() {
     try {
       const driver = manualBonusModal
       const newCoins = (driver.coins || 0) + amount
-      const res = await fetch(`http://localhost:5000/api/auth/users/${driver._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/users/${driver._id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ coins: newCoins })
       })

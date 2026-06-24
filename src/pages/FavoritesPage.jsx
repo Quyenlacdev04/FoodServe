@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -23,7 +24,7 @@ export default function FavoritesPage() {
   const fetchFavorites = async () => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/favorites/user/${user._id}`
+        `${API_BASE_URL}/api/favorites/user/${user._id}`
       );
       const data = await response.json();
       setFavorites(data.favorites);

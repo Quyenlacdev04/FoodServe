@@ -1,3 +1,4 @@
+import { API_BASE_URL, SOCKET_URL } from '../../config/api.js'
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiMessageCircle } from 'react-icons/fi';
@@ -18,7 +19,7 @@ export default function ChatButton({ orderId, orderInfo }) {
     fetchUnread();
 
     // Lắng nghe tin nhắn mới real-time để cập nhật badge
-    const sock = io('http://localhost:5000');
+    const sock = io(SOCKET_URL);
     socketRef.current = sock;
     sock.emit('join-user', user._id);
 
@@ -37,7 +38,7 @@ export default function ChatButton({ orderId, orderInfo }) {
   const fetchUnread = async () => {
     if (!user?._id) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/messages/unread/${user._id}`);
+      const res = await fetch(`${API_BASE_URL}/api/messages/unread/${user._id}`);
       const data = await res.json();
       setUnreadCount(data.unreadCount || 0);
     } catch {}
@@ -48,7 +49,7 @@ export default function ChatButton({ orderId, orderInfo }) {
     setUnreadCount(0);
     // Mark read ngay khi mở
     if (orderId && user?._id) {
-      fetch(`http://localhost:5000/api/messages/order/${orderId}/read-all`, {
+      fetch(`${API_BASE_URL}/api/messages/order/${orderId}/read-all`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user._id })

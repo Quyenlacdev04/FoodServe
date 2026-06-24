@@ -1,9 +1,10 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
 export const fetchRestaurants = createAsyncThunk(
   'restaurants/fetchAll',
   async () => {
-    const res = await fetch('http://localhost:5000/api/restaurants')
+    const res = await fetch(`${API_BASE_URL}/api/restaurants`)
     if (!res.ok) throw new Error('Lỗi fetch data')
     const data = await res.json()
     // API trả về { restaurants: [...], pagination: {...} }
@@ -16,7 +17,7 @@ export const fetchRestaurants = createAsyncThunk(
 export const fetchRestaurantDetails = createAsyncThunk(
   'restaurants/fetchDetails',
   async (id) => {
-    const res = await fetch(`http://localhost:5000/api/restaurants/${id}`)
+    const res = await fetch(`${API_BASE_URL}/api/restaurants/${id}`)
     if (!res.ok) throw new Error('Lỗi fetch chi tiết')
     const data = await res.json()
     // Return restaurant with id, and menuItems mapped with id

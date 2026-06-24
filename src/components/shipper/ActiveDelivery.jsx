@@ -1,3 +1,4 @@
+import { API_BASE_URL, SOCKET_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiMapPin, FiPhone, FiPackage, FiCheckCircle, FiNavigation, FiArrowRight, FiX } from 'react-icons/fi';
@@ -131,7 +132,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
     fetchActiveOrder();
 
     // Lắng nghe thông báo thanh toán online
-    const socket = io('http://localhost:5000');
+    const socket = io(SOCKET_URL);
     socket.on('payment-confirmed', (data) => {
       toast.success(data.message || 'Khách đã thanh toán online!', {
         icon: '💳',
@@ -223,7 +224,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
         const newLoc = { lat: interpolatedLat, lng: interpolatedLng };
         setShipperLocation(newLoc);
         
-        fetch(`http://localhost:5000/api/orders/${activeOrder._id}/update-location`, {
+        fetch(`${API_BASE_URL}/api/orders/${activeOrder._id}/update-location`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newLoc)
@@ -243,7 +244,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
 
   const fetchActiveOrder = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/orders?shipperId=${shipperId}`);
+      const response = await fetch(`${API_BASE_URL}/api/orders?shipperId=${shipperId}`);
       const data = await response.json();
       
       const active = data.find(o => 
@@ -273,7 +274,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
           const { latitude, longitude } = position.coords;
           setShipperLocation({ lat: latitude, lng: longitude });
           
-          await fetch(`http://localhost:5000/api/orders/${activeOrder._id}/update-location`, {
+          await fetch(`${API_BASE_URL}/api/orders/${activeOrder._id}/update-location`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -294,7 +295,7 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
   const handleUpdateStatus = async (newStatus) => {
     setUpdating(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/orders/${activeOrder._id}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders/${activeOrder._id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, shipperId })

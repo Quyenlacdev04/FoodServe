@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { FiStar, FiThumbsUp, FiFlag, FiMessageCircle, FiEdit3 } from 'react-icons/fi'
@@ -29,7 +30,7 @@ export default function ReviewList({ restaurantId }) {
   const fetchReviews = async () => {
     try {
       setLoading(true)
-      const res = await fetch(`http://localhost:5000/api/reviews/restaurant/${restaurantId}?page=${page}&limit=10&sort=${sortBy}`)
+      const res = await fetch(`${API_BASE_URL}/api/reviews/restaurant/${restaurantId}?page=${page}&limit=10&sort=${sortBy}`)
       if (res.ok) {
         const data = await res.json()
         setReviews(data.reviews)
@@ -44,7 +45,7 @@ export default function ReviewList({ restaurantId }) {
 
   const handleHelpful = async (reviewId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/reviews/${reviewId}/helpful`, {
+      const res = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/helpful`, {
         method: 'POST'
       })
       if (res.ok) {
@@ -60,7 +61,7 @@ export default function ReviewList({ restaurantId }) {
     if (!confirm('Bạn có chắc muốn báo cáo đánh giá này?')) return
     
     try {
-      const res = await fetch(`http://localhost:5000/api/reviews/${reviewId}/report`, {
+      const res = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'Spam hoặc nội dung không phù hợp' })
@@ -82,7 +83,7 @@ export default function ReviewList({ restaurantId }) {
 
     setSubmitting(true)
     try {
-      const res = await fetch('http://localhost:5000/api/reviews', {
+      const res = await fetch(`${API_BASE_URL}/api/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
@@ -82,7 +83,7 @@ export default function ProfilePage() {
 
     setPwLoading(true)
     try {
-      const res = await fetch('http://localhost:5000/api/auth/change-password', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

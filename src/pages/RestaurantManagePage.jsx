@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
@@ -115,7 +116,7 @@ export default function RestaurantManagePage() {
       try {
         setLoading(true)
         // 1. Get owned restaurant info
-        const res = await fetch(`http://localhost:5000/api/restaurants/owned/${user._id || user.id}`)
+        const res = await fetch(`${API_BASE_URL}/api/restaurants/owned/${user._id || user.id}`)
         if (!res.ok) {
           throw new Error('Bạn chưa được cấp quyền quản lý nhà hàng nào.')
         }
@@ -130,21 +131,21 @@ export default function RestaurantManagePage() {
         })
 
         // 2. Fetch full details (including menu items)
-        const detailsRes = await fetch(`http://localhost:5000/api/restaurants/${restData._id}`)
+        const detailsRes = await fetch(`${API_BASE_URL}/api/restaurants/${restData._id}`)
         if (detailsRes.ok) {
           const fullData = await detailsRes.json()
           setMenuItems(fullData.menuItems || [])
         }
 
         // 3. Fetch restaurant orders
-        const ordersRes = await fetch(`http://localhost:5000/api/orders/restaurant/${restData._id}`)
+        const ordersRes = await fetch(`${API_BASE_URL}/api/orders/restaurant/${restData._id}`)
         if (ordersRes.ok) {
           const ordersData = await ordersRes.json()
           setOrders(ordersData)
         }
 
         // 4. Fetch system settings (for subscription fee)
-        const settingsRes = await fetch('http://localhost:5000/api/settings')
+        const settingsRes = await fetch(`${API_BASE_URL}/api/settings`)
         if (settingsRes.ok) {
           const settingsData = await settingsRes.json()
           setSystemSettings(settingsData)
@@ -172,8 +173,8 @@ export default function RestaurantManagePage() {
 
     try {
       const url = editingItem 
-        ? `http://localhost:5000/api/restaurants/menu/${editingItem._id}`
-        : `http://localhost:5000/api/restaurants/${restaurant._id}/menu`
+        ? `${API_BASE_URL}/api/restaurants/menu/${editingItem._id}`
+        : `${API_BASE_URL}/api/restaurants/${restaurant._id}/menu`
       
       const method = editingItem ? 'PUT' : 'POST'
       
@@ -211,7 +212,7 @@ export default function RestaurantManagePage() {
   const handleDeleteItem = async (itemId) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa món này không?')) return
     try {
-      const res = await fetch(`http://localhost:5000/api/restaurants/menu/${itemId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/restaurants/menu/${itemId}`, {
         method: 'DELETE'
       })
       if (res.ok) {
@@ -228,7 +229,7 @@ export default function RestaurantManagePage() {
   // Update Order Status
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -276,7 +277,7 @@ export default function RestaurantManagePage() {
     if (!storeForm.name) { toast.error('Tên cửa hàng không được trống!'); return }
     try {
       setSavingStore(true)
-      const res = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/restaurants/${restaurant._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(storeForm)

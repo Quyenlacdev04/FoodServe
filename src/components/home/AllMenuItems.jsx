@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -18,18 +19,18 @@ export default function AllMenuItems() {
   const loadMenuItems = async () => {
     try {
       setLoading(true)
-      let response = await fetch(`http://localhost:5000/api/restaurants/menu/all?limit=${itemsPerPage}&page=${page}`)
+      let response = await fetch(`${API_BASE_URL}/api/restaurants/menu/all?limit=${itemsPerPage}&page=${page}`)
       let data = await response.json()
       
       if (!data.results || data.results.length === 0) {
-        response = await fetch(`http://localhost:5000/api/restaurants?limit=100`)
+        response = await fetch(`${API_BASE_URL}/api/restaurants?limit=100`)
         const restaurantsData = await response.json()
         const restaurants = restaurantsData.restaurants || []
         
         const allMenuItems = []
         for (const restaurant of restaurants) {
           try {
-            const menuResponse = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}`)
+            const menuResponse = await fetch(`${API_BASE_URL}/api/restaurants/${restaurant._id}`)
             const menuData = await menuResponse.json()
             if (menuData.menuItems && menuData.menuItems.length > 0) {
               menuData.menuItems.forEach(item => {

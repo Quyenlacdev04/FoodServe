@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -132,7 +133,7 @@ export default function PartnerRegisterPage() {
     const fetchStatus = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/partner/register/status?userId=${user._id}`
+          `${API_BASE_URL}/api/partner/register/status?userId=${user._id}`
         )
         const data = await res.json()
         if (res.ok) {
@@ -243,7 +244,7 @@ export default function PartnerRegisterPage() {
     setLoading(true)
     
     try {
-      const res = await fetch('http://localhost:5000/api/partner/register', {
+      const res = await fetch(`${API_BASE_URL}/api/partner/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, userId: user._id })

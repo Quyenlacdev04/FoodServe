@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiUpload, FiAlertCircle } from 'react-icons/fi';
@@ -120,7 +121,7 @@ export default function ShipperCancelOrderModal({ isOpen, onClose, order, onSucc
         const formData = new FormData();
         formData.append('image', proofImage);
         
-        const uploadRes = await fetch('http://localhost:5000/api/upload', {
+        const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
           method: 'POST',
           body: formData
         });
@@ -134,7 +135,7 @@ export default function ShipperCancelOrderModal({ isOpen, onClose, order, onSucc
       }
 
       // Cancel order with reason and proof
-      const response = await fetch(`http://localhost:5000/api/orders/${order._id}/shipper-cancel`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders/${order._id}/shipper-cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

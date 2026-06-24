@@ -98,8 +98,44 @@ function createGmailTransporter() {
  */
 export async function sendEmail({ to, subject, html }) {
   const errors = []
+  const isProduction = process.env.NODE_ENV === 'production'
+  let gmailTried = false
 
-  // 1. Ưu tiên Brevo (hoạt động tốt nhất trên Render, miễn phí 300 email/ngày)
+  // Helper function to send via Gmail SMTP
+  async function tryGmailSMTP() {
+    gmailTried = true
+    const transporter = createGmailTransporter()
+    if (transporter) {
+      try {
+        await withTimeout(
+          transporter.sendMail({
+            from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
+            to,
+            subject,
+            html,
+          }),
+          8000,  // 8s timeout tổng cho Gmail
+          'Gmail SMTP'
+        )
+        console.log(`📧 Email gửi qua Gmail SMTP thành công đến: ${to}`)
+        return { success: true, provider: 'gmail' }
+      } catch (err) {
+        console.error('❌ Gmail SMTP error:', err.message)
+        errors.push(`Gmail SMTP: ${err.message}`)
+        transporter.close()
+      }
+    }
+    return null
+  }
+
+  // 1. Trong môi trường development (local), ưu tiên dùng Gmail SMTP trước
+  // vì gửi trực tiếp từ Gmail cá nhân sẽ giúp email vào hộp thư chính (Inbox), tránh bị bộ lọc Spam của Gmail chặn (lỗi DMARC khi gửi ké qua Brevo)
+  if (!isProduction) {
+    const res = await tryGmailSMTP()
+    if (res) return res
+  }
+
+  // 2. Thử gửi qua Brevo (ưu tiên hàng đầu trên production Render vì Render chặn cổng SMTP)
   if (process.env.BREVO_API_KEY) {
     try {
       await sendViaBrevo(to, subject, html)
@@ -111,7 +147,7 @@ export async function sendEmail({ to, subject, html }) {
     }
   }
 
-  // 2. Thử Resend (HTTP API, hoạt động trên Render)
+  // 3. Thử gửi qua Resend (phương án dự phòng thứ 2 cho production)
   if (process.env.RESEND_API_KEY) {
     try {
       await sendViaResend(to, subject, html)
@@ -123,31 +159,13 @@ export async function sendEmail({ to, subject, html }) {
     }
   }
 
-  // 3. Fallback về Gmail (dev local — Render block SMTP)
-  const transporter = createGmailTransporter()
-  if (transporter) {
-    try {
-      await withTimeout(
-        transporter.sendMail({
-          from: `"FoodServe 🍽️" <${process.env.EMAIL_USER}>`,
-          to,
-          subject,
-          html,
-        }),
-        8000,  // 8s timeout tổng cho Gmail
-        'Gmail SMTP'
-      )
-      console.log(`📧 Email gửi qua Gmail thành công đến: ${to}`)
-      return { success: true, provider: 'gmail' }
-    } catch (err) {
-      console.error('❌ Gmail error:', err.message)
-      errors.push(`Gmail: ${err.message}`)
-      // Đóng transporter để giải phóng kết nối bị treo
-      transporter.close()
-    }
+  // 4. Nếu ở production (hoặc Gmail SMTP chưa được thử ở dev), thử gửi qua Gmail SMTP như phương án cuối cùng
+  if (!gmailTried) {
+    const res = await tryGmailSMTP()
+    if (res) return res
   }
 
-  // Không có provider nào thành công
+  // Không có provider nào gửi thành công
   const errorMsg = errors.length > 0
     ? `Tất cả email provider đều lỗi: ${errors.join(' | ')}`
     : 'Chưa cấu hình email provider (BREVO_API_KEY, RESEND_API_KEY, hoặc EMAIL_USER/EMAIL_PASS)'

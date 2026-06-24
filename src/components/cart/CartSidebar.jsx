@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
@@ -22,7 +23,7 @@ export default function CartSidebar() {
     if (!isOpen) return
     const checkMaintenance = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/settings')
+        const res = await fetch(`${API_BASE_URL}/api/settings`)
         if (res.ok) {
           const data = await res.json()
           setIsMaintenance(!!data.maintenanceMode)
@@ -47,7 +48,7 @@ export default function CartSidebar() {
     
     setVoucherLoading(true)
     try {
-      const res = await fetch('http://localhost:5000/api/vouchers/validate', {
+      const res = await fetch(`${API_BASE_URL}/api/vouchers/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: c, userId: user?._id || user?.id, orderTotal: total })

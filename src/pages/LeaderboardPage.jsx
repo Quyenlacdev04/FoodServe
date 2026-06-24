@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
@@ -24,7 +25,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/auth/leaderboard')
+    fetch(`${API_BASE_URL}/api/auth/leaderboard`)
       .then(res => res.json())
       .then(data => {
         setLeaders(data)

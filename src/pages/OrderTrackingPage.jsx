@@ -1,3 +1,4 @@
+import { API_BASE_URL, SOCKET_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -30,7 +31,7 @@ export default function OrderTrackingPage() {
 
     const fetchOrder = async (idToFetch) => {
       try {
-        const res = await fetch(`http://localhost:5000/api/orders/${idToFetch}`)
+        const res = await fetch(`${API_BASE_URL}/api/orders/${idToFetch}`)
         if (res.ok) {
           const data = await res.json()
           setOrder(data)
@@ -59,7 +60,7 @@ export default function OrderTrackingPage() {
         }
         // Fetch latest order for this user
         try {
-          const res = await fetch(`http://localhost:5000/api/orders?userId=${user._id || user.id}`)
+          const res = await fetch(`${API_BASE_URL}/api/orders?userId=${user._id || user.id}`)
           if (res.ok) {
             const orders = await res.json()
             if (orders.length > 0) {
@@ -80,7 +81,7 @@ export default function OrderTrackingPage() {
 
       if (targetOrderId) {
         // Connect to Socket.io only if we have an order
-        const socket = io('http://localhost:5000')
+        const socket = io(SOCKET_URL)
         socket.emit('join-order', targetOrderId)
 
         socket.on('order-status-updated', (data) => {
@@ -114,7 +115,7 @@ export default function OrderTrackingPage() {
   const handleCancelSuccess = () => {
     // Refresh order data
     if (order?._id) {
-      fetch(`http://localhost:5000/api/orders/${order._id}`)
+      fetch(`${API_BASE_URL}/api/orders/${order._id}`)
         .then(res => res.json())
         .then(data => {
           setOrder(data);

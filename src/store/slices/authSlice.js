@@ -1,10 +1,11 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (credentials, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials)
@@ -22,7 +23,7 @@ export const registerUser = createAsyncThunk(
   'auth/registerUser',
   async (userData, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/auth/register', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)
@@ -40,7 +41,7 @@ export const updateCoins = createAsyncThunk(
   'auth/updateCoins',
   async ({ userId, coins, spins, totalSpent, addVoucher, removeVoucher }, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/auth/update-coins', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/update-coins`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, coins, spins, totalSpent, addVoucher, removeVoucher })
@@ -58,7 +59,7 @@ export const updateProfile = createAsyncThunk(
   'auth/updateProfile',
   async (profileData, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/auth/profile', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profileData)

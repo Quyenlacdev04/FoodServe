@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FiSave, FiTruck, FiAward, FiInfo, FiActivity, FiPhone, FiMail, FiDollarSign, FiCreditCard } from 'react-icons/fi'
@@ -32,7 +33,7 @@ export default function AdminSettings() {
   const fetchSettings = async () => {
     try {
       setLoading(true)
-      const res = await fetch('http://localhost:5000/api/settings')
+      const res = await fetch(`${API_BASE_URL}/api/settings`)
       if (res.ok) {
         const data = await res.json()
         setSettings(data)
@@ -50,7 +51,7 @@ export default function AdminSettings() {
     e.preventDefault()
     try {
       setSaving(true)
-      const res = await fetch('http://localhost:5000/api/settings', {
+      const res = await fetch(`${API_BASE_URL}/api/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)

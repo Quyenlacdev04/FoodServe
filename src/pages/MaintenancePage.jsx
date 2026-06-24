@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FiSliders, FiPhone, FiMail, FiAlertTriangle, FiLock } from 'react-icons/fi'
@@ -11,7 +12,7 @@ export default function MaintenancePage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/settings')
+        const res = await fetch(`${API_BASE_URL}/api/settings`)
         if (res.ok) {
           const data = await res.json()
           setSettings(data)

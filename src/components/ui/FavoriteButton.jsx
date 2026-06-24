@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FiHeart } from 'react-icons/fi';
@@ -24,7 +25,7 @@ export default function FavoriteButton({ restaurantId, size = 'md' }) {
   const checkFavorite = async () => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/favorites/check/${user._id}/${restaurantId}`
+        `${API_BASE_URL}/api/favorites/check/${user._id}/${restaurantId}`
       );
       const data = await response.json();
       setIsFavorite(data.isFavorite);
@@ -45,7 +46,7 @@ export default function FavoriteButton({ restaurantId, size = 'md' }) {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/favorites/toggle', {
+      const response = await fetch(`${API_BASE_URL}/api/favorites/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { FiTrendingUp, FiDollarSign, FiShoppingBag, FiClock } from 'react-icons/fi'
@@ -23,14 +24,14 @@ export default function RestaurantAnalytics({ restaurantId }) {
       setLoading(true)
       
       // Fetch overview
-      const overviewRes = await fetch(`http://localhost:5000/api/analytics/restaurant/${restaurantId}/overview`)
+      const overviewRes = await fetch(`${API_BASE_URL}/api/analytics/restaurant/${restaurantId}/overview`)
       if (overviewRes.ok) {
         const data = await overviewRes.json()
         setOverview(data)
       }
 
       // Fetch revenue by day
-      const revenueRes = await fetch(`http://localhost:5000/api/analytics/restaurant/${restaurantId}/revenue-by-day?days=${timeRange}`)
+      const revenueRes = await fetch(`${API_BASE_URL}/api/analytics/restaurant/${restaurantId}/revenue-by-day?days=${timeRange}`)
       if (revenueRes.ok) {
         const data = await revenueRes.json()
         setRevenueData(data.map(d => ({
@@ -41,7 +42,7 @@ export default function RestaurantAnalytics({ restaurantId }) {
       }
 
       // Fetch top items
-      const topItemsRes = await fetch(`http://localhost:5000/api/analytics/restaurant/${restaurantId}/top-items?limit=5`)
+      const topItemsRes = await fetch(`${API_BASE_URL}/api/analytics/restaurant/${restaurantId}/top-items?limit=5`)
       if (topItemsRes.ok) {
         const data = await topItemsRes.json()
         setTopItems(data.map(d => ({
@@ -52,7 +53,7 @@ export default function RestaurantAnalytics({ restaurantId }) {
       }
 
       // Fetch peak hours
-      const peakHoursRes = await fetch(`http://localhost:5000/api/analytics/restaurant/${restaurantId}/peak-hours`)
+      const peakHoursRes = await fetch(`${API_BASE_URL}/api/analytics/restaurant/${restaurantId}/peak-hours`)
       if (peakHoursRes.ok) {
         const data = await peakHoursRes.json()
         setPeakHours(data.map(d => ({

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiX, FiStar } from 'react-icons/fi'
@@ -36,7 +37,7 @@ export default function ReviewModal({ order, onClose, onSubmit }) {
         }))
       }
 
-      const res = await fetch('http://localhost:5000/api/reviews', {
+      const res = await fetch(`${API_BASE_URL}/api/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reviewData)

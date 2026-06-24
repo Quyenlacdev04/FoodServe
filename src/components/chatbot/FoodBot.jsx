@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSelector, useDispatch } from 'react-redux'
@@ -91,7 +92,7 @@ export default function FoodBot() {
   // Handle creating order via chatbot
   const handleCreateOrder = async (orderData) => {
     try {
-      const res = await fetch('http://localhost:5000/api/chatbot/create-order', {
+      const res = await fetch(`${API_BASE_URL}/api/chatbot/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -188,7 +189,7 @@ export default function FoodBot() {
         content: m.content
       }))
 
-      const res = await fetch('http://localhost:5000/api/chatbot/chat', {
+      const res = await fetch(`${API_BASE_URL}/api/chatbot/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

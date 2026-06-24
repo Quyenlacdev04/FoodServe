@@ -1,3 +1,4 @@
+import { API_BASE_URL, SOCKET_URL } from '../config/api.js'
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -109,7 +110,7 @@ function ShipperRewards({ user }) {
     if (claimedRanks.includes(rank.name)) return;
     setClaiming(rank.name);
     try {
-      const res = await fetch('http://localhost:5000/api/orders/claim-rank-bonus', {
+      const res = await fetch(`${API_BASE_URL}/api/orders/claim-rank-bonus`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?._id || user?.id, rank: rank.name, bonusCoins: rank.bonus }),
       });
@@ -252,7 +253,7 @@ function ShipperHistory({ shipperId }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/orders?shipperId=${shipperId}`);
+        const res = await fetch(`${API_BASE_URL}/api/orders?shipperId=${shipperId}`);
         const data = await res.json();
         const completed = data.filter(o => o.status === 'completed');
         setOrders(completed);
@@ -348,7 +349,7 @@ function ShipperProfile({ user, onNavigate }) {
     e.preventDefault(); if (!form.name) return toast.error('Tên không được trống');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/profile', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user._id || user.id, ...form })
       });
@@ -365,7 +366,7 @@ function ShipperProfile({ user, onNavigate }) {
     if (pwForm.newPassword !== pwForm.confirmPassword) return toast.error('Không khớp');
     setPwLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/change-password', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user._id || user.id, currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword })
       });
@@ -850,7 +851,7 @@ export default function ShipperDashboardPage() {
           // Gửi vị trí real-time lên server nếu tài xế đang online
           // Backend sẽ tự động broadcast đến các đơn hàng đang giao của tài xế này
           if (isOnline && user?._id) {
-            fetch(`http://localhost:5000/api/shipper/update-location`, {
+            fetch(`${API_BASE_URL}/api/shipper/update-location`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -871,7 +872,7 @@ export default function ShipperDashboardPage() {
 
   // ===== Socket.io: Lắng nghe đơn hàng mới real-time =====
   useEffect(() => {
-    const socket = io('http://localhost:5000');
+    const socket = io(SOCKET_URL);
     socketRef.current = socket;
 
     socket.on('new-order', (order) => {
@@ -909,7 +910,7 @@ export default function ShipperDashboardPage() {
     setAcceptingOrder(true);
     try {
       const shipperId = user?._id || user?.id;
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/accept-shipper`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/accept-shipper`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shipperId })
@@ -939,7 +940,7 @@ export default function ShipperDashboardPage() {
   const fetchStats = async () => {
     try {
       const id = user?._id || user?.id; if (!id) return;
-      const res = await fetch(`http://localhost:5000/api/orders?shipperId=${id}`);
+      const res = await fetch(`${API_BASE_URL}/api/orders?shipperId=${id}`);
       if (res.ok) {
         const data = await res.json();
         const completed = data.filter(o => o.status === 'completed');
@@ -960,7 +961,7 @@ export default function ShipperDashboardPage() {
     setShowOnlineConfirm(false);
     toast.success(newStatus ? '🟢 Bạn đang Online!' : '🔴 Bạn đã Offline', { duration: 2000 });
     try {
-      await fetch(`http://localhost:5000/api/auth/users/${user?._id || user?.id}`, {
+      await fetch(`${API_BASE_URL}/api/auth/users/${user?._id || user?.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isOnline: newStatus })
       });

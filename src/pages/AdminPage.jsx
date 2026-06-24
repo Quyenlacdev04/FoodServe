@@ -1,3 +1,4 @@
+import { API_BASE_URL, SOCKET_URL } from '../config/api.js'
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
@@ -56,7 +57,7 @@ export default function AdminPage() {
     fetchSubscriptionRevenue()
     
     // Listen for real-time changes
-    const socket = io('http://localhost:5000')
+    const socket = io(SOCKET_URL)
     socket.on('order-status-updated', () => {
       fetchOrders()
     })
@@ -88,7 +89,7 @@ export default function AdminPage() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/orders')
+      const res = await fetch(`${API_BASE_URL}/api/orders`)
       if (res.ok) {
         const data = await res.json()
         setOrders(data)
@@ -103,7 +104,7 @@ export default function AdminPage() {
   // Tính tổng phí duy trì đã thu từ nhà hàng
   const fetchSubscriptionRevenue = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/restaurants')
+      const res = await fetch(`${API_BASE_URL}/api/restaurants`)
       if (res.ok) {
         const data = await res.json()
         const restaurants = data.restaurants || data
@@ -128,7 +129,7 @@ export default function AdminPage() {
   const fetchPartnerRequests = async () => {
     try {
       setRequestsLoading(true)
-      const res = await fetch('http://localhost:5000/api/partner/requests')
+      const res = await fetch(`${API_BASE_URL}/api/partner/requests`)
       if (res.ok) {
         const data = await res.json()
         setPartnerRequests(data)
@@ -148,7 +149,7 @@ export default function AdminPage() {
 
   const handlePartnerRequestStatus = async (requestId, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/partner/requests/${requestId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/partner/requests/${requestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, reviewedBy: user?._id || user?.id })
@@ -167,7 +168,7 @@ export default function AdminPage() {
   const fetchDriverRequests = async () => {
     try {
       setDriverRequestsLoading(true)
-      const res = await fetch('http://localhost:5000/api/partner/driver/requests')
+      const res = await fetch(`${API_BASE_URL}/api/partner/driver/requests`)
       if (res.ok) {
         const data = await res.json()
         setDriverRequests(data)
@@ -182,7 +183,7 @@ export default function AdminPage() {
   const fetchPaymentRequests = async () => {
     try {
       setPaymentRequestsLoading(true)
-      const res = await fetch('http://localhost:5000/api/restaurants/payment-requests/all')
+      const res = await fetch(`${API_BASE_URL}/api/restaurants/payment-requests/all`)
       if (res.ok) {
         const data = await res.json()
         setPaymentRequests(data)
@@ -205,7 +206,7 @@ export default function AdminPage() {
 
   const handleDriverRequestStatus = async (requestId, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/partner/driver/requests/${requestId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/partner/driver/requests/${requestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, reviewedBy: user?._id || user?.id })
@@ -224,7 +225,7 @@ export default function AdminPage() {
   const handlePaymentRequestStatus = async (requestId, action, reason = '') => {
     try {
       const endpoint = action === 'approve' ? 'approve' : 'reject'
-      const res = await fetch(`http://localhost:5000/api/restaurants/payment-requests/${requestId}/${endpoint}`, {
+      const res = await fetch(`${API_BASE_URL}/api/restaurants/payment-requests/${requestId}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -253,7 +254,7 @@ export default function AdminPage() {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })

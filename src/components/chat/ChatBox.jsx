@@ -1,3 +1,4 @@
+import { API_BASE_URL, SOCKET_URL } from '../../config/api.js'
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { FiX, FiSend, FiMessageCircle, FiChevronLeft } from 'react-icons/fi';
@@ -31,7 +32,7 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
     if (!orderId) return;
 
     // Kết nối Socket.io
-    const sock = io('http://localhost:5000');
+    const sock = io(SOCKET_URL);
     setSocket(sock);
 
     // Join room đơn hàng
@@ -56,14 +57,14 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
   const fetchMessages = async () => {
     if (!orderId) { setLoading(false); return; }
     try {
-      const res = await fetch(`http://localhost:5000/api/messages/order/${orderId}`);
+      const res = await fetch(`${API_BASE_URL}/api/messages/order/${orderId}`);
       const data = await res.json();
       setMessages(data.messages || []);
       scrollToBottom(true);
 
       // Mark all as read
       if (user?._id) {
-        fetch(`http://localhost:5000/api/messages/order/${orderId}/read-all`, {
+        fetch(`${API_BASE_URL}/api/messages/order/${orderId}/read-all`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user._id })
@@ -88,7 +89,7 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
     setText('');
 
     try {
-      const res = await fetch('http://localhost:5000/api/messages', {
+      const res = await fetch(`${API_BASE_URL}/api/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

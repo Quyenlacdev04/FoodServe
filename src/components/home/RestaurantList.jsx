@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
@@ -36,7 +37,7 @@ export default function RestaurantList() {
       if (filters.freeship) params.append('freeship', 'true')
       if (filters.sortBy) params.append('sortBy', filters.sortBy)
 
-      const response = await fetch(`http://localhost:5000/api/restaurants?${params}`)
+      const response = await fetch(`${API_BASE_URL}/api/restaurants?${params}`)
       const data = await response.json()
       setRestaurants(data.restaurants || data)
     } catch (error) {

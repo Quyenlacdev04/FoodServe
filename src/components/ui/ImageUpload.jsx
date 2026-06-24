@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useRef } from 'react'
 import { FiUpload, FiImage, FiX, FiLoader } from 'react-icons/fi'
 import toast from 'react-hot-toast'
@@ -41,7 +42,7 @@ export default function ImageUpload({
       const formData = new FormData()
       formData.append('image', file)
 
-      const response = await fetch('http://localhost:5000/api/upload', {
+      const response = await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'POST',
         body: formData
       })

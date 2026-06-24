@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiPlus, FiEdit2, FiTrash2, FiStar, FiClock, FiX, FiArrowLeft, FiImage, FiUpload, FiSearch, FiToggleLeft, FiToggleRight, FiEye } from 'react-icons/fi'
@@ -29,7 +30,7 @@ export default function AdminRestaurants() {
   const fetchRestaurants = async () => {
     try {
       setLoading(true)
-      const res = await fetch('http://localhost:5000/api/restaurants')
+      const res = await fetch(`${API_BASE_URL}/api/restaurants`)
       if (res.ok) {
         const data = await res.json()
         setRestaurants(data.restaurants || data)
@@ -41,7 +42,7 @@ export default function AdminRestaurants() {
   const fetchMenuItems = async (restaurantId) => {
     try {
       setMenuLoading(true)
-      const res = await fetch(`http://localhost:5000/api/restaurants/${restaurantId}`)
+      const res = await fetch(`${API_BASE_URL}/api/restaurants/${restaurantId}`)
       if (res.ok) { const data = await res.json(); setMenuItems(data.menuItems || []) }
     } catch { toast.error('Lỗi khi tải menu') }
     finally { setMenuLoading(false) }
@@ -50,7 +51,7 @@ export default function AdminRestaurants() {
   const uploadImage = async (file) => {
     const fd = new FormData(); fd.append('image', file); setUploadingImage(true)
     try {
-      const res = await fetch('http://localhost:5000/api/upload', { method: 'POST', body: fd })
+      const res = await fetch(`${API_BASE_URL}/api/upload`, { method: 'POST', body: fd })
       if (res.ok) { const data = await res.json(); return data.url || data.imageUrl || data.path }
       toast.error('Lỗi upload ảnh'); return null
     } catch { toast.error('Lỗi kết nối'); return null }
@@ -74,7 +75,7 @@ export default function AdminRestaurants() {
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Xóa nhà hàng "${name}"? Toàn bộ menu cũng sẽ bị xóa!`)) return
     try {
-      const res = await fetch(`http://localhost:5000/api/restaurants/${id}`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE_URL}/api/restaurants/${id}`, { method: 'DELETE' })
       if (res.ok) { toast.success('Đã xóa nhà hàng'); setRestaurants(r => r.filter(x => x._id !== id)) }
       else toast.error('Không thể xóa nhà hàng')
     } catch { toast.error('Lỗi kết nối') }
@@ -84,7 +85,7 @@ export default function AdminRestaurants() {
     const willClose = restaurant.isActive !== false
     if (!window.confirm(`${willClose ? '🔒 Đóng cửa' : '🔓 Mở cửa'} nhà hàng "${restaurant.name}"?`)) return
     try {
-      const res = await fetch(`http://localhost:5000/api/restaurants/${restaurant._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/restaurants/${restaurant._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !willClose })
@@ -100,7 +101,7 @@ export default function AdminRestaurants() {
     e.preventDefault()
     try {
       const payload = { ...formData, categories: formData.categories.split(',').map(c => c.trim()).filter(Boolean) }
-      const url = editingId ? `http://localhost:5000/api/restaurants/${editingId}` : 'http://localhost:5000/api/restaurants'
+      const url = editingId ? `${API_BASE_URL}/api/restaurants/${editingId}` : `${API_BASE_URL}/api/restaurants`
       const res = await fetch(url, { method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (res.ok) { toast.success(editingId ? 'Đã cập nhật!' : 'Đã thêm nhà hàng!'); setIsModalOpen(false); fetchRestaurants() }
       else toast.error('Lỗi khi lưu')
@@ -110,7 +111,7 @@ export default function AdminRestaurants() {
   const handleDeleteMenuItem = async (itemId) => {
     if (!window.confirm('Xóa món ăn này?')) return
     try {
-      const res = await fetch(`http://localhost:5000/api/restaurants/menu/${itemId}`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE_URL}/api/restaurants/menu/${itemId}`, { method: 'DELETE' })
       if (res.ok) { toast.success('Đã xóa món ăn'); setMenuItems(m => m.filter(x => x._id !== itemId)) }
       else toast.error('Lỗi khi xóa')
     } catch { toast.error('Lỗi kết nối') }
@@ -121,8 +122,8 @@ export default function AdminRestaurants() {
     try {
       const payload = { ...menuForm, price: Number(menuForm.price) }
       const res = editingMenuItem
-        ? await fetch(`http://localhost:5000/api/restaurants/menu/${editingMenuItem._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        : await fetch(`http://localhost:5000/api/restaurants/${selectedRestaurant._id}/menu`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        ? await fetch(`${API_BASE_URL}/api/restaurants/menu/${editingMenuItem._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        : await fetch(`${API_BASE_URL}/api/restaurants/${selectedRestaurant._id}/menu`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (res.ok) { toast.success(editingMenuItem ? 'Đã cập nhật!' : 'Đã thêm món!'); setIsMenuModalOpen(false); fetchMenuItems(selectedRestaurant._id) }
       else toast.error('Lỗi khi lưu')
     } catch { toast.error('Lỗi kết nối') }

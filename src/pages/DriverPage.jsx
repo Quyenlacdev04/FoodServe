@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
@@ -319,7 +320,7 @@ export default function DriverPage() {
   const syncProfileFromServer = async () => {
     const token = localStorage.getItem('foodserve_token')
     if (!token) return null
-    const res = await fetch('http://localhost:5000/api/auth/me', {
+    const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) return null
@@ -339,7 +340,7 @@ export default function DriverPage() {
       }
 
       const res = await fetch(
-        `http://localhost:5000/api/partner/driver/register/status?userId=${user._id}`
+        `${API_BASE_URL}/api/partner/driver/register/status?userId=${user._id}`
       )
       const data = await res.json()
       setDriverStatus(data)
@@ -357,7 +358,7 @@ export default function DriverPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true)
-      const res = await fetch('http://localhost:5000/api/orders')
+      const res = await fetch(`${API_BASE_URL}/api/orders`)
       if (res.ok) {
         const data = await res.json()
         setOrders(data)
@@ -376,7 +377,7 @@ export default function DriverPage() {
     try {
       const token = localStorage.getItem('foodserve_token')
       if (!token) return
-      const res = await fetch('http://localhost:5000/api/auth/me', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (res.ok) {
@@ -400,7 +401,7 @@ export default function DriverPage() {
     }
     try {
       setProcessingId(orderId)
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/accept`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/accept`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shipperId: user._id || user.id })
@@ -425,7 +426,7 @@ export default function DriverPage() {
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
       setProcessingId(orderId)
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -456,7 +457,7 @@ export default function DriverPage() {
   const handleCreateMockOrder = async () => {
     try {
       // 1. Get restaurants
-      const restRes = await fetch('http://localhost:5000/api/restaurants')
+      const restRes = await fetch(`${API_BASE_URL}/api/restaurants`)
       const restaurants = await restRes.json()
       const restaurant = restaurants.length > 0 ? restaurants[0] : null
       
@@ -475,7 +476,7 @@ export default function DriverPage() {
         contactPhone: '0909888999'
       }
 
-      const res = await fetch('http://localhost:5000/api/orders', {
+      const res = await fetch(`${API_BASE_URL}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mockOrder)
@@ -509,7 +510,7 @@ export default function DriverPage() {
 
       try {
         const res = await fetch(
-          `http://localhost:5000/api/partner/driver/register/status?userId=${user._id}`
+          `${API_BASE_URL}/api/partner/driver/register/status?userId=${user._id}`
         )
         const data = await res.json()
         if (!res.ok) {
@@ -616,7 +617,7 @@ export default function DriverPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true)
-      const res = await fetch('http://localhost:5000/api/orders')
+      const res = await fetch(`${API_BASE_URL}/api/orders`)
       if (res.ok) {
         const data = await res.json()
         setOrders(data)
@@ -635,7 +636,7 @@ export default function DriverPage() {
     try {
       const token = localStorage.getItem('foodserve_token')
       if (!token) return
-      const res = await fetch('http://localhost:5000/api/auth/me', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (res.ok) {
@@ -666,7 +667,7 @@ export default function DriverPage() {
     }
     try {
       setProcessingId(orderId)
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/accept`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/accept`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shipperId: user._id || user.id })
@@ -691,7 +692,7 @@ export default function DriverPage() {
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
       setProcessingId(orderId)
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -722,7 +723,7 @@ export default function DriverPage() {
   const handleCreateMockOrder = async () => {
     try {
       // 1. Get restaurants
-      const restRes = await fetch('http://localhost:5000/api/restaurants')
+      const restRes = await fetch(`${API_BASE_URL}/api/restaurants`)
       const restaurants = await restRes.json()
       const restaurant = restaurants.length > 0 ? restaurants[0] : null
       
@@ -741,7 +742,7 @@ export default function DriverPage() {
         contactPhone: '0909888999'
       }
 
-      const res = await fetch('http://localhost:5000/api/orders', {
+      const res = await fetch(`${API_BASE_URL}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mockOrder)

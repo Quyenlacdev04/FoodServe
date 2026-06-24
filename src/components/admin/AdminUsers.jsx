@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config/api.js'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiEdit2, FiTrash2, FiSearch, FiUser, FiX, FiAward, FiGift } from 'react-icons/fi'
@@ -36,7 +37,7 @@ export default function AdminUsers() {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const res = await fetch('http://localhost:5000/api/auth/users')
+      const res = await fetch(`${API_BASE_URL}/api/auth/users`)
       if (res.ok) {
         const data = await res.json()
         setUsers(data)
@@ -53,7 +54,7 @@ export default function AdminUsers() {
   const handleDelete = async (id) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa tài khoản người dùng này không? Hành động này không thể hoàn tác!')) return
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/users/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/users/${id}`, {
         method: 'DELETE'
       })
       if (res.ok) {
@@ -84,7 +85,7 @@ export default function AdminUsers() {
   const handleSave = async (e) => {
     e.preventDefault()
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/users/${editingUser._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/users/${editingUser._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

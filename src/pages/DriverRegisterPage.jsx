@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
@@ -155,7 +156,7 @@ export default function DriverRegisterPage() {
     setLoading(true)
     
     try {
-      const res = await fetch('http://localhost:5000/api/partner/driver/register', {
+      const res = await fetch(`${API_BASE_URL}/api/partner/driver/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
