@@ -24,6 +24,7 @@ export default function CheckoutPage() {
   const [feeLoading, setFeeLoading] = useState(false)
   const [showMapPicker, setShowMapPicker] = useState(false)
   const [deliveryCoordinates, setDeliveryCoordinates] = useState(null)
+  const [isMaintenance, setIsMaintenance] = useState(false)
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -42,6 +43,22 @@ export default function CheckoutPage() {
       }));
     }
   }, [user]);
+
+  // Check maintenance mode on mount
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/settings')
+        if (res.ok) {
+          const data = await res.json()
+          setIsMaintenance(!!data.maintenanceMode)
+        }
+      } catch (err) {
+        // Ignore
+      }
+    }
+    checkMaintenance()
+  }, [])
 
   // Redirect to home if cart is empty
   useEffect(() => {
@@ -85,6 +102,9 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault()
+    if (isMaintenance) {
+      return toast.error('Hệ thống đang bảo trì, không thể đặt hàng lúc này!')
+    }
     if (!isAuthenticated) {
       return toast.error('Vui lòng đăng nhập để đặt hàng!')
     }
@@ -398,20 +418,34 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <button
-                onClick={handlePlaceOrder}
-                disabled={loading}
-                className="w-full btn-primary py-4 mt-6 text-lg disabled:opacity-50"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-                    Đang xử lý...
-                  </span>
-                ) : (
-                  'Đặt hàng ngay'
-                )}
-              </button>
+              {isMaintenance ? (
+                <div className="mt-6 space-y-3">
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-red-600 dark:text-red-400 text-sm font-bold text-center">
+                    🔧 Hệ thống đang bảo trì. Vui lòng quay lại sau!
+                  </div>
+                  <button
+                    disabled
+                    className="w-full py-4 text-center text-lg font-bold rounded-2xl bg-gray-300 dark:bg-dark-300 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  >
+                    Tạm đóng đặt hàng
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handlePlaceOrder}
+                  disabled={loading}
+                  className="w-full btn-primary py-4 mt-6 text-lg disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                      Đang xử lý...
+                    </span>
+                  ) : (
+                    'Đặt hàng ngay'
+                  )}
+                </button>
+              )}
             </motion.div>
           </div>
         </div>

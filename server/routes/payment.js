@@ -835,14 +835,20 @@ router.get('/payos/check-status/:orderCode', async (req, res) => {
     }
 
     const restaurant = await Restaurant.findOne({
-      'paymentRequests.orderCode': Number(orderCode)
+      $or: [
+        { 'paymentRequests.orderCode': Number(orderCode) },
+        { 'paymentRequests.orderCode': String(orderCode) },
+        { 'paymentRequests._id': String(orderCode) }
+      ]
     });
 
     if (!restaurant) {
       return res.status(404).json({ message: 'Không tìm thấy yêu cầu thanh toán phù hợp.' });
     }
 
-    const request = restaurant.paymentRequests.find(r => r.orderCode === Number(orderCode));
+    const request = restaurant.paymentRequests.find(r => 
+      String(r.orderCode) === String(orderCode) || String(r._id) === String(orderCode)
+    );
     if (!request) {
       return res.status(404).json({ message: 'Không tìm thấy yêu cầu thanh toán.' });
     }

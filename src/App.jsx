@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { AnimatePresence } from 'framer-motion'
@@ -8,6 +8,8 @@ import BottomNav from './components/layout/BottomNav'
 import CartSidebar from './components/cart/CartSidebar'
 import AuthModal from './components/auth/AuthModal'
 import LoadingScreen from './components/ui/LoadingScreen'
+import MaintenanceBanner from './components/ui/MaintenanceBanner'
+import MaintenancePage from './pages/MaintenancePage'
 import HomePage from './pages/HomePage'
 import RestaurantPage from './pages/RestaurantPage'
 import OrderTrackingPage from './pages/OrderTrackingPage'
@@ -32,6 +34,25 @@ function App() {
   const dispatch = useDispatch()
   const location = useLocation()
   const { darkMode, loading } = useSelector((state) => state.ui)
+  const [isMaintenance, setIsMaintenance] = useState(false)
+
+  // Check maintenance mode on mount & poll
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/settings')
+        if (res.ok) {
+          const data = await res.json()
+          setIsMaintenance(!!data.maintenanceMode)
+        }
+      } catch (err) {
+        // Ignore
+      }
+    }
+    checkMaintenance()
+    const interval = setInterval(checkMaintenance, 15050)
+    return () => clearInterval(interval)
+  }, [])
 
   // Kiểm tra xem có phải trang admin, partner register hoặc quản lý nhà hàng/tài xế không
   const isAdminPage = location.pathname.startsWith('/admin')
@@ -50,6 +71,15 @@ function App() {
     setTimeout(() => dispatch(setLoading(false)), 2000)
   }, [dispatch])
 
+  // If maintenance mode is active and it's not the admin portal, block access entirely
+  if (isMaintenance && !isAdminPage) {
+    return (
+      <div className={`${darkMode ? 'dark' : ''}`}>
+        <MaintenancePage />
+      </div>
+    )
+  }
+
   return (
     <div className={`min-h-screen ${darkMode ? 'dark' : ''}`}>
       <div className="min-h-screen bg-surface-light dark:bg-dark-300 transition-colors duration-500">
@@ -58,6 +88,9 @@ function App() {
         </AnimatePresence>
         {!loading && (
           <>
+            {/* Banner bảo trì - hiển thị trên mọi trang */}
+            <MaintenanceBanner />
+            
             {/* Chỉ hiển thị Header khi KHÔNG thuộc các trang ẩn */}
             {!isHideLayout && <Header />}
             

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -16,6 +16,23 @@ export default function CartSidebar() {
   const navigate = useNavigate()
   const [voucherCode, setVoucherCode] = useState('')
   const [voucherLoading, setVoucherLoading] = useState(false)
+  const [isMaintenance, setIsMaintenance] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const checkMaintenance = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/settings')
+        if (res.ok) {
+          const data = await res.json()
+          setIsMaintenance(!!data.maintenanceMode)
+        }
+      } catch (err) {
+        // Ignore
+      }
+    }
+    checkMaintenance()
+  }, [isOpen])
 
   const deliveryFee = total > 100000 ? 0 : 15000
   const finalTotal = Math.max(0, total + deliveryFee - (discount || 0))
@@ -259,13 +276,27 @@ export default function CartSidebar() {
                 </div>
 
                 {/* Checkout CTA */}
-                <motion.button
-                  onClick={handleCheckout}
-                  whileTap={{ scale: 0.97 }}
-                  className="w-full btn-primary py-4 text-center text-base font-black shadow-glow-lg flex items-center justify-center gap-2"
-                >
-                  Thanh toán • {formatPrice(finalTotal)}
-                </motion.button>
+                {isMaintenance ? (
+                  <div className="space-y-3">
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-600 dark:text-amber-400 text-xs font-bold text-center">
+                      ⚠️ Hệ thống đang bảo trì. Bạn tạm thời không thể đặt đơn hàng mới.
+                    </div>
+                    <button
+                      disabled
+                      className="w-full py-4 text-center text-base font-black rounded-2xl bg-gray-300 dark:bg-dark-300 text-gray-500 dark:text-gray-400 cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      Tạm đóng đặt hàng
+                    </button>
+                  </div>
+                ) : (
+                  <motion.button
+                    onClick={handleCheckout}
+                    whileTap={{ scale: 0.97 }}
+                    className="w-full btn-primary py-4 text-center text-base font-black shadow-glow-lg flex items-center justify-center gap-2"
+                  >
+                    Thanh toán • {formatPrice(finalTotal)}
+                  </motion.button>
+                )}
               </div>
             )}
           </motion.div>

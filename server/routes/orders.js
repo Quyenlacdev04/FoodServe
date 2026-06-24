@@ -2,12 +2,21 @@ import express from 'express';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
 import Notification from '../models/Notification.js';
+import SystemSetting from '../models/SystemSetting.js';
 
 const router = express.Router();
 
 // Tạo đơn hàng mới
 router.post('/', async (req, res) => {
   try {
+    // Kiểm tra chế độ bảo trì
+    const settings = await SystemSetting.findOne();
+    if (settings?.maintenanceMode) {
+      return res.status(503).json({ 
+        message: '🔧 Hệ thống đang bảo trì. Vui lòng quay lại sau ít phút. Xin lỗi vì sự bất tiện!' 
+      });
+    }
+
     const newOrder = new Order({
       ...req.body,
       status: 'confirmed',
