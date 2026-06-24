@@ -27,25 +27,26 @@ router.post('/register/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 phút
     otpStore.set(`reg:${email}`, { otp, expiresAt });
 
-    // Thử gửi email thật (Brevo, Resend hoặc Gmail)
+    // Gửi email thật qua Brevo / Resend / Gmail
     const hasEmailConfig = process.env.BREVO_API_KEY || process.env.RESEND_API_KEY || (process.env.EMAIL_USER && process.env.EMAIL_PASS);
     let emailSent = false;
+    console.log(`📧 [Register] Gửi OTP đến ${email} | hasEmailConfig=${!!hasEmailConfig} | BREVO=${!!process.env.BREVO_API_KEY} | GMAIL=${!!process.env.EMAIL_USER}`);
     if (hasEmailConfig) {
       try {
-        await sendEmail({
+        const result = await sendEmail({
           to: email,
-          subject: '✅ Xác minh email đăng ký FoodServe',
+          subject: 'Xác minh email đăng ký FoodServe',
           html: otpEmailTemplate({ name, otp, type: 'register' }),
         });
         emailSent = true;
+        console.log(`✅ [Register] Email gửi thành công qua ${result?.provider || 'unknown'} đến ${email}`);
       } catch (mailError) {
-        console.error('Mail error (fallback to demo mode):', mailError.message);
-        // Không block user — fallback sang demo mode, trả OTP trực tiếp
+        console.error(`❌ [Register] Lỗi gửi email đến ${email}:`, mailError.message);
       }
     }
 
     if (!emailSent) {
-      console.log(`\n📧 OTP đăng ký cho ${email}: ${otp} (hết hạn 5 phút)\n`);
+      console.log(`⚠️ [Register] Fallback demo mode cho ${email}: OTP=${otp}`);
     }
 
     res.json({
