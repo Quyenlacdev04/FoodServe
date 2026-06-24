@@ -31,6 +31,7 @@ const restaurantSchema = new mongoose.Schema({
   }],
   paymentRequests: [{
     _id: String,
+    orderCode: Number,
     restaurantId: String,
     restaurantName: String,
     userId: String,
