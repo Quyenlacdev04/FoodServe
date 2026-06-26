@@ -227,12 +227,15 @@ export default function RestaurantManagePage() {
   }
 
   // Update Order Status
-  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+  const handleUpdateOrderStatus = async (orderId, newStatus, additionalData = {}) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ 
+          status: newStatus,
+          ...additionalData
+        })
       })
       if (res.ok) {
         toast.success('Đã cập nhật trạng thái đơn hàng!')
@@ -934,19 +937,56 @@ export default function RestaurantManagePage() {
                             {orderStatusMap[order.status]?.label}
                           </span>
                           
-                          {/* Trạng thái dropdown */}
-                          <select 
-                            value={order.status}
-                            onChange={(e) => handleUpdateOrderStatus(order._id, e.target.value)}
-                            className="bg-white dark:bg-dark-200 border border-gray-200 dark:border-gray-700 text-sm rounded-xl px-3 py-1.5 outline-none font-semibold text-gray-700 dark:text-gray-300 cursor-pointer"
-                          >
-                            <option value="pending">Chờ xác nhận</option>
-                            <option value="confirmed">Xác nhận đơn</option>
-                            <option value="preparing">Đang làm món</option>
-                            <option value="delivering">Đang giao hàng</option>
-                            <option value="completed">Đã giao xong</option>
-                            <option value="cancelled">Hủy đơn hàng</option>
-                          </select>
+                          {/* Trạng thái dropdown hoặc Nút bấm Nhận/Từ chối */}
+                          {order.status === 'pending' ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpdateOrderStatus(order._id, 'confirmed')}
+                                className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/10 active:scale-95"
+                              >
+                                ✅ Nhận đơn
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const reason = window.prompt("Nhập lý do từ chối đơn hàng (Ví dụ: Nhà hàng hết món, đóng cửa sớm...):", "Nhà hàng hết món")
+                                  if (reason !== null) {
+                                    handleUpdateOrderStatus(order._id, 'cancelled', { 
+                                      cancelledBy: 'merchant', 
+                                      reason: reason.trim() || 'Nhà hàng hết món' 
+                                    })
+                                  }
+                                }}
+                                className="px-3.5 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-red-500/10 active:scale-95"
+                              >
+                                ❌ Từ chối
+                              </button>
+                            </div>
+                          ) : (
+                            <select 
+                              value={order.status}
+                              onChange={(e) => {
+                                if (e.target.value === 'cancelled') {
+                                  const reason = window.prompt("Nhập lý do hủy đơn hàng:", "Nhà hàng gặp sự cố")
+                                  if (reason !== null) {
+                                    handleUpdateOrderStatus(order._id, 'cancelled', { 
+                                      cancelledBy: 'merchant', 
+                                      reason: reason.trim() || 'Nhà hàng gặp sự cố' 
+                                    })
+                                  }
+                                } else {
+                                  handleUpdateOrderStatus(order._id, e.target.value)
+                                }
+                              }}
+                              className="bg-white dark:bg-dark-200 border border-gray-200 dark:border-gray-700 text-sm rounded-xl px-3 py-1.5 outline-none font-semibold text-gray-700 dark:text-gray-300 cursor-pointer"
+                            >
+                              <option value="pending">Chờ xác nhận</option>
+                              <option value="confirmed">Xác nhận đơn</option>
+                              <option value="preparing">Đang làm món</option>
+                              <option value="delivering">Đang giao hàng</option>
+                              <option value="completed">Đã giao xong</option>
+                              <option value="cancelled">Hủy đơn hàng</option>
+                            </select>
+                          )}
                         </div>
                       </div>
 

@@ -19,8 +19,8 @@ router.post('/', async (req, res) => {
 
     const newOrder = new Order({
       ...req.body,
-      status: 'confirmed',
-      steps: [{ status: 'confirmed', time: new Date() }]
+      status: 'pending',
+      steps: [{ status: 'pending', time: new Date() }]
     });
     const savedOrder = await newOrder.save();
     
@@ -127,6 +127,42 @@ router.patch('/:id/status', async (req, res) => {
       order.shipperId = req.body.shipperId;
     }
     
+    // Nếu chuyển sang cancelled (hủy/từ chối đơn)
+    let refundMessage = '';
+    if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+      order.cancelledBy = req.body.cancelledBy || 'merchant';
+      order.cancellationReason = req.body.reason || 'Nhà hàng hết món hoặc gặp sự cố';
+      order.cancelledAt = new Date();
+
+      // Xử lý hoàn tiền nếu đã thanh toán online
+      if (order.paymentStatus === 'paid' && order.paymentMethod !== 'cash') {
+        order.paymentStatus = 'refunded';
+        
+        // Hoàn xu nếu thanh toán bằng coins
+        if (order.paymentMethod === 'coins' && order.userId) {
+          const user = await User.findById(order.userId);
+          if (user) {
+            const refundCoins = Number((order.finalAmount / 1000).toFixed(1));
+            user.coins = Number(((user.coins || 0) + refundCoins).toFixed(1));
+            await user.save();
+            refundMessage = ` Đã hoàn lại ${refundCoins} Xu vào ví của bạn.`;
+          }
+        } else {
+          refundMessage = ' Tiền thanh toán online sẽ được hoàn lại vào tài khoản của bạn.';
+        }
+      }
+
+      // Hoàn lại lượt quay và trừ totalSpent
+      if (order.userId && order.userId !== 'demo_user') {
+        await User.findByIdAndUpdate(order.userId, {
+          $inc: { 
+            spins: -1,
+            totalSpent: -order.finalAmount
+          }
+        });
+      }
+    }
+    
     await order.save();
     
     // Nếu đơn hàng chuyển sang completed và shipperId được gán, cộng tiền cho shipper
@@ -144,12 +180,13 @@ router.patch('/:id/status', async (req, res) => {
     
     // ✅ Tạo thông báo cho khách hàng khi trạng thái thay đổi
     const statusMessages = {
-      confirmed: '✅ Đơn hàng đã được xác nhận',
+      pending: '⏳ Đơn hàng của bạn đang chờ nhà hàng xác nhận',
+      confirmed: '✅ Đơn hàng đã được nhà hàng xác nhận',
       preparing: '👨‍🍳 Nhà hàng đang chuẩn bị món ăn của bạn',
       ready: '📦 Món ăn đã sẵn sàng, tài xế đang đến lấy',
       delivering: '🛵 Tài xế đang trên đường giao hàng đến bạn',
       completed: '🎉 Đơn hàng đã được giao thành công! Cảm ơn bạn',
-      cancelled: '❌ Đơn hàng đã bị hủy'
+      cancelled: `❌ Đơn hàng đã bị hủy bởi ${order.cancelledBy === 'merchant' ? 'nhà hàng' : order.cancelledBy === 'shipper' ? 'tài xế' : 'khách hàng'}. Lý do: ${order.cancellationReason}.${refundMessage}`
     };
     
     if (statusMessages[newStatus] && order.userId) {
@@ -158,7 +195,7 @@ router.patch('/:id/status', async (req, res) => {
           userId: order.userId,
           title: 'Cập nhật đơn hàng',
           message: statusMessages[newStatus],
-          type: 'order_status',
+          type: newStatus === 'cancelled' ? 'order_cancelled' : 'order_status',
           data: { orderId: order._id.toString() },
           read: false
         });
@@ -171,7 +208,6 @@ router.patch('/:id/status', async (req, res) => {
         }
       } catch (notifError) {
         console.error('Error creating notification:', notifError);
-        // Không throw error, chỉ log để không ảnh hưởng đến việc cập nhật đơn hàng
       }
     }
     

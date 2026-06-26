@@ -157,18 +157,34 @@ export default function OrderTrackingPage() {
               animate={{ scale: [1, 1.1, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              {order.status === 'cancelled' ? '❌' : currentStep < 3 ? '🛵' : '✅'}
+              {order.status === 'cancelled' 
+                ? '❌' 
+                : order.status === 'pending'
+                  ? '⏳'
+                  : currentStep < 3 
+                    ? '🛵' 
+                    : '✅'
+              }
             </motion.span>
             <h1 className="text-2xl font-display font-bold dark:text-white">
               {order.status === 'cancelled' 
                 ? 'Đơn hàng đã bị hủy'
-                : currentStep < 3 
-                  ? 'Đang theo dõi đơn hàng' 
-                  : 'Giao hàng thành công!'
+                : order.status === 'pending'
+                  ? 'Chờ nhà hàng xác nhận...'
+                  : currentStep < 3 
+                    ? 'Đang theo dõi đơn hàng' 
+                    : 'Giao hàng thành công!'
               }
             </h1>
             <p className="text-gray-400 text-sm mt-1">Đơn hàng #{order._id.substring(0, 8).toUpperCase()}</p>
             
+            {/* Banner thông báo chờ xác nhận */}
+            {order.status === 'pending' && (
+              <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl text-yellow-600 dark:text-yellow-400 text-sm font-bold text-center">
+                👨‍🍳 Nhà hàng đang kiểm tra món ăn và sẽ xác nhận đơn hàng của bạn ngay!
+              </div>
+            )}
+
             {/* Nút hủy đơn - chỉ hiển thị khi đơn hàng có thể hủy */}
             {['pending', 'confirmed', 'preparing'].includes(order.status) && (
               <motion.button
