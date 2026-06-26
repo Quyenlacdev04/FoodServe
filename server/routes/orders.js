@@ -253,7 +253,7 @@ router.patch('/:id/status', async (req, res) => {
       ready: '📦 Món ăn đã sẵn sàng, tài xế đang đến lấy',
       delivering: '🛵 Tài xế đang trên đường giao hàng đến bạn',
       completed: '🎉 Đơn hàng đã được giao thành công! Cảm ơn bạn',
-      cancelled: `❌ Đơn hàng đã bị hủy bởi ${order.cancelledBy === 'merchant' ? 'nhà hàng' : order.cancelledBy === 'shipper' ? 'tài xế' : 'khách hàng'}. Lý do: ${order.cancellationReason}.${refundMessage}`
+      cancelled: `❌ Đơn hàng đã bị hủy bởi ${order.cancelledBy === 'merchant' || order.cancelledBy === 'restaurant' ? 'nhà hàng' : order.cancelledBy === 'shipper' ? 'tài xế' : 'khách hàng'}. Lý do: ${order.cancellationReason}.${refundMessage}`
     };
     
     if (statusMessages[newStatus] && order.userId) {

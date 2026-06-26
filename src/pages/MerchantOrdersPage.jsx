@@ -513,7 +513,7 @@ export default function MerchantOrdersPage() {
                               const reason = window.prompt("Nhập lý do từ chối đơn hàng:", "Nhà hàng hết món")
                               if (reason !== null) {
                                 handleUpdateOrderStatus(order._id, 'cancelled', { 
-                                  cancelledBy: 'merchant', 
+                                  cancelledBy: 'restaurant', 
                                   reason: reason.trim() || 'Nhà hàng hết món' 
                                 })
                               }
@@ -531,7 +531,7 @@ export default function MerchantOrdersPage() {
                               const reason = window.prompt("Nhập lý do hủy đơn hàng:", "Nhà hàng gặp sự cố")
                               if (reason !== null) {
                                 handleUpdateOrderStatus(order._id, 'cancelled', { 
-                                  cancelledBy: 'merchant', 
+                                  cancelledBy: 'restaurant', 
                                   reason: reason.trim() || 'Nhà hàng gặp sự cố' 
                                 })
                               }

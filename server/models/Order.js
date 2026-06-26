@@ -63,7 +63,7 @@ const orderSchema = new mongoose.Schema({
   paidAt: Date,
   // Thông tin hủy đơn
   cancellationReason: String,
-  cancelledBy: { type: String, enum: ['customer', 'restaurant', 'admin', 'system'] },
+  cancelledBy: { type: String, enum: ['customer', 'restaurant', 'merchant', 'admin', 'system'] },
   cancelledAt: Date
 }, { timestamps: true });
 
