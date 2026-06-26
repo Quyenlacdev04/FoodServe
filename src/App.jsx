@@ -24,6 +24,7 @@ import ProfilePage from './pages/ProfilePage'
 import FavoritesPage from './pages/FavoritesPage'
 import PartnerRegisterPage from './pages/PartnerRegisterPage'
 import RestaurantManagePage from './pages/RestaurantManagePage'
+import MerchantOrdersPage from './pages/MerchantOrdersPage'
 import DriverRegisterPage from './pages/DriverRegisterPage'
 import ShipperDashboardPage from './pages/ShipperDashboardPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -112,6 +113,7 @@ function App() {
                 <Route path="/partner-register" element={<PartnerRegisterPage />} />
                 <Route path="/driver-register" element={<DriverRegisterPage />} />
                 <Route path="/restaurant-manage" element={<RestaurantManagePage />} />
+                <Route path="/restaurant-manage/orders" element={<MerchantOrdersPage />} />
                 <Route path="/driver" element={<ShipperDashboardPage />} />
                 <Route path="/shipper" element={<ShipperDashboardPage />} />
                 <Route path="*" element={<NotFoundPage />} />
