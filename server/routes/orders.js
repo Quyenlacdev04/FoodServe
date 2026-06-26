@@ -3,6 +3,7 @@ import Order from '../models/Order.js';
 import User from '../models/User.js';
 import Notification from '../models/Notification.js';
 import SystemSetting from '../models/SystemSetting.js';
+import Restaurant from '../models/Restaurant.js';
 
 const router = express.Router();
 
@@ -65,7 +66,6 @@ router.post('/', async (req, res) => {
 
     // ✅ Tạo thông báo cho Nhà hàng (Merchant) sở hữu cửa hàng này
     try {
-      const Restaurant = (await import('../models/Restaurant.js')).default;
       const restaurant = await Restaurant.findById(savedOrder.restaurantId);
       if (restaurant && restaurant.ownerId) {
         const notification = new Notification({
@@ -285,6 +285,19 @@ router.patch('/:id/status', async (req, res) => {
         orderId: order._id.toString(), 
         status: order.status 
       });
+      
+      // Phát sự kiện thời gian thực trực tiếp tới phòng của chủ nhà hàng làm lớp dự phòng
+      try {
+        const restaurant = await Restaurant.findById(order.restaurantId);
+        if (restaurant && restaurant.ownerId) {
+          ioInstance.to(`user-${restaurant.ownerId.toString()}`).emit('order-status-updated', {
+            orderId: order._id.toString(),
+            status: order.status
+          });
+        }
+      } catch (err) {
+        console.error('Error emitting order-status-updated to merchant:', err);
+      }
     }
     
     res.json(order);
@@ -312,10 +325,26 @@ router.patch('/:id/accept', async (req, res) => {
     order.steps.push({ status: 'preparing', time: new Date() });
     await order.save();
 
-    req.app.get('io').to(`order-${order._id}`).emit('order-status-updated', { 
-      orderId: order._id, 
-      status: order.status 
-    });
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`order-${order._id}`).emit('order-status-updated', { 
+        orderId: order._id, 
+        status: order.status 
+      });
+      
+      // Phát sự kiện thời gian thực trực tiếp tới phòng của chủ nhà hàng làm lớp dự phòng
+      try {
+        const restaurant = await Restaurant.findById(order.restaurantId);
+        if (restaurant && restaurant.ownerId) {
+          io.to(`user-${restaurant.ownerId.toString()}`).emit('order-status-updated', {
+            orderId: order._id.toString(),
+            status: order.status
+          });
+        }
+      } catch (err) {
+        console.error('Error emitting accept order-status-updated to merchant:', err);
+      }
+    }
 
     res.json(order);
   } catch (error) {
@@ -335,8 +364,6 @@ router.get('/shipper/available', async (req, res) => {
     .lean();
     
     // Populate thông tin nhà hàng để lấy địa chỉ và tọa độ
-    const Restaurant = (await import('../models/Restaurant.js')).default;
-    
     const ordersWithLocations = await Promise.all(
       orders.map(async (order) => {
         // Nếu đã có restaurantLocation thì không cần populate
@@ -418,11 +445,26 @@ router.post('/:id/accept-shipper', async (req, res) => {
     
     // Thông báo real-time
     const io = req.app.get('io');
-    io.to(`order-${order._id}`).emit('order-status-updated', {
-      orderId: order._id,
-      status: order.status,
-      shipperId: order.shipperId
-    });
+    if (io) {
+      io.to(`order-${order._id}`).emit('order-status-updated', {
+        orderId: order._id,
+        status: order.status,
+        shipperId: order.shipperId
+      });
+      
+      // Phát sự kiện thời gian thực trực tiếp tới phòng của chủ nhà hàng làm lớp dự phòng
+      try {
+        const restaurant = await Restaurant.findById(order.restaurantId);
+        if (restaurant && restaurant.ownerId) {
+          io.to(`user-${restaurant.ownerId.toString()}`).emit('order-status-updated', {
+            orderId: order._id.toString(),
+            status: order.status
+          });
+        }
+      } catch (err) {
+        console.error('Error emitting accept-shipper order-status-updated to merchant:', err);
+      }
+    }
 
     // ✅ Gửi thông báo cho khách hàng
     if (order.userId) {
@@ -678,6 +720,20 @@ router.post('/:id/cancel', async (req, res) => {
         orderId: order._id,
         status: order.status
       });
+      
+      // Phát sự kiện thời gian thực trực tiếp tới phòng của chủ nhà hàng làm lớp dự phòng
+      try {
+        const restaurant = await Restaurant.findById(order.restaurantId);
+        if (restaurant && restaurant.ownerId) {
+          io.to(`user-${restaurant.ownerId.toString()}`).emit('order-status-updated', {
+            orderId: order._id.toString(),
+            status: order.status
+          });
+        }
+      } catch (err) {
+        console.error('Error emitting cancel order-status-updated to merchant:', err);
+      }
+    }
 
       // Thông báo cho shipper nếu đã có người nhận
       if (order.shipperId) {
@@ -850,6 +906,19 @@ router.post('/:id/shipper-cancel', async (req, res) => {
         status: 'cancelled',
         message: 'Tài xế đã hủy đơn hàng của bạn'
       });
+      
+      // Phát sự kiện thời gian thực trực tiếp tới phòng của chủ nhà hàng làm lớp dự phòng
+      try {
+        const restaurant = await Restaurant.findById(order.restaurantId);
+        if (restaurant && restaurant.ownerId) {
+          io.to(`user-${restaurant.ownerId.toString()}`).emit('order-status-updated', {
+            orderId: order._id.toString(),
+            status: 'cancelled'
+          });
+        }
+      } catch (err) {
+        console.error('Error emitting shipper-cancel order-status-updated to merchant:', err);
+      }
     }
 
     // Tạo thông báo cho khách hàng

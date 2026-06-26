@@ -39,6 +39,7 @@ export default function RestaurantManagePage() {
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [selectedOrderId, setSelectedOrderId] = useState(null)
+  const [socket, setSocket] = useState(null)
 
   // Modals / forms state
   const [showItemModal, setShowItemModal] = useState(false)
@@ -115,7 +116,10 @@ export default function RestaurantManagePage() {
 
     const fetchOwnerRestaurant = async () => {
       try {
-        setLoading(true)
+        // Chỉ hiện loading đầy màn hình ở lần tải đầu tiên để tránh nhấp nháy UI khi reload thời gian thực
+        if (!restaurant) {
+          setLoading(true)
+        }
         // 1. Get owned restaurant info
         const res = await fetch(`${API_BASE_URL}/api/restaurants/owned/${user._id || user.id}`)
         if (!res.ok) {
@@ -166,42 +170,65 @@ export default function RestaurantManagePage() {
 
   // Socket.io real-time listener for new orders and status updates
   useEffect(() => {
-    if (!user || !restaurant) return;
+    if (!user) {
+      if (socket) {
+        socket.disconnect()
+        setSocket(null)
+      }
+      return
+    }
 
-    const socket = io(SOCKET_URL);
+    // Khởi tạo một kết nối Socket.io duy nhất cho toàn bộ vòng đời đăng nhập của Merchant
+    const s = io(SOCKET_URL)
+    setSocket(s)
     
     // Join personal room to receive real-time notifications
-    socket.emit('join-user', user._id || user.id);
+    s.emit('join-user', user._id || user.id)
+    console.log('🔌 Merchant Socket.io connected and joined personal room:', user._id || user.id)
 
     // Listen for new orders targeted for this merchant
-    socket.on('new-order-merchant', (newOrder) => {
-      console.log('🛎️ Có đơn hàng mới:', newOrder);
+    s.on('new-order-merchant', (newOrder) => {
+      console.log('🛎️ Có đơn hàng mới thời gian thực:', newOrder)
       toast('🛎️ Cửa hàng của bạn có đơn hàng mới đang chờ xác nhận!', {
         icon: '🛒',
         duration: 6000
-      });
+      })
       
       // Play a notification sound
       try {
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-500.wav');
-        audio.play().catch(() => {});
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-500.wav')
+        audio.play().catch(() => {})
       } catch (e) {
-        console.error('Audio play error:', e);
+        console.error('Audio play error:', e)
       }
       
       // Automatically refresh dashboard data to show the new order
-      triggerRefresh();
-    });
+      triggerRefresh()
+    })
 
-    // Listen for order status updates from other actions
-    socket.on('order-status-updated', (data) => {
-      triggerRefresh();
-    });
+    // Listen for order status updates from other actions (e.g. shipper accepts, customer cancels)
+    s.on('order-status-updated', (data) => {
+      console.log('🔄 Cập nhật trạng thái đơn hàng thời gian thực:', data)
+      triggerRefresh()
+    })
 
     return () => {
-      socket.disconnect();
-    };
-  }, [user, restaurant]);
+      console.log('🔌 Disconnecting merchant socket...')
+      s.disconnect()
+    }
+  }, [user])
+
+  // Tự động tham gia phòng socket cho từng đơn hàng đang hoạt động để nhận cập nhật trạng thái
+  useEffect(() => {
+    if (!socket || orders.length === 0) return
+
+    orders.forEach(order => {
+      // Chỉ đăng ký phòng cho các đơn hàng chưa hoàn tất hoặc chưa hủy để tối ưu hóa tài nguyên
+      if (order.status !== 'completed' && order.status !== 'cancelled') {
+        socket.emit('join-order', order._id)
+      }
+    })
+  }, [socket, orders])
 
   // Create or Update Menu Item
   const handleItemSubmit = async (e) => {
