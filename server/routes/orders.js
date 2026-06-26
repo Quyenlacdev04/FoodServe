@@ -62,6 +62,34 @@ router.post('/', async (req, res) => {
     } catch (notifError) {
       console.error('Error creating admin notification for new order:', notifError);
     }
+
+    // ✅ Tạo thông báo cho Nhà hàng (Merchant) sở hữu cửa hàng này
+    try {
+      const Restaurant = (await import('../models/Restaurant.js')).default;
+      const restaurant = await Restaurant.findById(savedOrder.restaurantId);
+      if (restaurant && restaurant.ownerId) {
+        const notification = new Notification({
+          userId: restaurant.ownerId,
+          type: 'order_new',
+          title: '🛎️ Đơn hàng mới cho cửa hàng!',
+          message: `Cửa hàng "${restaurant.name}" có đơn hàng mới #${savedOrder._id.toString().slice(-6).toUpperCase()} đang chờ xác nhận`,
+          data: {
+            orderId: savedOrder._id.toString()
+          },
+          read: false
+        });
+        await notification.save();
+        
+        // Gửi real-time notification qua Socket.io trực tiếp tới chủ nhà hàng
+        if (io) {
+          io.to(`user-${restaurant.ownerId.toString()}`).emit('new-notification', notification);
+          // Phát sự kiện reload đơn hàng thời gian thực cho chủ nhà hàng
+          io.to(`user-${restaurant.ownerId.toString()}`).emit('new-order-merchant', savedOrder);
+        }
+      }
+    } catch (merchantNotifError) {
+      console.error('Error creating merchant notification for new order:', merchantNotifError);
+    }
     
     res.status(201).json(savedOrder);
   } catch (error) {
@@ -86,6 +114,20 @@ router.get('/:id', async (req, res) => {
         console.error('Lỗi khi lấy thông tin shipper:', err);
       }
     }
+
+    // Nếu có userId, lấy thông tin khách hàng để đồng bộ tên và SĐT
+    if (order.userId) {
+      try {
+        const customer = await User.findById(order.userId).select('name phone').lean();
+        if (customer) {
+          order.userName = customer.name || 'Ẩn danh';
+          order.userPhone = order.contactPhone || customer.phone || 'Không có';
+          order.shippingAddress = order.deliveryAddress;
+        }
+      } catch (err) {
+        console.error('Lỗi khi lấy thông tin khách hàng:', err);
+      }
+    }
     
     res.json(order);
   } catch (error) {
@@ -104,8 +146,33 @@ router.get('/', async (req, res) => {
     if (req.query.shipperId) {
       filter.shipperId = req.query.shipperId;
     }
-    const orders = await Order.find(filter).sort({ createdAt: -1 }).populate('restaurantId', 'name address');
-    res.json(orders);
+    const orders = await Order.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('restaurantId', 'name address')
+      .lean();
+
+    // Ánh xạ thông tin khách hàng cho từng đơn hàng
+    const ordersWithCustomer = await Promise.all(
+      orders.map(async (order) => {
+        order.shippingAddress = order.deliveryAddress;
+        order.userPhone = order.contactPhone || 'Không có';
+        order.userName = 'Ẩn danh';
+
+        if (order.userId) {
+          try {
+            const user = await User.findById(order.userId).select('name phone').lean();
+            if (user) {
+              order.userName = user.name || 'Ẩn danh';
+              order.userPhone = order.contactPhone || user.phone || 'Không có';
+            }
+          } catch (err) {
+            console.error('Lỗi khi lấy thông tin khách hàng:', err);
+          }
+        }
+        return order;
+      })
+    );
+    res.json(ordersWithCustomer);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server' });
   }
@@ -485,8 +552,33 @@ router.post('/:id/rate-shipper', async (req, res) => {
 // Lấy danh sách đơn hàng cho một nhà hàng cụ thể
 router.get('/restaurant/:restaurantId', async (req, res) => {
   try {
-    const orders = await Order.find({ restaurantId: req.params.restaurantId }).sort({ createdAt: -1 });
-    res.json(orders);
+    const orders = await Order.find({ restaurantId: req.params.restaurantId })
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    // Ánh xạ thông tin khách hàng (tên, SĐT, địa chỉ) cho nhà hàng hiển thị
+    const ordersWithCustomer = await Promise.all(
+      orders.map(async (order) => {
+        order.shippingAddress = order.deliveryAddress;
+        order.userPhone = order.contactPhone || 'Không có';
+        order.userName = 'Ẩn danh';
+
+        if (order.userId) {
+          try {
+            const user = await User.findById(order.userId).select('name phone').lean();
+            if (user) {
+              order.userName = user.name || 'Ẩn danh';
+              order.userPhone = order.contactPhone || user.phone || 'Không có';
+            }
+          } catch (err) {
+            console.error('Lỗi khi lấy thông tin khách hàng:', err);
+          }
+        }
+        return order;
+      })
+    );
+    
+    res.json(ordersWithCustomer);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server khi lấy đơn hàng của nhà hàng' });
   }

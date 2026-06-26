@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../config/api.js'
+import { API_BASE_URL, SOCKET_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
@@ -9,6 +9,7 @@ import {
   FiXCircle, FiTrendingUp, FiSave, FiEye, FiSettings,
   FiCreditCard, FiImage, FiAlertTriangle, FiRefreshCw, FiMessageCircle
 } from 'react-icons/fi'
+import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../data/mockData'
 import { updateUser } from '../store/slices/authSlice'
@@ -162,6 +163,45 @@ export default function RestaurantManagePage() {
   }, [user, refreshTrigger])
 
   const triggerRefresh = () => setRefreshTrigger(prev => prev + 1)
+
+  // Socket.io real-time listener for new orders and status updates
+  useEffect(() => {
+    if (!user || !restaurant) return;
+
+    const socket = io(SOCKET_URL);
+    
+    // Join personal room to receive real-time notifications
+    socket.emit('join-user', user._id || user.id);
+
+    // Listen for new orders targeted for this merchant
+    socket.on('new-order-merchant', (newOrder) => {
+      console.log('🛎️ Có đơn hàng mới:', newOrder);
+      toast('🛎️ Cửa hàng của bạn có đơn hàng mới đang chờ xác nhận!', {
+        icon: '🛒',
+        duration: 6000
+      });
+      
+      // Play a notification sound
+      try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-500.wav');
+        audio.play().catch(() => {});
+      } catch (e) {
+        console.error('Audio play error:', e);
+      }
+      
+      // Automatically refresh dashboard data to show the new order
+      triggerRefresh();
+    });
+
+    // Listen for order status updates from other actions
+    socket.on('order-status-updated', (data) => {
+      triggerRefresh();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user, restaurant]);
 
   // Create or Update Menu Item
   const handleItemSubmit = async (e) => {
