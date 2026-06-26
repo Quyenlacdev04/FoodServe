@@ -733,7 +733,6 @@ router.post('/:id/cancel', async (req, res) => {
       } catch (err) {
         console.error('Error emitting cancel order-status-updated to merchant:', err);
       }
-    }
 
       // Thông báo cho shipper nếu đã có người nhận
       if (order.shipperId) {
