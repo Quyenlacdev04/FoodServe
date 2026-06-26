@@ -228,6 +228,28 @@ router.patch('/:id/status', async (req, res) => {
           }
         });
       }
+
+      // Thông báo cho shipper nếu đơn hàng đã được shipper nhận trước đó
+      if (order.shipperId) {
+        try {
+          const notification = new Notification({
+            userId: order.shipperId,
+            title: '❌ Đơn hàng đã bị hủy',
+            message: `Đơn hàng #${order._id.toString().slice(-6).toUpperCase()} đã bị nhà hàng hủy. Lý do: ${order.cancellationReason}`,
+            type: 'order_cancelled',
+            data: { orderId: order._id.toString() },
+            read: false
+          });
+          await notification.save();
+          
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`user-${order.shipperId.toString()}`).emit('new-notification', notification);
+          }
+        } catch (shipperNotifErr) {
+          console.error('Lỗi khi tạo thông báo hủy đơn cho shipper:', shipperNotifErr);
+        }
+      }
     }
     
     await order.save();
