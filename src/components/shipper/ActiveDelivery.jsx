@@ -198,8 +198,8 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
         const nextStep = prevStep + 1;
         const maxSteps = 10;
         
-        const restaurantLoc = activeOrder.restaurant?.location || { lat: 10.762622, lng: 106.660172 };
-        const customerLoc = activeOrder.deliveryLocation || { lat: 10.773996, lng: 106.700981 };
+        const restaurantLoc = activeOrder.restaurant?.location || { lat: 20.8907549, lng: 105.8587752 };
+        const customerLoc = activeOrder.deliveryLocation || { lat: 20.8957549, lng: 105.8637752 };
         
         let startPoint, endPoint;
         
@@ -458,12 +458,12 @@ export default function ActiveDelivery({ shipperId, onDeliveryCompleted, onOrder
           restaurantLocation={
             activeOrder.restaurant?.location
               ? { lat: activeOrder.restaurant.location.lat, lng: activeOrder.restaurant.location.lng }
-              : { lat: 10.762622, lng: 106.660172 }
+              : { lat: 20.8907549, lng: 105.8587752 }
           }
           customerLocation={
             activeOrder.deliveryLocation
               ? { lat: activeOrder.deliveryLocation.lat, lng: activeOrder.deliveryLocation.lng }
-              : { lat: 10.773996, lng: 106.700981 }
+              : { lat: 20.8957549, lng: 105.8637752 }
           }
           shipperLocation={shipperLocation}
           orderStatus={activeOrder.status}

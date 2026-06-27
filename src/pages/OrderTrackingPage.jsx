@@ -259,12 +259,12 @@ export default function OrderTrackingPage() {
                 restaurantLocation={
                   order.restaurant?.location
                     ? { lat: order.restaurant.location.lat, lng: order.restaurant.location.lng }
-                    : { lat: 10.762622, lng: 106.660172 }
+                    : { lat: 20.8907549, lng: 105.8587752 }
                 }
                 customerLocation={
                   order.deliveryLocation
                     ? { lat: order.deliveryLocation.lat, lng: order.deliveryLocation.lng }
-                    : { lat: 10.773996, lng: 106.700981 }
+                    : { lat: 20.8957549, lng: 105.8637752 }
                 }
                 shipperLocation={shipperLocation}
                 orderStatus={order.status}

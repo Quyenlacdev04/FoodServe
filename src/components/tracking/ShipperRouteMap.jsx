@@ -157,7 +157,7 @@ export default function ShipperRouteMap({
     if (restaurantLocation) {
       return [restaurantLocation.lat, restaurantLocation.lng];
     }
-    return [10.762622, 106.660172]; // Default: HCM
+    return [20.8907549, 105.8587752]; // Default: CTECH Thường Tín, Hà Nội
   };
 
   const getMapBounds = () => {

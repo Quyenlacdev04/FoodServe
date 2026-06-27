@@ -47,8 +47,32 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Geocode delivery address if deliveryLocation coordinates are missing
+    let deliveryLocation = req.body.deliveryLocation;
+    if ((!deliveryLocation || !deliveryLocation.lat || !deliveryLocation.lng) && req.body.deliveryAddress) {
+      try {
+        const encodedAddress = encodeURIComponent(req.body.deliveryAddress + ', Việt Nam');
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+          { headers: { 'User-Agent': 'FoodServe/1.0' } }
+        );
+        const geoData = await geoRes.json();
+        if (geoData && geoData.length > 0) {
+          deliveryLocation = {
+            lat: parseFloat(geoData[0].lat),
+            lng: parseFloat(geoData[0].lon),
+            address: req.body.deliveryAddress
+          };
+          console.log(`📌 Geocoded delivery address on creation to:`, deliveryLocation);
+        }
+      } catch (geoErr) {
+        console.error('Failed to geocode delivery address on order creation:', geoErr.message);
+      }
+    }
+
     const newOrder = new Order({
       ...req.body,
+      deliveryLocation: deliveryLocation,
       restaurant: restaurant ? {
         location: restaurantLocation,
         address: restaurant.address || '',
@@ -137,6 +161,30 @@ router.get('/:id', async (req, res) => {
     const order = await Order.findById(req.params.id).populate('restaurantId').lean();
     if (!order) return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
     
+    // Đồng bộ tọa độ nhà hàng nếu chưa có
+    if (!order.restaurant || !order.restaurant.location || !order.restaurant.location.lat) {
+      const restaurant = order.restaurantId;
+      if (restaurant) {
+        order.restaurant = {
+          location: {
+            lat: restaurant.location?.lat || 20.8907549,
+            lng: restaurant.location?.lng || 105.8587752
+          },
+          address: restaurant.address || '',
+          name: restaurant.name || ''
+        };
+      }
+    }
+
+    // Đồng bộ tọa độ giao hàng nếu chưa có
+    if ((!order.deliveryLocation || !order.deliveryLocation.lat) && order.deliveryAddress) {
+      order.deliveryLocation = {
+        lat: 20.8907549 + 0.005,
+        lng: 105.8587752 + 0.005,
+        address: order.deliveryAddress
+      };
+    }
+
     // Nếu có shipperId, lấy thông tin shipper
     if (order.shipperId) {
       try {
@@ -182,7 +230,7 @@ router.get('/', async (req, res) => {
     }
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
-      .populate('restaurantId', 'name address')
+      .populate('restaurantId')
       .lean();
 
     // Ánh xạ thông tin khách hàng cho từng đơn hàng
@@ -191,6 +239,30 @@ router.get('/', async (req, res) => {
         order.shippingAddress = order.deliveryAddress;
         order.userPhone = order.contactPhone || 'Không có';
         order.userName = 'Ẩn danh';
+
+        // Đồng bộ tọa độ nhà hàng nếu chưa có
+        if (!order.restaurant || !order.restaurant.location || !order.restaurant.location.lat) {
+          const restaurant = order.restaurantId;
+          if (restaurant) {
+            order.restaurant = {
+              location: {
+                lat: restaurant.location?.lat || 20.8907549,
+                lng: restaurant.location?.lng || 105.8587752
+              },
+              address: restaurant.address || '',
+              name: restaurant.name || ''
+            };
+          }
+        }
+
+        // Đồng bộ tọa độ giao hàng nếu chưa có
+        if ((!order.deliveryLocation || !order.deliveryLocation.lat) && order.deliveryAddress) {
+          order.deliveryLocation = {
+            lat: 20.8907549 + 0.005,
+            lng: 105.8587752 + 0.005,
+            address: order.deliveryAddress
+          };
+        }
 
         if (order.userId) {
           try {

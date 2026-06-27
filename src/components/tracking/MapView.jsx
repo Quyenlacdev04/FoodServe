@@ -20,7 +20,7 @@ export default function MapView({
   useEffect(() => {
     if (!window.google || !mapRef.current) return;
 
-    const defaultCenter = customerLocation || { lat: 10.762622, lng: 106.660172 }; // TP.HCM
+    const defaultCenter = customerLocation || { lat: 20.8907549, lng: 105.8587752 }; // Thường Tín, Hà Nội
     
     const mapInstance = new window.google.maps.Map(mapRef.current, {
       center: defaultCenter,

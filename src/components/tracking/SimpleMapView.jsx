@@ -89,7 +89,7 @@ export default function SimpleMapView({
 
     const center = customerLocation
       ? [customerLocation.lat, customerLocation.lng]
-      : [10.762622, 106.660172]; // TP.HCM mặc định
+      : [20.8907549, 105.8587752]; // Thường Tín, Hà Nội mặc định
 
     const map = L.map(mapRef.current, {
       center,
