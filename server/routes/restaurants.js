@@ -194,7 +194,26 @@ router.get('/:id', async (req, res) => {
 // Thêm nhà hàng mới
 router.post('/', async (req, res) => {
   try {
-    const newRestaurant = new Restaurant(req.body);
+    const body = { ...req.body };
+    if (body.address) {
+      try {
+        const encodedAddress = encodeURIComponent(body.address + ', Việt Nam');
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+          { headers: { 'User-Agent': 'FoodServe/1.0' } }
+        );
+        const geoData = await geoRes.json();
+        if (geoData && geoData.length > 0) {
+          body.location = {
+            lat: parseFloat(geoData[0].lat),
+            lng: parseFloat(geoData[0].lon)
+          };
+        }
+      } catch (geoErr) {
+        console.error('Failed to geocode restaurant address:', geoErr.message);
+      }
+    }
+    const newRestaurant = new Restaurant(body);
     const saved = await newRestaurant.save();
     res.status(201).json(saved);
   } catch (error) {
@@ -230,6 +249,27 @@ router.put('/:id', async (req, res) => {
     if (body.orders !== undefined) body.orders = parseInt(body.orders) || 0;
     if (body.reviews !== undefined) body.reviews = parseInt(body.reviews) || 0;
     if (body.minOrder !== undefined) body.minOrder = parseInt(body.minOrder) || 0;
+
+    // Geocode address via Nominatim if provided
+    if (body.address) {
+      try {
+        const encodedAddress = encodeURIComponent(body.address + ', Việt Nam');
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+          { headers: { 'User-Agent': 'FoodServe/1.0' } }
+        );
+        const geoData = await geoRes.json();
+        if (geoData && geoData.length > 0) {
+          body.location = {
+            lat: parseFloat(geoData[0].lat),
+            lng: parseFloat(geoData[0].lon)
+          };
+          console.log(`📌 Geocoded address to coordinates:`, body.location);
+        }
+      } catch (geoErr) {
+        console.error('Failed to geocode restaurant address:', geoErr.message);
+      }
+    }
 
     const updated = await Restaurant.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: false });
     if (!updated) {

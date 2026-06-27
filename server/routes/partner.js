@@ -162,6 +162,26 @@ router.patch('/requests/:id', async (req, res) => {
     if (status === 'approved') {
       const user = await User.findOne({ email: request.ownerEmail });
       
+      let location = { lat: 20.8907549, lng: 105.8587752 }; // Default to CTECH Thường Tín
+      if (request.restaurantAddress) {
+        try {
+          const encodedAddress = encodeURIComponent(request.restaurantAddress + ', Việt Nam');
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+            { headers: { 'User-Agent': 'FoodServe/1.0' } }
+          );
+          const geoData = await geoRes.json();
+          if (geoData && geoData.length > 0) {
+            location = {
+              lat: parseFloat(geoData[0].lat),
+              lng: parseFloat(geoData[0].lon)
+            };
+          }
+        } catch (geoErr) {
+          console.error('Failed to geocode restaurant address in partner approval:', geoErr.message);
+        }
+      }
+
       const newRestaurant = new Restaurant({
         name: request.restaurantName,
         image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=400&q=80',
@@ -173,6 +193,7 @@ router.patch('/requests/:id', async (req, res) => {
         discount: 0,
         categories: request.cuisineTypes,
         address: request.restaurantAddress,
+        location: location,
         description: request.description || `Nhà hàng đối tác ${request.restaurantName}`,
         ownerId: user ? user._id : null,
         isActive: false, // Mới đăng ký cần đóng phí duy trì để kích hoạt

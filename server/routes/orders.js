@@ -18,8 +18,42 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const restaurant = await Restaurant.findById(req.body.restaurantId);
+    let restaurantLocation = { lat: 20.8907549, lng: 105.8587752 }; // Mặc định tọa độ CTECH Thường Tín
+    
+    if (restaurant) {
+      if (restaurant.location?.lat && restaurant.location?.lng) {
+        restaurantLocation = {
+          lat: restaurant.location.lat,
+          lng: restaurant.location.lng
+        };
+      } else if (restaurant.address) {
+        try {
+          const encodedAddress = encodeURIComponent(restaurant.address + ', Việt Nam');
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+            { headers: { 'User-Agent': 'FoodServe/1.0' } }
+          );
+          const geoData = await geoRes.json();
+          if (geoData && geoData.length > 0) {
+            restaurantLocation = {
+              lat: parseFloat(geoData[0].lat),
+              lng: parseFloat(geoData[0].lon)
+            };
+          }
+        } catch (geoErr) {
+          console.error('Failed to geocode restaurant on order creation:', geoErr.message);
+        }
+      }
+    }
+
     const newOrder = new Order({
       ...req.body,
+      restaurant: restaurant ? {
+        location: restaurantLocation,
+        address: restaurant.address || '',
+        name: restaurant.name || ''
+      } : undefined,
       status: 'pending',
       steps: [{ status: 'pending', time: new Date() }]
     });
@@ -397,16 +431,9 @@ router.get('/shipper/available', async (req, res) => {
         try {
           const restaurant = await Restaurant.findById(order.restaurantId).lean();
           if (restaurant) {
-            // Giả sử nhà hàng có địa chỉ, ta sẽ dùng tọa độ giả định dựa trên tên
-            // Trong thực tế, bạn cần geocoding API hoặc lưu tọa độ trong DB
-            // Tạm thời dùng tọa độ trung tâm TP.HCM với offset ngẫu nhiên
-            const baseLat = 10.7756;
-            const baseLng = 106.7019;
-            const offset = 0.05; // ~5km radius
-            
             order.restaurantLocation = {
-              lat: baseLat + (Math.random() - 0.5) * offset,
-              lng: baseLng + (Math.random() - 0.5) * offset,
+              lat: restaurant.location?.lat || 20.8907549,
+              lng: restaurant.location?.lng || 105.8587752,
               address: restaurant.address || restaurant.name
             };
           }
@@ -416,15 +443,23 @@ router.get('/shipper/available', async (req, res) => {
         
         // Tạo customerLocation từ deliveryAddress nếu chưa có
         if (!order.customerLocation?.lat && order.deliveryAddress) {
-          const baseLat = 10.7756;
-          const baseLng = 106.7019;
-          const offset = 0.05;
-          
-          order.customerLocation = {
-            lat: baseLat + (Math.random() - 0.5) * offset,
-            lng: baseLng + (Math.random() - 0.5) * offset,
-            address: order.deliveryAddress
-          };
+          if (order.deliveryLocation?.lat && order.deliveryLocation?.lng) {
+            order.customerLocation = {
+              lat: order.deliveryLocation.lat,
+              lng: order.deliveryLocation.lng,
+              address: order.deliveryAddress
+            };
+          } else {
+            const baseLat = 20.8907549;
+            const baseLng = 105.8587752;
+            const offset = 0.05;
+            
+            order.customerLocation = {
+              lat: baseLat + (Math.random() - 0.5) * offset,
+              lng: baseLng + (Math.random() - 0.5) * offset,
+              address: order.deliveryAddress
+            };
+          }
         }
         
         return order;

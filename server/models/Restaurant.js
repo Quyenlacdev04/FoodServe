@@ -14,6 +14,10 @@ const restaurantSchema = new mongoose.Schema({
   promo: String,
   categories: [String],
   address: String,
+  location: {
+    lat: { type: Number, default: 20.8907549 },
+    lng: { type: Number, default: 105.8587752 }
+  },
   description: String,
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   subscriptionExpiry: { type: Date, default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }, // Hết hạn phí duy trì (mặc định 30 ngày)
