@@ -137,6 +137,15 @@ export default function Header() {
               <a href="#restaurants" onClick={handleRestaurantsClick} className={menuLinkClass}>🍔 Nhà hàng</a>
             )}
             <Link to="/games" onClick={closeMenu} className={`${menuLinkClass} !text-amber-500 font-semibold`}>🎁 Săn Xu</Link>
+            {isAuthenticated && (
+              <button 
+                type="button" 
+                onClick={() => { closeMenu(); setJoinGroupModalOpen(true); }} 
+                className={`${menuLinkClass} w-[calc(100%-16px)] text-left !text-primary-500 font-semibold`}
+              >
+                👥 Đặt nhóm (Split Bill)
+              </button>
+            )}
           </div>
 
           {isAuthenticated && (
@@ -242,18 +251,6 @@ export default function Header() {
 
             {/* Actions */}
             <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0">
-              {isAuthenticated && (
-                <button 
-                  type="button" 
-                  onClick={() => setJoinGroupModalOpen(true)} 
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-primary-500 to-amber-500 hover:from-primary-600 hover:to-amber-600 text-white rounded-2xl text-xs font-black shadow-md cursor-pointer border border-white/10 active:scale-95 transition-all mr-1"
-                  aria-label="Tham gia đặt nhóm"
-                >
-                  <FiUsers className="text-sm animate-pulse" />
-                  <span className="hidden sm:inline">Đặt nhóm</span>
-                </button>
-              )}
-
               <button type="button" onClick={() => dispatch(toggleDarkMode())} className={iconBtnClass} aria-label="Toggle dark mode">
                 {darkMode
                   ? <FiSun className="text-xl text-amber-400" />
