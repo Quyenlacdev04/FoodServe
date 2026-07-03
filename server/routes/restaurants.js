@@ -529,11 +529,6 @@ router.get('/recommendations/user/:userId', async (req, res) => {
     res.status(500).json({ message: 'Lỗi server khi lấy đề xuất AI' });
   }
 });
-  } catch (error) {
-    console.error('AI Recommendation endpoint error:', error);
-    res.status(500).json({ message: 'Lỗi server khi lấy đề xuất AI' });
-  }
-});
 
 // Lấy chi tiết nhà hàng và menu của nó
 router.get('/:id', async (req, res) => {
