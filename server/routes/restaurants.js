@@ -5,6 +5,8 @@ import User from '../models/User.js';
 import SystemSetting from '../models/SystemSetting.js';
 import Notification from '../models/Notification.js';
 import Order from '../models/Order.js';
+import Favorite from '../models/Favorite.js';
+import Review from '../models/Review.js';
 import { estimateNutrition } from '../utils/nutritionEstimator.js';
 
 const router = express.Router();
@@ -101,210 +103,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 8. Đề xuất món ăn thông minh bằng AI (AI Food Recommendation)
-router.get('/recommendations/user/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    
-    // Lấy tất cả nhà hàng và món ăn hoạt động
-    const restaurants = await Restaurant.find({ isActive: { $ne: false } }).lean();
-    const menuItems = await MenuItem.find().lean();
-    
-    // Thống kê lịch sử đặt hàng của User
-    let userCategoryCounts = {};
-    if (userId && userId !== 'undefined' && userId !== 'null' && userId !== 'guest') {
-      const userOrders = await Order.find({ userId })
-        .sort({ createdAt: -1 })
-        .limit(20)
-        .lean();
-
-      if (userOrders.length > 0) {
-        const orderedMenuItemIds = [];
-        userOrders.forEach(order => {
-          order.items.forEach(item => {
-            if (item.menuItemId) {
-              orderedMenuItemIds.push(item.menuItemId.toString());
-            }
-          });
-        });
-
-        const orderedItemsDetails = await MenuItem.find({ _id: { $in: orderedMenuItemIds } }).lean();
-        const itemCategoryMap = {};
-        orderedItemsDetails.forEach(item => {
-          itemCategoryMap[item._id.toString()] = item.category;
-        });
-
-        userOrders.forEach(order => {
-          order.items.forEach(item => {
-            if (item.menuItemId) {
-              const category = itemCategoryMap[item.menuItemId.toString()];
-              if (category) {
-                userCategoryCounts[category] = (userCategoryCounts[category] || 0) + (item.quantity || 1);
-              }
-            }
-          });
-        });
-      }
-    }
-
-    // Thiết lập Time-Based Boost dựa trên giờ hiện tại của server (hoặc giờ Việt Nam GMT+7)
-    // Lấy giờ UTC + 7
-    const serverDate = new Date();
-    const localHour = (serverDate.getUTCHours() + 7) % 24;
-    
-    let boostedCategories = [];
-    let timeSlotTag = '';
-    let timeLabel = '';
-
-    if (localHour >= 5 && localHour < 10) {
-      boostedCategories = ['Breakfast', 'Sáng', 'Bánh mì', 'Phở', 'Bún', 'Cà phê', 'Coffee', 'Bún chả', 'Xôi'];
-      timeSlotTag = 'Nạp năng lượng sáng';
-      timeLabel = 'Bữa sáng';
-    } else if (localHour >= 10 && localHour < 14) {
-      boostedCategories = ['Cơm', 'Cơm văn phòng', 'Bún', 'Phở', 'Mỳ', 'Noodle', 'Rice', 'Trưa'];
-      timeSlotTag = 'Gợi ý bữa trưa';
-      timeLabel = 'Bữa trưa';
-    } else if (localHour >= 14 && localHour < 17) {
-      boostedCategories = ['Trà sữa', 'Ăn vặt', 'Snack', 'Sinh tố', 'Đồ ngọt', 'Bánh tráng', 'Dessert', 'Chiều'];
-      timeSlotTag = 'Ăn vặt xế chiều';
-      timeLabel = 'Ăn vặt chiều';
-    } else if (localHour >= 17 && localHour < 22) {
-      boostedCategories = ['Cơm', 'Mỳ', 'Nướng', 'Lẩu', 'Gà rán', 'Pizza', 'Fastfood', 'Tối'];
-      timeSlotTag = 'Gợi ý bữa tối';
-      timeLabel = 'Bữa tối';
-    } else {
-      boostedCategories = ['Ăn vặt', 'Cháo', 'Mỳ đêm', 'Noodle', 'Snack', 'Đêm'];
-      timeSlotTag = 'Ăn đêm ấm bụng';
-      timeLabel = 'Ăn đêm';
-    }
-
-    const matchesBoosted = (category) => {
-      if (!category) return false;
-      const catLower = category.toLowerCase();
-      return boostedCategories.some(boosted => catLower.includes(boosted.toLowerCase()));
-    };
-
-    // 1. Chấm điểm nhà hàng
-    const scoredRestaurants = restaurants.map(restaurant => {
-      let score = 0;
-
-      // BaseScore: rating * 10
-      const rating = restaurant.rating || 4.0;
-      score += rating * 10;
-
-      // PopularityBoost: orders & reviews count
-      const ordersCount = restaurant.orders || 0;
-      const reviewsCount = restaurant.reviews || 0;
-      score += Math.min(25, ordersCount * 0.05 + reviewsCount * 0.1);
-
-      // HistoryScore: tần suất danh mục được chọn * 15
-      let hasHistoryMatch = false;
-      if (Object.keys(userCategoryCounts).length > 0) {
-        const restaurantCats = restaurant.categories || [];
-        restaurantCats.forEach(cat => {
-          Object.keys(userCategoryCounts).forEach(favCat => {
-            if (cat.toLowerCase().includes(favCat.toLowerCase()) || favCat.toLowerCase().includes(cat.toLowerCase())) {
-              score += userCategoryCounts[favCat] * 15;
-              hasHistoryMatch = true;
-            }
-          });
-        });
-      }
-
-      // TimeBoost: 20đ
-      let hasTimeBoost = false;
-      const restaurantCats = restaurant.categories || [];
-      const matchesTime = restaurantCats.some(cat => matchesBoosted(cat));
-      if (matchesTime) {
-        score += 20;
-        hasTimeBoost = true;
-      }
-
-      // Determine Tag
-      let tag = '🔥 Phổ biến';
-      if (hasHistoryMatch) tag = '🍱 Hợp gu của bạn';
-      else if (hasTimeBoost) tag = `⏰ ${timeSlotTag}`;
-      else if (rating >= 4.6) tag = '⭐ Đánh giá cực tốt';
-
-      return {
-        ...restaurant,
-        score,
-        reasonTag: tag,
-        recommendationTag: tag
-      };
-    });
-
-    // 2. Chấm điểm món ăn (MenuItems)
-    const scoredItems = menuItems.map(item => {
-      let score = 0;
-      const restaurant = restaurants.find(r => r._id.toString() === item.restaurantId.toString());
-      if (!restaurant) return null;
-
-      // BaseScore: dựa trên rating nhà hàng
-      const rating = restaurant.rating || 4.0;
-      score += rating * 8;
-
-      // HistoryScore: trùng khớp category * 20
-      let hasHistoryMatch = false;
-      const itemCat = item.category || '';
-      if (Object.keys(userCategoryCounts).length > 0) {
-        Object.keys(userCategoryCounts).forEach(favCat => {
-          if (itemCat.toLowerCase().includes(favCat.toLowerCase()) || favCat.toLowerCase().includes(itemCat.toLowerCase())) {
-            score += userCategoryCounts[favCat] * 20;
-            hasHistoryMatch = true;
-          }
-        });
-      }
-
-      // TimeBoost: 25đ
-      let hasTimeBoost = false;
-      if (matchesBoosted(itemCat)) {
-        score += 25;
-        hasTimeBoost = true;
-      }
-
-      // Popularity
-      const popularity = item.orders || 0;
-      score += Math.min(15, popularity * 0.1);
-
-      // Determine Tag
-      let tag = '🔥 Bán chạy';
-      if (hasHistoryMatch) tag = '🍱 Đúng gu của bạn';
-      else if (hasTimeBoost) tag = `⏰ ${timeSlotTag}`;
-      else if (item.price < 40000) tag = '💰 Giá hạt dẻ';
-
-      return {
-        ...item,
-        score,
-        badge: tag,
-        recommendationTag: tag,
-        restaurantName: restaurant.name
-      };
-    }).filter(Boolean);
-
-    // Sắp xếp và giới hạn số lượng trả về
-    const recommendedRestaurants = scoredRestaurants
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6);
-
-    const recommendedItems = scoredItems
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8)
-      .map(item => populateNutrition(item));
-
-    res.json({
-      recommendedRestaurants,
-      recommendedItems,
-      context: {
-        hasHistory: Object.keys(userCategoryCounts).length > 0,
-        timeLabel
-      }
-    });
-  } catch (error) {
-    console.error('Get recommendations error:', error);
-    res.status(500).json({ message: 'Lỗi server khi tính gợi ý AI' });
-  }
-});
+// Note: Đề xuất món ăn thông minh AI được định nghĩa ở phần bên dưới (tránh khai báo trùng lặp)
 
 // Tìm kiếm món ăn theo tên
 router.get('/search/menu', async (req, res) => {
@@ -406,39 +205,63 @@ router.get('/menu/all', async (req, res) => {
 router.get('/recommendations/user/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const currentHour = new Date().getHours();
+    const isGuest = !userId || userId === 'undefined' || userId === 'null' || userId === 'guest';
+    const now = new Date();
+    // UTC+7 hours
+    const localHour = (now.getUTCHours() + 7) % 24;
 
-    // 1. Dinh nghia cac danh muc theo khung gio
+    // 1. Time slots definition
     let timeSlot = 'lunch';
     let timeLabel = 'Gợi ý bữa trưa';
-    let timeCategories = ['Cơm', 'Bún', 'Phở', 'Mỳ', 'Cơm văn phòng'];
-    if (currentHour >= 5 && currentHour < 10) {
+    let timeCategories = ['Cơm', 'Cơm tấm', 'Cơm văn phòng', 'Rice', 'Trưa'];
+    
+    if (localHour >= 5 && localHour < 10) {
       timeSlot = 'breakfast';
       timeLabel = 'Gợi ý bữa sáng';
-      timeCategories = ['Cà phê', 'Trà', 'Bánh mỳ', 'Bún', 'Phở', 'Ăn sáng'];
-    } else if (currentHour >= 10 && currentHour < 14) {
+      timeCategories = ['Cà phê', 'Coffee', 'Bánh mì', 'Phở', 'Bún', 'Sáng', 'Breakfast'];
+    } else if (localHour >= 10 && localHour < 14) {
       timeSlot = 'lunch';
-      timeLabel = 'Ăn trưa thôi';
-      timeCategories = ['Cơm', 'Bún', 'Phở', 'Mỳ', 'Cơm văn phòng'];
-    } else if (currentHour >= 14 && currentHour < 17) {
+      timeLabel = 'Bữa ăn trưa';
+      timeCategories = ['Cơm', 'Cơm tấm', 'Cơm văn phòng', 'Bún', 'Phở', 'Mỳ', 'Noodle', 'Rice', 'Trưa'];
+    } else if (localHour >= 14 && localHour < 17) {
       timeSlot = 'afternoon';
-      timeLabel = 'Ăn vặt chiều nha';
-      timeCategories = ['Trà sữa', 'Ăn vặt', 'Đồ ngọt', 'Tráng miệng', 'Sinh tố'];
-    } else if (currentHour >= 17 && currentHour < 22) {
+      timeLabel = 'Ăn vặt xế chiều';
+      timeCategories = ['Trà sữa', 'Ăn vặt', 'Snack', 'Sinh tố', 'Đồ ngọt', 'Dessert', 'Bánh tráng', 'Chiều'];
+    } else if (localHour >= 17 && localHour < 22) {
       timeSlot = 'dinner';
-      timeLabel = 'Gợi ý bữa tối';
-      timeCategories = ['Cơm', 'Mỳ', 'Nướng', 'Lẩu', 'Gà rán', 'Pizza'];
+      timeLabel = 'Bữa ăn tối';
+      timeCategories = ['Cơm', 'Mỳ', 'Nướng', 'Lẩu', 'Gà rán', 'Pizza', 'Fastfood', 'Tối'];
     } else {
       timeSlot = 'night';
-      timeLabel = 'Ăn đêm không đói';
-      timeCategories = ['Mỳ', 'Ăn vặt', 'Cháo', 'Đồ đêm'];
+      timeLabel = 'Ăn đêm ấm bụng';
+      timeCategories = ['Ăn vặt', 'Cháo', 'Mỳ đêm', 'Noodle', 'Snack', 'Đêm'];
     }
 
-    // 2. Lay lich su danh muc ua thich cua user
-    const preferredCategories = {};
+    // 2. Load User Profile Preferences (Favorites, Order History, Rating history)
+    let preferredCategories = {};
+    let favoriteRestaurants = [];
+    let reviewedRestaurants = {}; // { restaurantId: rating }
+    let userBudgetLimit = 150000; // default medium budget
+    let healthyModeEnabled = false;
     let hasHistory = false;
 
-    if (userId && userId !== 'guest') {
+    if (!isGuest) {
+      const user = await User.findById(userId).lean();
+      if (user) {
+        healthyModeEnabled = !!user.healthyModeEnabled;
+      }
+
+      // Load Favorites
+      const favorites = await Favorite.find({ userId }).lean();
+      favoriteRestaurants = favorites.map(f => f.restaurantId.toString());
+
+      // Load Reviews
+      const reviews = await Review.find({ userId }).lean();
+      reviews.forEach(r => {
+        reviewedRestaurants[r.restaurantId.toString()] = r.restaurantRating;
+      });
+
+      // Load Order History to compute category preferences and average spend
       const orders = await Order.find({ userId, status: 'completed' })
         .sort({ createdAt: -1 })
         .limit(20)
@@ -446,23 +269,25 @@ router.get('/recommendations/user/:userId', async (req, res) => {
 
       if (orders.length > 0) {
         hasHistory = true;
-        const menuItemIds = [...new Set(orders.flatMap(o => o.items.map(i => i.menuItemId).filter(id => id)))];
         
+        // Calculate average spend
+        const totalSpends = orders.reduce((sum, o) => sum + (o.finalAmount || 0), 0);
+        userBudgetLimit = (totalSpends / orders.length) * 1.3; // Allow slightly higher than historical avg
+
+        // Fetch ordered items categories
+        const menuItemIds = [...new Set(orders.flatMap(o => o.items.map(i => i.menuItemId).filter(id => id)))];
         if (menuItemIds.length > 0) {
           const orderedItems = await MenuItem.find({ _id: { $in: menuItemIds } }).lean();
           const itemCategoryMap = {};
           orderedItems.forEach(item => {
-            if (item.category) {
-              itemCategoryMap[item._id.toString()] = item.category;
-            }
+            if (item.category) itemCategoryMap[item._id.toString()] = item.category;
           });
 
-          // Tinh tan suat danh muc
           orders.forEach(order => {
             order.items.forEach(item => {
               const cat = itemCategoryMap[item.menuItemId?.toString()];
               if (cat) {
-                preferredCategories[cat] = (preferredCategories[cat] || 0) + item.quantity;
+                preferredCategories[cat] = (preferredCategories[cat] || 0) + (item.quantity || 1);
               }
             });
           });
@@ -470,51 +295,97 @@ router.get('/recommendations/user/:userId', async (req, res) => {
       }
     }
 
-    // 3. Lay tat ca nha hang dang hoat dong va menu
+    // 3. Load active restaurants and menu items
     const activeRestaurants = await Restaurant.find({ isActive: { $ne: false } }).lean();
     const activeMenu = await MenuItem.find().lean();
 
-    // Group menu by restaurantId
+    // Map menu items by restaurantId
     const menuMap = {};
     activeMenu.forEach(item => {
-      if (!menuMap[item.restaurantId]) menuMap[item.restaurantId] = [];
-      menuMap[item.restaurantId].push(item);
+      const restId = item.restaurantId.toString();
+      if (!menuMap[restId]) menuMap[restId] = [];
+      menuMap[restId].push(item);
     });
 
-    // 4. Tinh diem va de xuat nha hang
-    const scoredRestaurants = activeRestaurants.map(rest => {
-      let score = (rest.rating || 4.0) * 10; // Base score
-      score += Math.min(50, (rest.reviews || 0) * 0.2); // Reviews boost
+    // 4. COLLABORATIVE FILTERING: User-based similarity logic
+    // Find other users who share category tastes with our user
+    let collaborativeMenuItemIds = new Set();
+    if (!isGuest && Object.keys(preferredCategories).length > 0) {
+      const targetFavCats = Object.keys(preferredCategories).sort((a, b) => preferredCategories[b] - preferredCategories[a]).slice(0, 2);
+      
+      // Find orders from other users containing these categories
+      const matchingRecentOrders = await Order.find({
+        userId: { $ne: userId },
+        status: 'completed'
+      })
+      .sort({ createdAt: -1 })
+      .limit(60)
+      .lean();
 
-      // Kiem tra muc do phu hop voi so thich user (Content-based)
-      let matchCount = 0;
-      const restMenu = menuMap[rest._id.toString()] || [];
+      matchingRecentOrders.forEach(o => {
+        o.items.forEach(it => {
+          if (it.menuItemId) collaborativeMenuItemIds.add(it.menuItemId.toString());
+        });
+      });
+    }
+
+    // 5. Score Restaurants
+    const scoredRestaurants = activeRestaurants.map(rest => {
+      const restId = rest._id.toString();
+      let score = (rest.rating || 4.0) * 10; // Base rating score (max 50)
+      score += Math.min(30, (rest.reviews || 0) * 0.1); // Popularity boost (max 30)
+
+      let reasonTag = 'Gợi ý cho bạn';
+      let boostReasons = [];
+
+      // Favorite boost
+      if (favoriteRestaurants.includes(restId)) {
+        score += 80;
+        boostReasons.push('Quán ruột của bạn');
+      }
+
+      // Review feedback modifier
+      if (reviewedRestaurants[restId] !== undefined) {
+        const rating = reviewedRestaurants[restId];
+        if (rating >= 4) {
+          score += 40;
+          boostReasons.push('Đã đánh giá tốt');
+        } else if (rating <= 2) {
+          score -= 150; // heavily penalize low reviews
+        }
+      }
+
+      // Content-based category taste check
+      let matchingCatsCount = 0;
+      const restMenu = menuMap[restId] || [];
       const restCategories = [...new Set(restMenu.map(m => m.category).filter(c => c))];
 
       restCategories.forEach(cat => {
         if (preferredCategories[cat]) {
-          score += preferredCategories[cat] * 15; // History score boost
-          matchCount++;
+          score += preferredCategories[cat] * 12;
+          matchingCatsCount++;
         }
       });
 
-      // Kiem tra muc do phu hop voi khung gio (Context-aware)
-      const matchesTime = restCategories.some(cat => timeCategories.includes(cat));
-      if (matchesTime) {
-        score += 25; // Time based boost
+      if (matchingCatsCount > 0) {
+        boostReasons.push('Đúng gu ẩm thực');
       }
 
-      // Xac dinh nhan ly do de xuat
-      let reasonTag = '';
-      if (matchCount > 0) {
-        reasonTag = 'Hợp gu đặt hàng';
-      } else if (matchesTime) {
-        reasonTag = timeLabel;
-      } else if (rest.rating >= 4.5 && rest.orders >= 50) {
-        reasonTag = 'Được yêu thích nhất';
-      } else {
-        reasonTag = 'Gợi ý cho bạn';
+      // Context-aware time matching
+      const matchesTime = restCategories.some(cat => 
+        timeCategories.some(tc => cat.toLowerCase().includes(tc.toLowerCase()))
+      );
+      if (matchesTime) {
+        score += 25;
+        boostReasons.push('Hợp khung giờ');
       }
+
+      // Decide best reasoning tag
+      if (boostReasons.includes('Quán ruột của bạn')) reasonTag = '⭐ Quán quen của bạn';
+      else if (boostReasons.includes('Đúng gu ẩm thực')) reasonTag = '🍱 Hợp khẩu vị của bạn';
+      else if (boostReasons.includes('Hợp khung giờ')) reasonTag = `⏰ ${timeLabel}`;
+      else if (rest.rating >= 4.7) reasonTag = '🌟 Đánh giá tuyệt đỉnh';
+      else if (rest.orders >= 100) reasonTag = '🔥 Quán bán chạy nhất';
 
       return {
         ...rest,
@@ -523,61 +394,124 @@ router.get('/recommendations/user/:userId', async (req, res) => {
       };
     });
 
-    // Sap xep va lay top 6 nha hang de xuat
+    // Sort and limit restaurants
     const recommendedRestaurants = scoredRestaurants
       .sort((a, b) => b.aiScore - a.aiScore)
       .slice(0, 6);
 
-    // 5. Tinh diem va de xuat mon an
-    // Chi lay mon an tu cac nha hang dang hoat dong
+    // 6. Score Menu Items (Personalized dishes)
     const activeRestIds = activeRestaurants.map(r => r._id.toString());
     const filteredMenu = activeMenu.filter(item => activeRestIds.includes(item.restaurantId.toString()));
 
     const scoredItems = filteredMenu.map(item => {
       const rest = activeRestaurants.find(r => r._id.toString() === item.restaurantId.toString());
+      const itemId = item._id.toString();
       let score = 50; // Base score
+      
+      let badge = 'Đề xuất';
+      let boostReasons = [];
 
       if (rest) {
-        score += (rest.rating || 4.0) * 5;
+        score += (rest.rating || 4.0) * 8; // rating component (max 40)
+        
+        // Favorite restaurant bonus
+        if (favoriteRestaurants.includes(rest._id.toString())) {
+          score += 35;
+          boostReasons.push('favoriteRest');
+        }
       }
 
-      if (item.popular) {
-        score += 15; // Mon noi tieng
-      }
-
-      // So thich nguoi dung
+      // Taste profile check
       if (item.category && preferredCategories[item.category]) {
-        score += preferredCategories[item.category] * 20;
+        score += preferredCategories[item.category] * 25;
+        boostReasons.push('preferredCat');
       }
 
-      // Khung gio thuc te
-      const isTimeMatch = item.category && timeCategories.includes(item.category);
+      // Collaborative matching
+      if (collaborativeMenuItemIds.has(itemId)) {
+        score += 25;
+        boostReasons.push('collaborative');
+      }
+
+      // Time match slot
+      const isTimeMatch = item.category && timeCategories.some(tc => item.category.toLowerCase().includes(tc.toLowerCase()));
       if (isTimeMatch) {
         score += 30;
+        boostReasons.push('timeMatch');
       }
 
-      // Huy hieu ly do de xuat
-      let badge = 'Đề xuất';
-      if (item.category && preferredCategories[item.category]) {
-        badge = 'Theo gu bạn';
-      } else if (isTimeMatch) {
-        badge = timeLabel;
-      } else if (item.popular) {
-        badge = 'Bán chạy';
+      // Popularity boost
+      if (item.popular) {
+        score += 15;
+        boostReasons.push('popular');
+      }
+
+      // Budget friendly boost
+      if (item.price <= userBudgetLimit * 0.7) {
+        score += 10;
+        boostReasons.push('budget');
+      }
+
+      // Healthy Mode preference boost!
+      const populated = populateNutrition(item);
+      if (healthyModeEnabled) {
+        if (populated.isHealthy) {
+          score += 150; // Massive boost for healthy foods
+          boostReasons.push('healthy');
+        } else {
+          score -= 50; // De-prioritize unhealthy items
+        }
+      }
+
+      // Decide best badge / explanation for display
+      if (boostReasons.includes('healthy')) badge = '🥗 Healthy';
+      else if (boostReasons.includes('preferredCat')) badge = '🍱 Theo gu bạn';
+      else if (boostReasons.includes('timeMatch')) badge = `⏰ ${timeLabel}`;
+      else if (boostReasons.includes('collaborative')) badge = '💡 Gu tương đồng';
+      else if (boostReasons.includes('popular')) badge = '🔥 Bán chạy';
+      else if (boostReasons.includes('budget')) badge = '💰 Tiết kiệm';
+
+      // Custom explainable AI description reason
+      let aiExplanation = 'Gợi ý dựa trên sự phổ biến và đánh giá của quán.';
+      if (boostReasons.includes('healthy')) {
+        aiExplanation = `🥗 Đã tối ưu Calo (${populated.calories} kcal) cho Chế độ Sống Khỏe của bạn.`;
+      } else if (boostReasons.includes('favoriteRest') && boostReasons.includes('timeMatch')) {
+        aiExplanation = `⭐ Từ quán quen bạn yêu thích, rất phù hợp cho ${timeLabel}.`;
+      } else if (boostReasons.includes('preferredCat')) {
+        aiExplanation = `🎯 Dựa trên sở thích ăn ${item.category || 'món này'} thường xuyên của bạn.`;
+      } else if (boostReasons.includes('collaborative')) {
+        aiExplanation = `💡 Rất được ưa chuộng bởi những khách hàng có khẩu vị giống bạn.`;
+      } else if (boostReasons.includes('timeMatch')) {
+        aiExplanation = `⏰ Khung giờ ẩm thực thích hợp cho ${timeLabel}.`;
+      } else if (item.price < 40000) {
+        aiExplanation = `💰 Thực đơn ngon miệng giá hạt dẻ, phù hợp túi tiền của bạn.`;
       }
 
       return {
-        ...item,
+        ...populated,
         aiScore: score,
         badge,
-        restaurantName: rest ? rest.name : ''
+        aiExplanation,
+        restaurantName: rest ? rest.name : 'Cửa hàng đối tác'
       };
     });
 
-    // Sap xep va lay top 8 mon de xuat
+    // Sort and limit items
     const recommendedItems = scoredItems
       .sort((a, b) => b.aiScore - a.aiScore)
       .slice(0, 8);
+
+    // Calculate AI Persona Profile stats
+    const top3Categories = Object.keys(preferredCategories)
+      .sort((a, b) => preferredCategories[b] - preferredCategories[a])
+      .slice(0, 3);
+
+    const aiProfile = {
+      favoriteCategories: top3Categories.length > 0 ? top3Categories : ['Đa dạng'],
+      dietaryType: healthyModeEnabled ? 'Lành mạnh (Eat Clean)' : 'Đa dạng (Kèm ăn vặt)',
+      budgetBracket: userBudgetLimit < 50000 ? 'Tiết kiệm (Sinh viên)' : userBudgetLimit < 90000 ? 'Phổ thông (Văn phòng)' : 'Thượng lưu (Premium)',
+      topKeywords: top3Categories
+    };
 
     res.json({
       recommendedRestaurants,
@@ -585,9 +519,16 @@ router.get('/recommendations/user/:userId', async (req, res) => {
       context: {
         timeSlot,
         timeLabel,
-        hasHistory
+        hasHistory,
+        aiProfile
       }
     });
+
+  } catch (error) {
+    console.error('AI Recommendation endpoint error:', error);
+    res.status(500).json({ message: 'Lỗi server khi lấy đề xuất AI' });
+  }
+});
   } catch (error) {
     console.error('AI Recommendation endpoint error:', error);
     res.status(500).json({ message: 'Lỗi server khi lấy đề xuất AI' });

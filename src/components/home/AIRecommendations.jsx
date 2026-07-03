@@ -106,6 +106,33 @@ export default function AIRecommendations() {
         </div>
       </div>
 
+      {/* AI Persona Profile Widget */}
+      {context.aiProfile && (
+        <div className="bg-gradient-to-r from-primary-500/5 to-amber-500/5 dark:from-primary-500/10 dark:to-amber-500/10 border border-primary-500/10 dark:border-primary-500/15 rounded-3xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🧠</span>
+            <div>
+              <h4 className="font-bold text-gray-900 dark:text-white text-sm">Hồ sơ khẩu vị AI của bạn</h4>
+              <p className="text-[11px] text-gray-400 mt-0.5">Thuật toán phân tích lịch sử đặt đơn, thời gian và sở thích để cá nhân hóa đề xuất.</p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2.5 items-center w-full md:w-auto">
+            <div className="bg-white/60 dark:bg-dark-100 border border-gray-150 dark:border-gray-800 px-3.5 py-1.5 rounded-2xl shadow-sm text-xs font-bold text-gray-700 dark:text-gray-300">
+              🥦 Kiểu ăn: <span className="text-green-500">{context.aiProfile.dietaryType}</span>
+            </div>
+            <div className="bg-white/60 dark:bg-dark-100 border border-gray-150 dark:border-gray-800 px-3.5 py-1.5 rounded-2xl shadow-sm text-xs font-bold text-gray-700 dark:text-gray-300">
+              💰 Ví Xu: <span className="text-amber-500">{context.aiProfile.budgetBracket}</span>
+            </div>
+            {context.aiProfile.favoriteCategories?.length > 0 && (
+              <div className="bg-white/60 dark:bg-dark-100 border border-gray-150 dark:border-gray-800 px-3.5 py-1.5 rounded-2xl shadow-sm text-xs font-bold text-gray-700 dark:text-gray-300">
+                🍜 Gu tủ: <span className="text-primary-500">{context.aiProfile.favoriteCategories.join(', ')}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 1. RECOMMENDED RESTAURANTS */}
       {recommendedRestaurants.length > 0 && (
         <div className="space-y-4">
@@ -233,14 +260,22 @@ export default function AIRecommendations() {
                     <h5 className="font-bold text-gray-900 dark:text-white text-xs line-clamp-1">
                       {item.name}
                     </h5>
-                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">
-                      🏪 {item.restaurantName}
-                    </p>
-                    {healthyMode && item.calories > 0 && (
-                      <div className="mt-1.5 text-[9px] font-bold text-green-600 dark:text-green-400 bg-green-500/5 px-2 py-0.5 rounded border border-green-500/10 w-max">
-                        🔥 {item.calories} kcal
-                      </div>
-                    )}
+                      <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+                        🏪 {item.restaurantName}
+                      </p>
+                      
+                      {/* AI Explanation subtext */}
+                      {item.aiExplanation && (
+                        <p className="text-[9px] text-primary-500/90 dark:text-primary-400/90 italic font-semibold mt-1 flex items-center gap-0.5 leading-snug line-clamp-2">
+                          <span>🧠</span> {item.aiExplanation}
+                        </p>
+                      )}
+                      
+                      {healthyMode && item.calories > 0 && (
+                        <div className="mt-1.5 text-[9px] font-bold text-green-600 dark:text-green-400 bg-green-500/5 px-2 py-0.5 rounded border border-green-500/10 w-max">
+                          🔥 {item.calories} kcal
+                        </div>
+                      )}
                   </div>
                   <div className="flex items-center justify-between mt-2.5">
                     <span className="font-extrabold text-primary-500 text-sm">
