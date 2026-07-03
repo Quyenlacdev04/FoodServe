@@ -316,6 +316,10 @@ export default function GroupOrderPage() {
               {session.status === 'ordered' && '🎉 Đã đặt'}
             </div>
             
+            <Link to={`/restaurant/${session.restaurantId}`} className="text-xs font-bold text-primary-500 hover:underline inline-flex items-center gap-1 mb-3">
+              ← Quay lại cửa hàng
+            </Link>
+            
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">
               🍔 Đặt Chung: {session.restaurantName}
             </h1>
