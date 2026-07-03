@@ -13,6 +13,8 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import { io } from 'socket.io-client';
 import AvailableOrders from '../components/shipper/AvailableOrders';
 import ActiveDelivery from '../components/shipper/ActiveDelivery';
@@ -67,6 +69,93 @@ function MapController({ position }) {
   useEffect(() => {
     if (position) map.flyTo(position, 15, { duration: 1.5 });
   }, [position]);
+  return null;
+}
+
+// ===== CUSTOM MAP ICONS =====
+const restaurantIcon = L.divIcon({
+  html: `<div style="width:40px;height:40px;border-radius:50% 50% 50% 0;background:#EF4444;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:18px;transform:rotate(-45deg);"><span style="transform:rotate(45deg)">🏪</span></div>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
+  className: ''
+});
+
+const customerIcon = L.divIcon({
+  html: `<div style="width:40px;height:40px;border-radius:50% 50% 50% 0;background:#3B82F6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:18px;transform:rotate(-45deg);"><span style="transform:rotate(45deg)">🏠</span></div>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
+  className: ''
+});
+
+// ===== ROUTING PATH COMPONENT FOR COLLABORATIVE ROUTING =====
+function RoutingPath({ activeOrder, shipperPosition }) {
+  const map = useMap();
+  const routingControlRef = useRef(null);
+
+  useEffect(() => {
+    if (!map || !activeOrder || !shipperPosition) return;
+
+    const isPickedUp = activeOrder.status === 'delivering';
+    const restLoc = activeOrder.restaurant?.location || { lat: 20.8907549, lng: 105.8587752 };
+    const custLoc = activeOrder.deliveryLocation || { lat: 20.8957549, lng: 105.8637752 };
+
+    let waypoints = [];
+    if (isPickedUp) {
+      // Đã lấy hàng -> từ vị trí shipper đến địa chỉ khách
+      waypoints = [
+        L.latLng(shipperPosition[0], shipperPosition[1]),
+        L.latLng(custLoc.lat, custLoc.lng)
+      ];
+    } else {
+      // Chưa lấy hàng -> từ shipper -> nhà hàng -> địa chỉ khách
+      waypoints = [
+        L.latLng(shipperPosition[0], shipperPosition[1]),
+        L.latLng(restLoc.lat, restLoc.lng),
+        L.latLng(custLoc.lat, custLoc.lng)
+      ];
+    }
+
+    if (routingControlRef.current) {
+      map.removeControl(routingControlRef.current);
+    }
+
+    const control = L.Routing.control({
+      waypoints,
+      routeWhileDragging: false,
+      addWaypoints: false,
+      draggableWaypoints: false,
+      fitSelectedRoutes: true,
+      showAlternatives: false,
+      lineOptions: {
+        styles: [{ color: '#ff6b35', opacity: 0.85, weight: 6 }],
+        extendToWaypoints: true,
+        missingRouteTolerance: 0
+      },
+      createMarker: () => null,
+      router: L.Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1',
+        profile: 'driving'
+      })
+    }).addTo(map);
+
+    routingControlRef.current = control;
+
+    // Hide instructions container
+    setTimeout(() => {
+      const container = document.querySelector('.leaflet-routing-container');
+      if (container) container.style.display = 'none';
+    }, 100);
+
+    return () => {
+      if (routingControlRef.current) {
+        map.removeControl(routingControlRef.current);
+        routingControlRef.current = null;
+      }
+    };
+  }, [map, activeOrder, shipperPosition]);
+
   return null;
 }
 
@@ -824,6 +913,7 @@ export default function ShipperDashboardPage() {
   const { user, isAuthenticated } = useSelector(s => s.auth);
   const [activeTab, setActiveTab] = useState('home');
   const [activeOrderId, setActiveOrderId] = useState(null);
+  const [activeOrder, setActiveOrder] = useState(null);
   const [isOnline, setIsOnline] = useState(false);
   const [position, setPosition] = useState([10.7769, 106.7009]);
   const [stats, setStats] = useState({ total: 0, earnings: 0, rating: 0 });
@@ -842,6 +932,13 @@ export default function ShipperDashboardPage() {
       navigator.geolocation.getCurrentPosition(pos => setPosition([pos.coords.latitude, pos.coords.longitude]), () => {}, { enableHighAccuracy: true });
     }
   }, [user, isAuthenticated]);
+
+  // Polling stats & active orders every 20s
+  useEffect(() => {
+    if (!isAuthenticated || !user?._id) return;
+    const interval = setInterval(fetchStats, 20000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     if (isOnline && navigator.geolocation) {
@@ -953,6 +1050,17 @@ export default function ShipperDashboardPage() {
           rating: user?.shipperRating || 0
         });
         setTodayOrders(today.length);
+
+        // Lấy đơn hàng đang hoạt động để làm định tuyến bản đồ
+        const active = data.find(o => 
+          o.status === 'preparing' || o.status === 'delivering' || o.status === 'ready'
+        );
+        setActiveOrder(active || null);
+        if (active) {
+          setActiveOrderId(active._id);
+        } else {
+          setActiveOrderId(null);
+        }
       }
     } catch {}
   };
@@ -1018,11 +1126,71 @@ export default function ShipperDashboardPage() {
             <MapContainer center={position} zoom={15} className="w-full h-full" zoomControl={false} style={{ height: '100%', width: '100%' }}>
               <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <MapController position={position} />
+              
+              {/* Vị trí Shipper */}
               <Marker position={position} icon={shipperIcon}>
                 <Popup><div className="text-center font-bold text-sm p-1">🛵 Vị trí của bạn<br /><span className="text-xs text-gray-500 font-normal">{isOnline ? '🟢 Online' : '🔴 Offline'}</span></div></Popup>
               </Marker>
-              {isOnline && <Circle center={position} radius={500} pathOptions={{ color: '#ff6b35', fillColor: '#ff6b35', fillOpacity: 0.08, weight: 1.5 }} />}
+
+              {/* Vị trí nhà hàng của đơn hàng đang hoạt động */}
+              {activeOrder && activeOrder.restaurant?.location && (
+                <Marker 
+                  position={[activeOrder.restaurant.location.lat, activeOrder.restaurant.location.lng]} 
+                  icon={restaurantIcon}
+                >
+                  <Popup>
+                    <div className="text-center font-bold text-xs p-1">
+                      🏪 {activeOrder.restaurant?.name || 'Nhà hàng'}<br />
+                      <span className="text-[10px] text-gray-500 font-normal">Điểm lấy hàng</span>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+
+              {/* Vị trí khách hàng của đơn hàng đang hoạt động */}
+              {activeOrder && activeOrder.deliveryLocation && (
+                <Marker 
+                  position={[activeOrder.deliveryLocation.lat, activeOrder.deliveryLocation.lng]} 
+                  icon={customerIcon}
+                >
+                  <Popup>
+                    <div className="text-center font-bold text-xs p-1">
+                      🏠 Điểm giao hàng<br />
+                      <span className="text-[10px] text-gray-500 font-normal">{activeOrder.deliveryAddress}</span>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+
+              {/* Vẽ đường đi định tuyến thực tế (Advanced Routing) */}
+              {activeOrder && (
+                <RoutingPath activeOrder={activeOrder} shipperPosition={position} />
+              )}
+
+              {!activeOrder && isOnline && <Circle center={position} radius={500} pathOptions={{ color: '#ff6b35', fillColor: '#ff6b35', fillOpacity: 0.08, weight: 1.5 }} />}
             </MapContainer>
+
+            {/* Thông báo nổi đơn hàng đang hoạt động */}
+            {activeOrder && (
+              <div className="absolute top-20 left-4 right-4 z-[999] bg-white/95 dark:bg-dark-200/95 backdrop-blur-md rounded-2xl p-4 shadow-xl border border-primary-500/20 flex items-center justify-between">
+                <div className="min-w-0 pr-2">
+                  <div className="text-[10px] text-primary-500 font-black uppercase tracking-wider">🚀 Đang giao hàng</div>
+                  <h4 className="font-extrabold text-xs text-gray-800 dark:text-white mt-0.5 truncate">
+                    {activeOrder.restaurant?.name || 'Nhà hàng'}
+                  </h4>
+                  <p className="text-[10px] text-gray-400 truncate">
+                    Trạng thái: <strong>{activeOrder.status === 'delivering' ? 'Giao đến khách' : 'Lấy hàng'}</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('active')}
+                  className="px-3.5 py-2 bg-gradient-primary text-white font-bold text-[10px] rounded-xl shadow-md transition-all active:scale-95 shrink-0 cursor-pointer"
+                >
+                  Xem chi tiết
+                </button>
+              </div>
+            )}
+
             <button onClick={() => navigator.geolocation?.getCurrentPosition(p => setPosition([p.coords.latitude, p.coords.longitude]))}
               className="absolute bottom-48 right-4 z-[500] w-12 h-12 bg-white rounded-2xl shadow-lg flex items-center justify-center hover:bg-gray-50">
               <FiNavigation className="text-primary-500 text-xl" />
