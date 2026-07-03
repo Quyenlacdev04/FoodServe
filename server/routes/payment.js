@@ -7,6 +7,7 @@ import User from '../models/User.js';
 import Restaurant from '../models/Restaurant.js';
 import Notification from '../models/Notification.js';
 import SystemSetting from '../models/SystemSetting.js';
+import CoinTransaction from '../models/CoinTransaction.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -352,6 +353,29 @@ router.post('/momo/ipn', async (req, res) => {
             subscriptionExpiry: renewedRestaurant.subscriptionExpiry
           });
         }
+      } else if (orderId && orderId.startsWith('TOPUP_')) {
+        const [_, userId, transactionId] = orderId.split('_');
+        const coinTx = await CoinTransaction.findById(transactionId);
+        if (coinTx && coinTx.status !== 'completed') {
+          coinTx.status = 'completed';
+          coinTx.referenceId = req.body.transId || coinTx.referenceId;
+          await coinTx.save();
+          
+          const user = await User.findById(userId);
+          if (user) {
+            user.coins += coinTx.coins;
+            await user.save();
+            
+            const io = req.app.get('io');
+            if (io) {
+              io.to(`user-${userId}`).emit('topup-success', {
+                coins: user.coins,
+                coinsAdded: coinTx.coins,
+                message: `Nạp xu thành công! Bạn nhận được ${coinTx.coins} xu.`
+              });
+            }
+          }
+        }
       } else {
         // Tìm order theo transactionId
         const order = await Order.findOne({ transactionId: orderId });
@@ -408,6 +432,39 @@ router.get('/momo/return', async (req, res) => {
   };
 
   try {
+    // Check if coin top-up payment
+    if (orderId && orderId.startsWith('TOPUP_')) {
+      const [_, userId, transactionId] = orderId.split('_');
+      const frontendUrl = getFrontendUrl();
+      
+      if (String(resultCode) === '0') {
+        const coinTx = await CoinTransaction.findById(transactionId);
+        if (coinTx && coinTx.status !== 'completed') {
+          coinTx.status = 'completed';
+          coinTx.referenceId = transId || coinTx.referenceId;
+          await coinTx.save();
+          
+          const user = await User.findById(userId);
+          if (user) {
+            user.coins += coinTx.coins;
+            await user.save();
+            
+            const io = req.app.get('io');
+            if (io) {
+              io.to(`user-${userId}`).emit('topup-success', {
+                coins: user.coins,
+                coinsAdded: coinTx.coins
+              });
+            }
+          }
+        }
+        res.redirect(`${frontendUrl}/profile?success=true&tab=wallet&type=topup&amount=${amount || ''}`);
+      } else {
+        res.redirect(`${frontendUrl}/profile?success=false&error=momo_failed&responseCode=${resultCode}`);
+      }
+      return;
+    }
+
     // Check if subscription payment
     if (orderId && orderId.startsWith('SUB_')) {
       const [_, restaurantId] = orderId.split('_');
@@ -538,6 +595,275 @@ router.post('/coins/pay', async (req, res) => {
   }
 });
 
+// ===== COINS: Lấy lịch sử giao dịch xu =====
+router.get('/coins/history/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const history = await CoinTransaction.find({ userId }).sort({ createdAt: -1 });
+    res.json(history);
+  } catch (error) {
+    console.error('Get coin history error:', error);
+    res.status(500).json({ message: 'Lỗi khi lấy lịch sử giao dịch xu' });
+  }
+});
+
+// ===== COINS: Tạo link nạp xu (MoMo / PayOS) =====
+router.post('/coins/create-topup', async (req, res) => {
+  try {
+    const { userId, amount, paymentMethod } = req.body;
+
+    if (!userId || !amount || !paymentMethod) {
+      return res.status(400).json({ message: 'Thiếu thông tin bắt buộc' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+
+    const coinsToCredit = Math.floor(amount / 1000);
+    if (coinsToCredit <= 0) {
+      return res.status(400).json({ message: 'Số tiền nạp tối thiểu là 1.000đ (tương đương 1 Xu)' });
+    }
+
+    // 1. Tạo bản ghi giao dịch xu tạm thời ở trạng thái pending
+    const coinTx = await CoinTransaction.create({
+      userId,
+      amount,
+      coins: coinsToCredit,
+      type: 'topup',
+      paymentMethod,
+      status: 'pending',
+      description: `Nạp ${coinsToCredit} Xu qua cổng ${paymentMethod.toUpperCase()}`
+    });
+
+    const serverOrigin = `${req.protocol}://${req.get('host')}`;
+    const frontendUrl = serverOrigin.includes('localhost')
+      ? 'http://localhost:3000'
+      : serverOrigin;
+
+    if (paymentMethod === 'momo') {
+      const redirectUrl = momoConfig.redirectUrl.includes('localhost')
+        ? `${serverOrigin}/api/payment/momo/return`
+        : momoConfig.redirectUrl;
+      const ipnUrl = momoConfig.ipnUrl.includes('localhost')
+        ? `${serverOrigin}/api/payment/momo/ipn`
+        : momoConfig.ipnUrl;
+
+      const orderId = `TOPUP_${userId}_${coinTx._id}`;
+      const orderInfo = `Nap ${coinsToCredit} Xu vao tai khoan FoodServe`;
+      const requestId = orderId;
+      const requestType = 'payWithMethod';
+      const extraData = '';
+      const autoCapture = true;
+      const lang = 'vi';
+
+      const rawSignature =
+        'accessKey=' + momoConfig.accessKey +
+        '&amount=' + amount +
+        '&extraData=' + extraData +
+        '&ipnUrl=' + ipnUrl +
+        '&orderId=' + orderId +
+        '&orderInfo=' + orderInfo +
+        '&partnerCode=' + momoConfig.partnerCode +
+        '&redirectUrl=' + redirectUrl +
+        '&requestId=' + requestId +
+        '&requestType=' + requestType;
+
+      const signature = crypto
+        .createHmac('sha256', momoConfig.secretKey)
+        .update(rawSignature)
+        .digest('hex');
+
+      const requestBody = JSON.stringify({
+        partnerCode: momoConfig.partnerCode,
+        partnerName: 'FoodServe',
+        storeId: 'FoodServeStore',
+        requestId: requestId,
+        amount: amount,
+        orderId: orderId,
+        orderInfo: orderInfo,
+        redirectUrl: redirectUrl,
+        ipnUrl: ipnUrl,
+        lang: lang,
+        requestType: requestType,
+        autoCapture: autoCapture,
+        extraData: extraData,
+        signature: signature,
+      });
+
+      const options = {
+        hostname: 'test-payment.momo.vn',
+        port: 443,
+        path: '/v2/gateway/api/create',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(requestBody),
+        },
+      };
+
+      const momoRes = await new Promise((resolve, reject) => {
+        const momoReq = https.request(options, (momoResponse) => {
+          let data = '';
+          momoResponse.on('data', (chunk) => { data += chunk; });
+          momoResponse.on('end', () => resolve(JSON.parse(data)));
+        });
+        momoReq.on('error', reject);
+        momoReq.write(requestBody);
+        momoReq.end();
+      });
+
+      if (momoRes.resultCode === 0) {
+        // Cập nhật referenceId bằng orderId của MoMo
+        coinTx.referenceId = orderId;
+        await coinTx.save();
+
+        res.json({
+          success: true,
+          paymentUrl: momoRes.payUrl,
+          transactionId: coinTx._id
+        });
+      } else {
+        coinTx.status = 'failed';
+        await coinTx.save();
+        res.status(400).json({ message: 'Lỗi tạo cổng MoMo: ' + momoRes.message });
+      }
+      return;
+    }
+
+    if (paymentMethod === 'payos') {
+      const payOSInstance = await getPayOSInstance();
+      if (!payOSInstance) {
+        // Nếu chưa cấu hình PayOS -> sử dụng Mock / Giả lập thanh toán
+        const orderCode = Number(String(Date.now()).slice(-8) + Math.floor(10 + Math.random() * 90));
+        coinTx.referenceId = orderCode.toString();
+        coinTx.description = `Nạp ${coinsToCredit} Xu (Giả lập QR)`;
+        await coinTx.save();
+
+        const settings = await SystemSetting.findOne();
+        const adminBankName = settings?.adminBankName || 'Techcombank';
+        const adminAccountNumber = settings?.adminAccountNumber || '509868686868';
+        const adminAccountName = settings?.adminAccountName || 'VU VAN QUYEN';
+        
+        const binMap = {
+          'Techcombank': '970407',
+          'Vietcombank': '970436',
+          'MBBank': '970422',
+          'VietinBank': '970415',
+          'BIDV': '970418',
+          'Agribank': '970405',
+          'ACB': '970416'
+        };
+        const bin = binMap[adminBankName] || '970407';
+
+        return res.json({
+          success: true,
+          isDemo: true,
+          orderCode: orderCode,
+          bin: bin,
+          accountNumber: adminAccountNumber,
+          accountName: adminAccountName,
+          amount: Number(amount),
+          description: `Nap ${coinsToCredit} xu`.slice(0, 25)
+        });
+      }
+
+      // Nếu có PayOS thật
+      const orderCode = Number(String(Date.now()).slice(-8) + Math.floor(10 + Math.random() * 90));
+      const description = `Nap ${coinsToCredit} xu`.slice(0, 25);
+      const returnUrl = `${frontendUrl}/profile?success=true&tab=wallet&type=topup&method=payos&orderCode=${orderCode}`;
+      const cancelUrl = `${frontendUrl}/profile?success=false&tab=wallet&type=topup&method=payos&orderCode=${orderCode}`;
+
+      const paymentData = {
+        orderCode: orderCode,
+        amount: Number(amount),
+        description: description,
+        returnUrl: returnUrl,
+        cancelUrl: cancelUrl
+      };
+
+      const paymentLinkRes = await payOSInstance.paymentRequests.create(paymentData);
+      
+      coinTx.referenceId = orderCode.toString();
+      await coinTx.save();
+
+      res.json({
+        success: true,
+        paymentUrl: paymentLinkRes.checkoutUrl,
+        orderCode: orderCode
+      });
+      return;
+    }
+
+    res.status(400).json({ message: 'Phương thức thanh toán không được hỗ trợ' });
+  } catch (error) {
+    console.error('Create coin topup error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi khởi tạo nạp xu' });
+  }
+});
+
+// ===== COINS: Check status nạp xu VietQR (Chỉ dùng cho Demo / Giả lập hoặc đối soát nhanh) =====
+router.post('/coins/check-topup-status/:orderCode', async (req, res) => {
+  try {
+    const { orderCode } = req.params;
+    const coinTx = await CoinTransaction.findOne({ referenceId: orderCode });
+    if (!coinTx) {
+      return res.status(404).json({ message: 'Không tìm thấy giao dịch nạp xu này' });
+    }
+
+    if (coinTx.status === 'completed') {
+      return res.json({ success: true, message: 'Giao dịch đã hoàn tất trước đó', coins: coinTx.coins });
+    }
+
+    // Kiểm tra xem PayOS cấu hình thật hay demo
+    const payOSInstance = await getPayOSInstance();
+    let isPaid = false;
+
+    if (payOSInstance) {
+      const paymentInfo = await payOSInstance.paymentRequests.get(Number(orderCode));
+      if (paymentInfo.status === 'PAID') {
+        isPaid = true;
+      }
+    } else {
+      // Giả lập Demo: Tự động cho thành công sau khi click kiểm tra để test
+      isPaid = true;
+    }
+
+    if (isPaid) {
+      coinTx.status = 'completed';
+      await coinTx.save();
+
+      const user = await User.findById(coinTx.userId);
+      if (user) {
+        user.coins += coinTx.coins;
+        await user.save();
+
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`user-${user._id}`).emit('topup-success', {
+            coins: user.coins,
+            coinsAdded: coinTx.coins,
+            message: `Nạp xu thành công! Bạn nhận được ${coinTx.coins} xu.`
+          });
+        }
+
+        return res.json({
+          success: true,
+          coins: user.coins,
+          coinsAdded: coinTx.coins,
+          message: 'Thanh toán thành công và xu đã được cộng!'
+        });
+      }
+    }
+
+    res.json({ success: false, message: 'Giao dịch chưa được thanh toán hoặc đang xử lý' });
+  } catch (error) {
+    console.error('Check topup status error:', error);
+    res.status(500).json({ message: 'Lỗi kiểm tra trạng thái giao dịch' });
+  }
+});
+
 // ===== PAYOS: Thanh toán đơn hàng khách qua PayOS (VietQR) =====
 router.post('/payos/create-payment', async (req, res) => {
   try {
@@ -624,30 +950,60 @@ router.get('/payos/return', async (req, res) => {
     if (paymentInfo.status === 'PAID') {
       // Tìm và cập nhật order
       const order = await Order.findOne({ transactionId: orderCode.toString() });
-      if (order && order.paymentStatus !== 'paid') {
-        order.paymentStatus = 'paid';
-        order.paymentMethod = 'payos';
-        order.paidAt = new Date();
-        await order.save();
+      if (order) {
+        if (order.paymentStatus !== 'paid') {
+          order.paymentStatus = 'paid';
+          order.paymentMethod = 'payos';
+          order.paidAt = new Date();
+          await order.save();
 
-        // Emit thông báo real-time
-        const io = req.app.get('io');
-        if (io) {
-          io.emit('payment-confirmed', {
-            orderId: order._id,
-            paymentMethod: 'VietQR (PayOS) 🏦',
-            amount: order.finalAmount,
-            message: `Khách hàng đã thanh toán qua VietQR (PayOS) 🏦`
-          });
+          // Emit thông báo real-time
+          const io = req.app.get('io');
+          if (io) {
+            io.emit('payment-confirmed', {
+              orderId: order._id,
+              paymentMethod: 'VietQR (PayOS) 🏦',
+              amount: order.finalAmount,
+              message: `Khách hàng đã thanh toán qua VietQR (PayOS) 🏦`
+            });
+          }
+        }
+        res.redirect(`${frontendUrl}/payment-result?success=true&orderId=${order._id}&amount=${paymentInfo.amount}&transactionId=${orderCode}`);
+      } else {
+        // Có thể là nạp xu?
+        const coinTx = await CoinTransaction.findOne({ referenceId: orderCode.toString() });
+        if (coinTx) {
+          if (coinTx.status !== 'completed') {
+            coinTx.status = 'completed';
+            await coinTx.save();
+
+            const user = await User.findById(coinTx.userId);
+            if (user) {
+              user.coins += coinTx.coins;
+              await user.save();
+
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`user-${user._id}`).emit('topup-success', {
+                  coins: user.coins,
+                  coinsAdded: coinTx.coins,
+                  message: `Nạp xu thành công! Bạn nhận được ${coinTx.coins} xu.`
+                });
+              }
+            }
+          }
+          res.redirect(`${frontendUrl}/profile?success=true&tab=wallet&type=topup&amount=${paymentInfo.amount}`);
+        } else {
+          res.redirect(`${frontendUrl}/payment-result?success=false&responseCode=transaction_not_found`);
         }
       }
-      
-      const realOrderId = order ? order._id : '';
-      res.redirect(`${frontendUrl}/payment-result?success=true&orderId=${realOrderId}&amount=${paymentInfo.amount}&transactionId=${orderCode}`);
     } else {
       const order = await Order.findOne({ transactionId: orderCode.toString() });
-      const realOrderId = order ? order._id : '';
-      res.redirect(`${frontendUrl}/payment-result?success=false&orderId=${realOrderId}&responseCode=${paymentInfo.status}`);
+      if (order) {
+        res.redirect(`${frontendUrl}/payment-result?success=false&orderId=${order._id}&responseCode=${paymentInfo.status}`);
+      } else {
+        res.redirect(`${frontendUrl}/profile?success=false&error=payos_failed&responseCode=${paymentInfo.status}`);
+      }
     }
   } catch (error) {
     console.error('PayOS return error:', error);

@@ -10,6 +10,7 @@ import { getUserRank } from '../../utils/rankUtils'
 import { setSearchQuery } from '../../store/slices/restaurantSlice'
 import useUserCapabilities from '../../hooks/useUserCapabilities'
 import NotificationBell from '../ui/NotificationBell'
+import CoinWalletModal from '../profile/CoinWalletModal'
 
 const menuLinkClass =
   'flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-primary-50/60 dark:hover:bg-white/5 rounded-xl mx-2 transition-all duration-200'
@@ -24,6 +25,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [walletOpen, setWalletOpen] = useState(false)
   const menuRef = useRef(null)
   const { caps } = useUserCapabilities()
 
@@ -115,7 +117,13 @@ export default function Header() {
                     </span>
                   )
                 })()}
-                <span className="text-xs font-bold text-amber-500 ml-auto">🪙 {user?.coins || 0} Xu</span>
+                <button 
+                  type="button" 
+                  onClick={() => { closeMenu(); setWalletOpen(true); }}
+                  className="text-xs font-bold text-amber-500 hover:text-amber-600 transition-colors ml-auto flex items-center gap-1 hover:underline cursor-pointer"
+                >
+                  🪙 {user?.coins || 0} Xu (Nạp)
+                </button>
               </div>
             </div>
           )}
@@ -384,7 +392,13 @@ export default function Header() {
                       </div>
                       <div>
                         <p className="font-semibold dark:text-white">{user?.name || 'User'}</p>
-                        <p className="text-xs text-amber-500 font-bold">🪙 {user?.coins || 0} Xu</p>
+                        <button 
+                          type="button" 
+                          onClick={() => { dispatch(closeMobileMenu()); setWalletOpen(true); }}
+                          className="text-xs text-amber-500 font-bold hover:underline flex items-center gap-0.5 text-left"
+                        >
+                          🪙 {user?.coins || 0} Xu (Nạp)
+                        </button>
                       </div>
                     </div>
                     <button type="button" onClick={() => { dispatch(closeMobileMenu()); dispatch(logout()) }}
@@ -398,6 +412,8 @@ export default function Header() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <CoinWalletModal isOpen={walletOpen} onClose={() => setWalletOpen(false)} />
     </>
   )
 }

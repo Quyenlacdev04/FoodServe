@@ -8,12 +8,15 @@ import { updateProfile } from '../store/slices/authSlice'
 import { getUserRank } from '../utils/rankUtils'
 import { formatPrice } from '../data/mockData'
 import FoodBot from '../components/chatbot/FoodBot'
+import CoinWalletModal from '../components/profile/CoinWalletModal'
 
 export default function ProfilePage() {
   const { user, isAuthenticated, loading } = useSelector(s => s.auth)
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const [walletOpen, setWalletOpen] = useState(false)
 
   // Scroll đến FoodBot nếu URL có #foodbot
   useEffect(() => {
@@ -23,6 +26,31 @@ export default function ProfilePage() {
       }, 300)
     }
   }, [location.hash])
+
+  // Lắng nghe kết quả nạp xu
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const success = params.get('success')
+    const type = params.get('type')
+    const error = params.get('error')
+
+    if (type === 'topup') {
+      if (success === 'true') {
+        const amount = params.get('amount')
+        const coinsAdded = amount ? Math.floor(Number(amount) / 1000) : 0
+        toast.success(`Nạp xu thành công! +${coinsAdded} Xu đã được cộng vào tài khoản.`, {
+          icon: '🪙',
+          duration: 5000
+        })
+        setWalletOpen(true)
+        navigate('/profile', { replace: true })
+      } else if (success === 'false') {
+        toast.error(error === 'momo_failed' ? 'Thanh toán qua MoMo thất bại.' : 'Nạp xu thất bại. Vui lòng thử lại.')
+        setWalletOpen(true)
+        navigate('/profile', { replace: true })
+      }
+    }
+  }, [location.search, navigate])
 
   const [formData, setFormData] = useState({
     name: '',
@@ -164,7 +192,16 @@ export default function ProfilePage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-500 text-sm">💰 Ví Xu</span>
-                <span className="font-bold text-yellow-500">{user.coins || 0} Xu</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-yellow-500">{user.coins || 0} Xu</span>
+                  <button 
+                    type="button"
+                    onClick={() => setWalletOpen(true)}
+                    className="px-2.5 py-1 bg-yellow-500 hover:bg-yellow-600 text-white text-[10px] font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+                  >
+                    Nạp Xu
+                  </button>
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-500 text-sm">🛒 Đã chi</span>
@@ -403,6 +440,8 @@ export default function ProfilePage() {
           <FoodBot />
         </div>
       </div>
+
+      <CoinWalletModal isOpen={walletOpen} onClose={() => setWalletOpen(false)} />
     </div>
   )
 }
