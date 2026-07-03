@@ -98,6 +98,13 @@ export default function GroupOrderPage() {
     socket.emit('join-group-order', code.toUpperCase())
 
     socket.on('group-order-updated', (updatedSession) => {
+      // Check if current user is still in members (exclude host)
+      const isStillMember = updatedSession.members.some(m => m.userId === user?._id)
+      if (!isStillMember && updatedSession.hostId !== user?._id) {
+        toast.error('Bạn đã bị chủ phòng mời ra khỏi nhóm đặt chung!')
+        navigate('/')
+        return
+      }
       setSession(updatedSession)
       if (updatedSession.status === 'ordered' && updatedSession.orderId) {
         fetchSplitBill(updatedSession.orderId)
@@ -113,7 +120,7 @@ export default function GroupOrderPage() {
     return () => {
       socket.disconnect()
     }
-  }, [code])
+  }, [code, user?._id, navigate])
 
   const fetchSplitBill = async (orderId) => {
     try {
@@ -185,6 +192,31 @@ export default function GroupOrderPage() {
       if (!res.ok) {
         const err = await res.json()
         toast.error(err.message || 'Lỗi cập nhật món ăn')
+      }
+    } catch (e) {
+      toast.error('Lỗi kết nối')
+    }
+  }
+
+  const handleKickMember = async (userIdToKick, memberName) => {
+    if (!session || session.status !== 'active') return
+    if (!window.confirm(`Bạn có chắc chắn muốn đuổi ${memberName} khỏi phòng đặt chung không?`)) return
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/group-orders/kick`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: code.toUpperCase(),
+          hostId: user._id,
+          userIdToKick
+        })
+      })
+      if (res.ok) {
+        toast.success(`Đã mời ${memberName} ra khỏi phòng!`)
+      } else {
+        const err = await res.json()
+        toast.error(err.message || 'Lỗi khi đuổi thành viên')
       }
     } catch (e) {
       toast.error('Lỗi kết nối')
@@ -441,6 +473,16 @@ export default function GroupOrderPage() {
                           <span className="font-bold text-sm text-gray-800 dark:text-gray-200">
                             {group.name} {userId === user._id && <span className="text-[10px] text-gray-400 font-normal">(Bạn)</span>}
                           </span>
+                          {isHost && userId !== user?._id && session.status === 'active' && (
+                            <button
+                              type="button"
+                              onClick={() => handleKickMember(userId, group.name)}
+                              className="ml-2 text-red-500 hover:text-red-600 transition-colors text-[10px] font-bold border border-red-500/20 hover:border-red-500/40 px-2 py-0.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer"
+                              title="Đuổi khỏi phòng"
+                            >
+                              Đuổi
+                            </button>
+                          )}
                           <span className="text-xs font-black text-primary-500 ml-auto">{formatPrice(group.total)}</span>
                         </div>
 

@@ -198,7 +198,47 @@ router.post('/lock', async (req, res) => {
   }
 });
 
-// 6. Xử lý đặt đơn hàng nhóm & Chia hóa đơn (Checkout)
+// 6. Đuổi thành viên khỏi phòng đặt chung (Chỉ Host mới có quyền)
+router.post('/kick', async (req, res) => {
+  try {
+    const { code, hostId, userIdToKick } = req.body;
+    if (!code || !hostId || !userIdToKick) {
+      return res.status(400).json({ message: 'Thiếu thông tin đuổi thành viên khỏi phòng' });
+    }
+
+    const session = await GroupOrderSession.findOne({ code: code.toUpperCase() });
+    if (!session) {
+      return res.status(404).json({ message: 'Không tìm thấy phòng đặt chung' });
+    }
+
+    if (session.hostId !== hostId) {
+      return res.status(403).json({ message: 'Chỉ chủ phòng mới có quyền đuổi thành viên' });
+    }
+
+    if (userIdToKick === hostId) {
+      return res.status(400).json({ message: 'Chủ phòng không thể tự đuổi chính mình' });
+    }
+
+    // Xóa thành viên
+    session.members = session.members.filter(m => m.userId !== userIdToKick);
+    // Xóa món ăn của thành viên này
+    session.items = session.items.filter(item => item.userId !== userIdToKick);
+
+    await session.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`group-order-${session.code}`).emit('group-order-updated', session);
+    }
+
+    res.json(session);
+  } catch (error) {
+    console.error('Kick member error:', error);
+    res.status(500).json({ message: 'Lỗi server khi đuổi thành viên khỏi phòng đặt chung' });
+  }
+});
+
+// 7. Xử lý đặt đơn hàng nhóm & Chia hóa đơn (Checkout)
 router.post('/checkout', async (req, res) => {
   try {
     const { code, hostId, deliveryAddress, contactPhone, deliveryFee, discount, paymentMethod } = req.body;
