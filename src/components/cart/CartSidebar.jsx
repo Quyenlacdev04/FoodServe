@@ -10,7 +10,7 @@ import toast from 'react-hot-toast'
 
 export default function CartSidebar() {
   const dispatch = useDispatch()
-  const { items, isOpen, voucher, discount } = useSelector((s) => s.cart)
+  const { items = [], isOpen, voucher, discount } = useSelector((s) => s.cart)
   const { user } = useSelector((s) => s.auth)
   const { healthyMode } = useSelector((s) => s.ui)
   const total = useSelector(selectCartTotal)
@@ -21,7 +21,7 @@ export default function CartSidebar() {
   const [isMaintenance, setIsMaintenance] = useState(false)
 
   // Tính toán tổng dinh dưỡng của các sản phẩm trong giỏ hàng
-  const cartNutrition = items.reduce((acc, item) => {
+  const cartNutrition = (items || []).reduce((acc, item) => {
     const cal = item.calories || 0;
     const prot = item.protein || 0;
     const carb = item.carbs || 0;
@@ -167,9 +167,8 @@ export default function CartSidebar() {
               </button>
             </div>
 
-            {/* Content List */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
-              {items.length === 0 ? (
+              {!items || items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center py-10">
                   <span className="text-6xl mb-4 filter drop-shadow-md">🛒</span>
                   <p className="text-gray-900 dark:text-white text-lg font-bold">Giỏ hàng trống</p>
@@ -177,7 +176,7 @@ export default function CartSidebar() {
                 </div>
               ) : (
                 <AnimatePresence mode="popLayout">
-                  {items.map((item) => (
+                  {(items || []).map((item) => (
                     <motion.div
                       key={item.id}
                       layout
@@ -233,7 +232,7 @@ export default function CartSidebar() {
               )}
 
               {/* BÁO CÁO DINH DƯỠNG GIỎ HÀNG (HEALTHY MODE) */}
-              {healthyMode && items.length > 0 && cartNutrition.calories > 0 && (
+              {healthyMode && items && items.length > 0 && cartNutrition.calories > 0 && (
                 <div className="mt-6 p-4 rounded-3xl bg-green-500/5 dark:bg-green-500/10 border border-green-500/15 space-y-3.5 shadow-inner">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-green-700 dark:text-green-400 flex items-center gap-1">
@@ -295,7 +294,7 @@ export default function CartSidebar() {
             </div>
 
             {/* Footer Summary & Vouchers */}
-            {items.length > 0 && (
+            {items && items.length > 0 && (
               <div className="border-t border-gray-100 dark:border-white/5 p-5 space-y-4 bg-gray-50/30 dark:bg-dark-100/10">
                 {/* Apply Voucher Code */}
                 <div className="flex gap-2">
