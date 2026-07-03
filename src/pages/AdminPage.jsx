@@ -15,6 +15,7 @@ import AdminVouchers from '../components/admin/AdminVouchers'
 import NotificationBell from '../components/ui/NotificationBell'
 import { logout } from '../store/slices/authSlice'
 import { toggleDarkMode } from '../store/slices/uiSlice'
+import { showBrowserNotification } from '../utils/webNotification'
 
 const statusMap = {
   pending: { label: 'Chờ xác nhận', color: 'bg-yellow-500/10 text-yellow-500' },
@@ -72,6 +73,17 @@ export default function AdminPage() {
       setNewOrderAlert(order)
       setUnreadOrders(prev => prev + 1)
       fetchOrders()
+
+      // 🔔 Web Push Notification cho admin (khi tab ở nền)
+      showBrowserNotification({
+        title: '🛒 Đơn hàng mới!',
+        body: `Đơn #${String(order?._id || '').slice(-6).toUpperCase()} — ${order?.deliveryAddress || 'Đơn hàng mới'}`,
+        type: 'order_new',
+        tag: `admin-new-order-${order?._id || Date.now()}`,
+        data: { orderId: order?._id },
+        onClick: () => window.focus()
+      })
+
       setTimeout(() => setNewOrderAlert(null), 8000)
     })
 

@@ -23,6 +23,7 @@ import { updateUser } from '../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { formatPrice } from '../data/mockData';
 import DemandHeatmap from '../components/analytics/DemandHeatmap';
+import { showBrowserNotification } from '../utils/webNotification';
 
 // Fix Leaflet default icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -994,6 +995,16 @@ export default function ShipperDashboardPage() {
           osc.stop(ctx.currentTime + i * 0.15 + 0.3);
         });
       } catch {}
+
+      // 🔔 Web Push Notification cho shipper (khi tab ở nền)
+      showBrowserNotification({
+        title: '🛒 Đơn hàng mới!',
+        body: `Có đơn hàng mới cần giao${order?.restaurantName ? ` từ ${order.restaurantName}` : ''}. Nhấn để xem chi tiết.`,
+        type: 'order_new',
+        tag: `shipper-new-order-${order?._id || Date.now()}`,
+        data: { orderId: order?._id },
+        onClick: () => window.focus()
+      });
 
       // Hiển thị popup đơn hàng mới
       setIncomingOrder(order);

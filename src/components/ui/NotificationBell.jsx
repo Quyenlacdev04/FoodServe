@@ -1,11 +1,19 @@
 import { API_BASE_URL, SOCKET_URL } from '../../config/api.js'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiBell, FiCheck, FiX, FiTrash2 } from 'react-icons/fi'
+import { FiBell, FiCheck, FiX, FiTrash2, FiBellOff } from 'react-icons/fi'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
+import {
+  isNotificationSupported,
+  getPermissionStatus,
+  requestNotificationPermission,
+  showBrowserNotification,
+  saveNotificationPreference,
+  getUserNotificationPreference
+} from '../../utils/webNotification'
 
 export default function NotificationBell() {
   const navigate = useNavigate()
@@ -14,6 +22,10 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [showDropdown, setShowDropdown] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // Web Notification state
+  const [pushEnabled, setPushEnabled] = useState(() => getUserNotificationPreference())
+  const [permissionStatus, setPermissionStatus] = useState(() => getPermissionStatus())
 
   const handleNotificationClick = async (notif) => {
     // Đánh dấu đã đọc trước
@@ -46,7 +58,7 @@ export default function NotificationBell() {
   }
 
   // Tạo âm thanh thông báo
-  const playNotificationSound = () => {
+  const playNotificationSound = useCallback(() => {
     try {
       // Tạo âm thanh bằng Web Audio API
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
@@ -82,7 +94,42 @@ export default function NotificationBell() {
     } catch (error) {
       console.log('Cannot play notification sound:', error)
     }
-  }
+  }, [])
+
+  // Toggle Web Push Notification
+  const handleTogglePush = useCallback(async () => {
+    if (!isNotificationSupported()) {
+      toast.error('Trình duyệt của bạn không hỗ trợ thông báo đẩy')
+      return
+    }
+
+    if (pushEnabled) {
+      // Tắt thông báo đẩy
+      setPushEnabled(false)
+      saveNotificationPreference(false)
+      toast.success('Đã tắt thông báo đẩy trên trình duyệt', { icon: '🔕' })
+    } else {
+      // Bật thông báo đẩy - cần xin quyền
+      const status = await requestNotificationPermission()
+      setPermissionStatus(status)
+
+      if (status === 'granted') {
+        setPushEnabled(true)
+        saveNotificationPreference(true)
+        toast.success('Đã bật thông báo đẩy! Bạn sẽ nhận thông báo ngay cả khi chuyển tab.', { icon: '🔔', duration: 4000 })
+        
+        // Gửi thông báo test
+        showBrowserNotification({
+          title: 'FoodServe',
+          body: '✨ Thông báo đẩy đã được kích hoạt thành công!',
+          type: 'order_status',
+          tag: 'push-test'
+        })
+      } else if (status === 'denied') {
+        toast.error('Bạn đã chặn quyền thông báo. Vui lòng vào Cài đặt trình duyệt để cho phép.', { duration: 6000 })
+      }
+    }
+  }, [pushEnabled])
 
   useEffect(() => {
     if (!user) return
@@ -100,10 +147,32 @@ export default function NotificationBell() {
       // Play notification sound
       playNotificationSound()
       
-      // Show toast
+      // Show toast (hiển thị khi tab đang active)
       toast.success(notification.title, {
         icon: getNotificationIcon(notification.type),
         duration: 4000
+      })
+
+      // 🔔 Hiển thị Web Push Notification (hiển thị khi tab ở nền)
+      showBrowserNotification({
+        title: notification.title,
+        body: notification.message,
+        type: notification.type,
+        tag: `notif-${notification._id || Date.now()}`,
+        data: notification.data,
+        onClick: () => {
+          // Khi click vào push notification, điều hướng
+          const orderId = notification.data?.orderId
+          const restaurantId = notification.data?.restaurantId
+          if (orderId) {
+            if (user?.role === 'admin') navigate('/admin')
+            else if (user?.role === 'shipper' || user?.role === 'driver') navigate('/shipper-dashboard')
+            else navigate('/tracking', { state: { orderId } })
+          } else if (restaurantId) {
+            if (user?.role === 'partner') navigate('/restaurant-manage')
+            else navigate(`/restaurant/${restaurantId}`)
+          }
+        }
       })
     })
 
@@ -113,6 +182,62 @@ export default function NotificationBell() {
     })
 
     return () => socket.disconnect()
+  }, [user, playNotificationSound, navigate])
+
+  // Tự động xin quyền nhẹ nhàng khi component mount lần đầu
+  useEffect(() => {
+    if (!user) return
+    if (!isNotificationSupported()) return
+    
+    const status = getPermissionStatus()
+    setPermissionStatus(status)
+    
+    // Nếu chưa hỏi lần nào (default) và user đã đăng nhập -> hiện gợi ý
+    if (status === 'default') {
+      // Đợi 10s rồi hiện gợi ý
+      const timer = setTimeout(() => {
+        toast((t) => (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-semibold text-gray-800">🔔 Bật thông báo đẩy?</p>
+            <p className="text-xs text-gray-500">Nhận thông báo đơn hàng ngay cả khi bạn chuyển tab</p>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  toast.dismiss(t.id)
+                  const result = await requestNotificationPermission()
+                  setPermissionStatus(result)
+                  if (result === 'granted') {
+                    setPushEnabled(true)
+                    toast.success('Đã bật thông báo đẩy!', { icon: '🔔' })
+                  }
+                }}
+                className="px-3 py-1.5 bg-primary-500 text-white text-xs font-bold rounded-lg hover:bg-primary-600 transition-colors"
+              >
+                Cho phép
+              </button>
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Để sau
+              </button>
+            </div>
+          </div>
+        ), {
+          duration: 15000,
+          position: 'bottom-right',
+          style: {
+            background: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+            padding: '16px',
+            border: '1px solid rgba(255,107,0,0.15)',
+          }
+        })
+      }, 10000)
+      
+      return () => clearTimeout(timer)
+    }
   }, [user])
 
   const fetchNotifications = async () => {
@@ -204,7 +329,17 @@ export default function NotificationBell() {
     return `${days} ngày trước`
   }
 
+  // Nhãn trạng thái quyền push
+  const getPushStatusLabel = () => {
+    if (!isNotificationSupported()) return { text: 'Không hỗ trợ', color: 'text-gray-400' }
+    if (permissionStatus === 'denied') return { text: 'Đã chặn', color: 'text-red-500' }
+    if (pushEnabled && permissionStatus === 'granted') return { text: 'Đang bật', color: 'text-green-500' }
+    return { text: 'Đang tắt', color: 'text-gray-400' }
+  }
+
   if (!user) return null
+
+  const pushStatus = getPushStatusLabel()
 
   return (
     <div className="relative">
@@ -239,16 +374,60 @@ export default function NotificationBell() {
               className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-dark-200 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 z-50 overflow-hidden"
             >
               {/* Header */}
-              <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
-                <h3 className="font-bold text-lg dark:text-white">Thông báo</h3>
-                {unreadCount > 0 && (
+              <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-lg dark:text-white">Thông báo</h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-xs text-primary-500 hover:underline font-semibold"
+                    >
+                      Đánh dấu tất cả đã đọc
+                    </button>
+                  )}
+                </div>
+
+                {/* Web Push Notification Toggle */}
+                <div className="mt-3 flex items-center justify-between bg-gray-50 dark:bg-dark-100 rounded-xl px-3 py-2.5 border border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      pushEnabled && permissionStatus === 'granted'
+                        ? 'bg-gradient-to-br from-primary-400 to-primary-600 shadow-md'
+                        : 'bg-gray-200 dark:bg-gray-700'
+                    }`}>
+                      {pushEnabled && permissionStatus === 'granted'
+                        ? <FiBell className="text-white text-sm" />
+                        : <FiBellOff className="text-gray-400 text-sm" />
+                      }
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold dark:text-white leading-tight">Thông báo đẩy</p>
+                      <p className={`text-[10px] font-semibold ${pushStatus.color}`}>{pushStatus.text}</p>
+                    </div>
+                  </div>
                   <button
-                    onClick={markAllAsRead}
-                    className="text-xs text-primary-500 hover:underline font-semibold"
+                    onClick={handleTogglePush}
+                    disabled={permissionStatus === 'denied'}
+                    className={`relative w-11 h-6 rounded-full transition-all duration-300 ${
+                      pushEnabled && permissionStatus === 'granted'
+                        ? 'bg-primary-500'
+                        : 'bg-gray-300 dark:bg-gray-600'
+                    } ${permissionStatus === 'denied' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    title={
+                      permissionStatus === 'denied' 
+                        ? 'Bạn đã chặn quyền thông báo trong trình duyệt. Vui lòng vào Cài đặt trình duyệt để thay đổi.' 
+                        : pushEnabled ? 'Tắt thông báo đẩy' : 'Bật thông báo đẩy'
+                    }
                   >
-                    Đánh dấu tất cả đã đọc
+                    <motion.div
+                      className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md"
+                      animate={{
+                        left: pushEnabled && permissionStatus === 'granted' ? '22px' : '2px'
+                      }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    />
                   </button>
-                )}
+                </div>
               </div>
 
               {/* Notifications List */}
