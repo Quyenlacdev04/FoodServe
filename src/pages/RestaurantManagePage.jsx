@@ -7,7 +7,8 @@ import {
   FiHome, FiPlus, FiEdit, FiTrash2, FiShoppingBag, 
   FiLayers, FiDollarSign, FiClock, FiCheckCircle, 
   FiXCircle, FiTrendingUp, FiSave, FiEye, FiSettings,
-  FiCreditCard, FiImage, FiAlertTriangle, FiRefreshCw, FiMessageCircle
+  FiCreditCard, FiImage, FiAlertTriangle, FiRefreshCw, FiMessageCircle,
+  FiMap
 } from 'react-icons/fi'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
@@ -16,6 +17,7 @@ import { updateUser } from '../store/slices/authSlice'
 import ImageUpload from '../components/ui/ImageUpload'
 import RestaurantAnalytics from '../components/analytics/RestaurantAnalytics'
 import ChatButton from '../components/chat/ChatButton'
+import DemandHeatmap from '../components/analytics/DemandHeatmap'
 
 const orderStatusMap = {
   pending: { label: 'Chờ xác nhận', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' },
@@ -862,6 +864,16 @@ export default function RestaurantManagePage() {
               <FiTrendingUp className="text-lg" /> Báo cáo thống kê
             </button>
             <button 
+              onClick={() => setActiveTab('heatmap')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-bold transition-all ${
+                activeTab === 'heatmap' 
+                  ? 'bg-primary-500 text-white shadow-glow shadow-primary-500/20' 
+                  : 'bg-white dark:bg-dark-200 hover:bg-gray-100 dark:hover:bg-dark-100 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <FiMap className="text-lg" /> Bản đồ nhiệt dự báo
+            </button>
+            <button 
               onClick={() => setActiveTab('menu')} 
               className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-bold transition-all ${
                 activeTab === 'menu' 
@@ -1015,6 +1027,17 @@ export default function RestaurantManagePage() {
                   <p className="text-sm text-gray-400">Phân tích doanh thu, món bán chạy và giờ cao điểm</p>
                 </div>
                 <RestaurantAnalytics restaurantId={restaurant._id} />
+              </div>
+            )}
+
+            {/* BẢN ĐỒ NHIỆT DỰ BÁO TAB */}
+            {activeTab === 'heatmap' && (
+              <div className="space-y-6">
+                <DemandHeatmap 
+                  role="merchant" 
+                  restaurantId={restaurant._id} 
+                  restaurantLocation={restaurant.location} 
+                />
               </div>
             )}
 

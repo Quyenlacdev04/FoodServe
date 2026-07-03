@@ -7,7 +7,8 @@ import {
   FiHome, FiPackage, FiTruck, FiDollarSign, FiStar, FiUser,
   FiPhone, FiCamera, FiSave, FiLock, FiEye, FiEyeOff, FiClock,
   FiCheckCircle, FiMapPin, FiNavigation, FiChevronDown, FiChevronUp,
-  FiAward, FiGift, FiChevronLeft, FiChevronRight, FiX, FiZap, FiBell
+  FiAward, FiGift, FiChevronLeft, FiChevronRight, FiX, FiZap, FiBell,
+  FiMap
 } from 'react-icons/fi';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -19,6 +20,7 @@ import ChatButton from '../components/chat/ChatButton';
 import { updateUser } from '../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { formatPrice } from '../data/mockData';
+import DemandHeatmap from '../components/analytics/DemandHeatmap';
 
 // Fix Leaflet default icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -972,6 +974,7 @@ export default function ShipperDashboardPage() {
     { id: 'home',      label: 'Trang chủ', icon: FiHome },
     { id: 'available', label: 'Đơn hàng',  icon: FiPackage },
     { id: 'active',    label: 'Đang giao', icon: FiTruck },
+    { id: 'heatmap',   label: 'Nhiệt',     icon: FiMap },
     { id: 'history',   label: 'Lịch sử',   icon: FiClock },
     { id: 'profile',   label: 'Tôi',       icon: FiUser },
   ];
@@ -1111,6 +1114,7 @@ export default function ShipperDashboardPage() {
           <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-dark-300">
             {activeTab === 'available' && <div className="p-4"><AvailableOrders shipperId={user?._id || user?.id} onOrderAccepted={() => setActiveTab('active')} isOnline={isOnline} shipperLocation={position ? { lat: position[0], lng: position[1] } : null} /></div>}
             {activeTab === 'active' && <div className="p-4"><ActiveDelivery shipperId={user?._id || user?.id} onDeliveryCompleted={() => { setActiveTab('available'); fetchStats(); }} onOrderChange={id => setActiveOrderId(id)} /></div>}
+            {activeTab === 'heatmap' && <div className="p-4"><DemandHeatmap role="shipper" shipperLocation={position} /></div>}
             {activeTab === 'history' && <ShipperHistory shipperId={user?._id || user?.id} />}
             {activeTab === 'profile' && <ShipperProfile user={user} onNavigate={setActiveTab} />}
           </div>
@@ -1119,7 +1123,7 @@ export default function ShipperDashboardPage() {
 
       {/* BOTTOM NAV */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-2xl z-[600] bg-white border-t border-gray-200 shadow-2xl">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
