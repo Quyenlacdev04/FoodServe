@@ -163,14 +163,22 @@ export default function RestaurantPage() {
               </div>
             )}
             {!isExpired && (
-              <button
-                type="button"
-                onClick={handleStartGroupOrder}
-                disabled={groupLoading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-amber-500 text-white text-xs font-black shadow-lg hover:shadow-glow transition-all active:scale-95 disabled:opacity-60 cursor-pointer border border-white/10"
-              >
-                👥 {groupLoading ? 'Đang tạo...' : 'Đặt nhóm (Split Bill)'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleStartGroupOrder}
+                  disabled={groupLoading}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-amber-500 text-white text-xs font-black shadow-lg hover:shadow-glow transition-all active:scale-95 disabled:opacity-60 cursor-pointer border border-white/10"
+                >
+                  👥 {groupLoading ? 'Đang tạo...' : 'Đặt nhóm (Split Bill)'}
+                </button>
+                <Link
+                  to={`/subscriptions?restaurantId=${selectedRestaurant._id || selectedRestaurant.id}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-green-500 to-teal-500 text-white text-xs font-black shadow-lg hover:shadow-glow transition-all active:scale-95 cursor-pointer border border-white/10"
+                >
+                  📅 Đăng ký gói ăn (Tiết kiệm 20%)
+                </Link>
+              </>
             )}
           </div>
         </div>

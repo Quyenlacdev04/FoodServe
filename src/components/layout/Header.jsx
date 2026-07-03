@@ -169,6 +169,7 @@ export default function Header() {
               <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tài khoản</p>
               <Link to="/profile" onClick={closeMenu} className={menuLinkClass}>👤 Hồ sơ của tôi</Link>
               <Link to="/profile#foodbot" onClick={closeMenu} className={`${menuLinkClass} !text-primary-500 font-semibold`}>🤖 FoodBot AI</Link>
+              <Link to="/subscriptions" onClick={closeMenu} className={menuLinkClass}>📅 Đăng ký gói ăn</Link>
               <Link to="/favorites" onClick={closeMenu} className={menuLinkClass}>❤️ Yêu thích</Link>
               <Link to="/history" onClick={closeMenu} className={menuLinkClass}>📜 Lịch sử đơn hàng</Link>
               <Link to="/leaderboard" onClick={closeMenu} className={menuLinkClass}>🏆 Bảng xếp hạng</Link>
@@ -402,6 +403,7 @@ export default function Header() {
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-1 mt-4 mb-1">Tài khoản</p>
                     <Link to="/profile" onClick={() => dispatch(closeMobileMenu())} className="px-3 py-2.5 text-base text-gray-800 dark:text-white rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">👤 Hồ sơ</Link>
                     <Link to="/profile#foodbot" onClick={() => dispatch(closeMobileMenu())} className="px-3 py-2.5 text-base font-semibold text-primary-500 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 transition-colors">🤖 FoodBot AI</Link>
+                    <Link to="/subscriptions" onClick={() => dispatch(closeMobileMenu())} className="px-3 py-2.5 text-base text-gray-800 dark:text-white rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">📅 Đăng ký gói ăn</Link>
                     <Link to="/history" onClick={() => dispatch(closeMobileMenu())} className="px-3 py-2.5 text-base text-gray-800 dark:text-white rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">📜 Lịch sử đơn hàng</Link>
                     <Link to="/leaderboard" onClick={() => dispatch(closeMobileMenu())} className="px-3 py-2.5 text-base text-amber-500 font-bold rounded-xl hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors">🏆 Bảng xếp hạng</Link>
                     {user?.role === 'admin' && (

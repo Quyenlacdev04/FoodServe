@@ -29,6 +29,7 @@ import RestaurantManagePage from './pages/RestaurantManagePage'
 import MerchantOrdersPage from './pages/MerchantOrdersPage'
 import DriverRegisterPage from './pages/DriverRegisterPage'
 import ShipperDashboardPage from './pages/ShipperDashboardPage'
+import MealSubscriptionPage from './pages/MealSubscriptionPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { fetchRestaurants } from './store/slices/restaurantSlice'
 
@@ -112,6 +113,7 @@ function App() {
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/favorites" element={<FavoritesPage />} />
+                <Route path="/subscriptions" element={<MealSubscriptionPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="/partner-register" element={<PartnerRegisterPage />} />
                 <Route path="/driver-register" element={<DriverRegisterPage />} />

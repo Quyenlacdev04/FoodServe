@@ -216,6 +216,13 @@ export default function ProfilePage() {
                 <span className="font-bold text-green-600">{formatPrice(user.totalSpent || 0)}</span>
               </div>
             </div>
+
+            <Link
+              to="/subscriptions"
+              className="w-full mt-4 py-3 bg-gradient-primary hover:shadow-glow text-white text-xs font-black rounded-2xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+            >
+              <FiCalendar /> Lên lịch & Đăng ký Gói Ăn
+            </Link>
           </div>
 
           {/* Cột phải: Form cập nhật */}

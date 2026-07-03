@@ -21,11 +21,13 @@ import reviewRoutes from './routes/reviews.js'
 import favoriteRoutes from './routes/favorites.js'
 import shipperRoutes from './routes/shipper.js'
 import { startVoucherExpiryJob } from './services/voucherExpiry.js'
+import { startMealSubscriptionJob } from './services/mealSubscriptionDispatcher.js'
 import messageRoutes from './routes/messages.js'
 import paymentRoutes from './routes/payment.js'
 import chatbotRoutes from './routes/chatbot.js'
 import voucherRoutes from './routes/vouchers.js'
 import groupOrderRoutes from './routes/groupOrders.js'
+import mealSubscriptionRoutes from './routes/mealSubscriptions.js'
 import { checkExpiringSubscriptions, checkOnStartup } from './utils/subscriptionChecker.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 import { requestLogger, cleanOldLogs } from './middleware/logger.js'
@@ -210,6 +212,7 @@ app.use('/api/group-orders', groupOrderRoutes)
 app.use('/api/chatbot', chatbotRoutes)
 app.use('/api/vouchers', voucherRoutes)
 app.use('/api/shipper', shipperRoutes)
+app.use('/api/meal-subscriptions', mealSubscriptionRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -282,4 +285,7 @@ httpServer.listen(PORT, () => {
   
   // Khởi động voucher expiry job
   startVoucherExpiryJob(io)
+
+  // Khởi động meal subscription automatic dispatch job
+  startMealSubscriptionJob(io)
 })
