@@ -19,7 +19,15 @@ const systemSettingSchema = new mongoose.Schema({
   // Cấu hình API PayOS của riêng admin
   payosClientId: { type: String, default: '' },
   payosApiKey: { type: String, default: '' },
-  payosChecksumKey: { type: String, default: '' }
+  payosChecksumKey: { type: String, default: '' },
+
+  // Cấu hình Hệ thống Voucher Động (Behavioral Marketing)
+  behavioralEnabled: { type: Boolean, default: true },
+  behavioralAbandonedCartCode: { type: String, default: 'SAVE15' },
+  behavioralAbandonedCartMin: { type: Number, default: 100000 },
+  behavioralFirstOrderCode: { type: String, default: 'NEW30' },
+  behavioralHighValueCode: { type: String, default: 'VIP100' },
+  behavioralHighValueThreshold: { type: Number, default: 250000 }
 }, { timestamps: true });
 
 export default mongoose.model('SystemSetting', systemSettingSchema);

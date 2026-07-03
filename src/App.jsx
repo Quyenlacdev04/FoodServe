@@ -9,6 +9,7 @@ import BottomNav from './components/layout/BottomNav'
 import CartSidebar from './components/cart/CartSidebar'
 import AuthModal from './components/auth/AuthModal'
 import LoadingScreen from './components/ui/LoadingScreen'
+import DynamicVoucherTrigger from './components/vouchers/DynamicVoucherTrigger'
 import MaintenanceBanner from './components/ui/MaintenanceBanner'
 import MaintenancePage from './pages/MaintenancePage'
 import HomePage from './pages/HomePage'
@@ -131,6 +132,7 @@ function App() {
                 <CartSidebar />
                 <AuthModal />
                 <BottomNav />
+                <DynamicVoucherTrigger />
               </>
             )}
           </>

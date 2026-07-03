@@ -254,6 +254,61 @@ export default function CartSidebar() {
                   </div>
                 )}
 
+                {/* DYNAMIC VOUCHER & BEHAVIORAL MARKETING SUGGESTIONS */}
+                {!voucher && (
+                  <div className="bg-gradient-to-r from-amber-50 to-orange-50/50 dark:from-dark-100 dark:to-orange-950/10 border border-orange-200/40 p-4 rounded-2xl space-y-3 shadow-sm">
+                    {/* A. VIP100 Upsell Target */}
+                    {total < 250000 ? (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-bold text-gray-700 dark:text-gray-300">
+                          <span className="flex items-center gap-1">🚀 Cần mua thêm: <b className="text-primary-500 font-sans">{formatPrice(250000 - total)}</b></span>
+                          <span className="text-[10px] text-gray-400">Ưu đãi VIP100</span>
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="w-full h-2 bg-gray-255/80 dark:bg-gray-800 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-primary rounded-full transition-all duration-500" 
+                            style={{ width: `${Math.min(100, (total / 250000) * 100)}%` }} 
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-normal">
+                          Đặt thêm để áp dụng mã <b>VIP100</b> nhận ngay ưu đãi giảm <b>100.000đ</b> cho đơn hàng!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[10px] bg-green-500 text-white font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">Đạt điều kiện</span>
+                          <h5 className="font-bold text-sm text-gray-900 dark:text-white mt-1">Sẵn sàng nhận giảm 100k!</h5>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Áp dụng ngay mã VIP100 cực khủng.</p>
+                        </div>
+                        <button
+                          onClick={() => handleApplyVoucher('VIP100')}
+                          className="flex-shrink-0 px-3.5 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-black rounded-xl shadow-md transition-all duration-200"
+                        >
+                          Áp dụng
+                        </button>
+                      </div>
+                    )}
+
+                    {/* B. First Order Suggestion */}
+                    {isAuthenticated && user && (user.totalSpent === 0 || !user.totalSpent) && total >= 100000 && (
+                      <div className="pt-2.5 border-t border-gray-200/30 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[10px] bg-primary-500 text-white font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">Quà bạn mới</span>
+                          <h5 className="font-bold text-xs text-gray-800 dark:text-white mt-1">Giảm ngay 30k cho bạn mới!</h5>
+                        </div>
+                        <button
+                          onClick={() => handleApplyVoucher('NEW30')}
+                          className="flex-shrink-0 px-3 py-1.5 bg-gradient-primary text-white text-[11px] font-black rounded-lg shadow-sm transition-all duration-200"
+                        >
+                          Dùng mã
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Summary calculation breakdown */}
                 <div className="space-y-2.5 text-sm border-t border-gray-100 dark:border-white/5 pt-4">
                   <div className="flex justify-between font-medium text-gray-500 dark:text-gray-400">

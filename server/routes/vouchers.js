@@ -149,6 +149,7 @@ router.post('/validate', async (req, res) => {
       'NEW30':   { type: 'fixed', value: 30000, minOrder: 100000, description: 'Giảm 30.000đ' },
       'VIP100':  { type: 'fixed', value: 100000, minOrder: 300000, description: 'Giảm 100.000đ' },
       'SALE20':  { type: 'fixed', value: 20000, minOrder: 0, description: 'Giảm 20.000đ' },
+      'SAVE15':  { type: 'percent', value: 15, minOrder: 100000, description: 'Giảm 15% tối đa 40k cho giỏ hàng bỏ quên', maxDiscount: 40000 },
     };
 
     let voucherData;

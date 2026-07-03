@@ -21,7 +21,13 @@ export default function AdminSettings() {
     adminAccountNumber: '509868686868',
     payosClientId: '',
     payosApiKey: '',
-    payosChecksumKey: ''
+    payosChecksumKey: '',
+    behavioralEnabled: true,
+    behavioralAbandonedCartCode: 'SAVE15',
+    behavioralAbandonedCartMin: 100000,
+    behavioralFirstOrderCode: 'NEW30',
+    behavioralHighValueCode: 'VIP100',
+    behavioralHighValueThreshold: 250000
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -178,6 +184,94 @@ export default function AdminSettings() {
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">Đơn hàng đạt giá trị này sẽ được miễn phí vận chuyển 100%.</p>
               </div>
+
+            </div>
+
+            {/* Cấu hình Hệ thống Voucher Động (Behavioral Marketing) */}
+            <div className="space-y-4 pt-6 border-t border-gray-150 dark:border-gray-800">
+              <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                <FiAward className="text-primary-500" /> Hệ thống Voucher Động (Behavioral Marketing)
+              </h4>
+
+              <div className="flex justify-between items-center bg-gray-50 dark:bg-dark-200 p-4 rounded-2xl">
+                <div>
+                  <h5 className="font-bold text-sm dark:text-white">Kích hoạt Hệ thống Voucher Động</h5>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Tự động gợi ý quà bạn mới, kích hoạt ưu đãi giỏ hàng bỏ quên và đẩy doanh số đơn giá trị cao.</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setSettings({ ...settings, behavioralEnabled: !settings.behavioralEnabled })}
+                  className={`w-12 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${
+                    settings.behavioralEnabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-700'
+                  }`}
+                >
+                  <motion.div 
+                    layout 
+                    className="bg-white w-5 h-5 rounded-full shadow-md"
+                    animate={{ x: settings.behavioralEnabled ? 20 : 0 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
+
+              {settings.behavioralEnabled && (
+                <div className="space-y-4 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Mã Giỏ hàng bỏ quên</label>
+                      <input 
+                        type="text" 
+                        value={settings.behavioralAbandonedCartCode} 
+                        onChange={e => setSettings({ ...settings, behavioralAbandonedCartCode: e.target.value.toUpperCase() })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 text-gray-900 dark:text-white font-mono font-bold uppercase outline-none focus:ring-2 focus:ring-primary-500 text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Đơn tối thiểu kích hoạt (đ)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={settings.behavioralAbandonedCartMin} 
+                        onChange={e => setSettings({ ...settings, behavioralAbandonedCartMin: parseInt(e.target.value) || 0 })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 text-gray-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-primary-500 text-sm" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Mã Quà tặng bạn mới</label>
+                      <input 
+                        type="text" 
+                        value={settings.behavioralFirstOrderCode} 
+                        onChange={e => setSettings({ ...settings, behavioralFirstOrderCode: e.target.value.toUpperCase() })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 text-gray-900 dark:text-white font-mono font-bold uppercase outline-none focus:ring-2 focus:ring-primary-500 text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Mã Giỏ hàng giá trị cao</label>
+                      <input 
+                        type="text" 
+                        value={settings.behavioralHighValueCode} 
+                        onChange={e => setSettings({ ...settings, behavioralHighValueCode: e.target.value.toUpperCase() })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 text-gray-900 dark:text-white font-mono font-bold uppercase outline-none focus:ring-2 focus:ring-primary-500 text-sm" 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Ngưỡng Giỏ hàng giá trị cao (đ)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={settings.behavioralHighValueThreshold} 
+                      onChange={e => setSettings({ ...settings, behavioralHighValueThreshold: parseInt(e.target.value) || 0 })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-200 text-gray-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-primary-500 text-sm" 
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Khi đạt ngưỡng này, hệ thống sẽ gợi ý/tự động kích hoạt mã giảm giá giá trị cao cho người dùng.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
