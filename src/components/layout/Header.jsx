@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiSearch, FiShoppingCart, FiUser, FiSun, FiMoon, FiMenu, FiX, FiChevronDown } from 'react-icons/fi'
+import { FiSearch, FiShoppingCart, FiUser, FiSun, FiMoon, FiMenu, FiX, FiChevronDown, FiUsers } from 'react-icons/fi'
+import toast from 'react-hot-toast'
 import { toggleDarkMode, openAuthModal, toggleMobileMenu, closeMobileMenu } from '../../store/slices/uiSlice'
 import { toggleCart, selectCartCount } from '../../store/slices/cartSlice'
 import { logout } from '../../store/slices/authSlice'
@@ -26,6 +27,8 @@ export default function Header() {
   const [searchText, setSearchText] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [walletOpen, setWalletOpen] = useState(false)
+  const [joinGroupModalOpen, setJoinGroupModalOpen] = useState(false)
+  const [groupCodeInput, setGroupCodeInput] = useState('')
   const menuRef = useRef(null)
   const { caps } = useUserCapabilities()
 
@@ -239,6 +242,18 @@ export default function Header() {
 
             {/* Actions */}
             <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0">
+              {isAuthenticated && (
+                <button 
+                  type="button" 
+                  onClick={() => setJoinGroupModalOpen(true)} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-primary-500 to-amber-500 hover:from-primary-600 hover:to-amber-600 text-white rounded-2xl text-xs font-black shadow-md cursor-pointer border border-white/10 active:scale-95 transition-all mr-1"
+                  aria-label="Tham gia đặt nhóm"
+                >
+                  <FiUsers className="text-sm animate-pulse" />
+                  <span className="hidden sm:inline">Đặt nhóm</span>
+                </button>
+              )}
+
               <button type="button" onClick={() => dispatch(toggleDarkMode())} className={iconBtnClass} aria-label="Toggle dark mode">
                 {darkMode
                   ? <FiSun className="text-xl text-amber-400" />
@@ -408,6 +423,70 @@ export default function Header() {
                   </>
                 )}
               </nav>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Group Join Modal */}
+      <AnimatePresence>
+        {joinGroupModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setJoinGroupModalOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-dark-200 rounded-3xl p-6 max-w-sm w-full border border-gray-100 dark:border-gray-800 shadow-glow relative"
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                👥 Tham gia nhóm đặt chung
+              </h3>
+              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                Nhập mã phòng đặt chung gồm 6 ký tự (Ví dụ: ABCD12) từ bạn bè của bạn để bắt đầu đặt món chung.
+              </p>
+              
+              <div className="mt-4">
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="MÃ PHÒNG (6 KÝ TỰ)"
+                  value={groupCodeInput}
+                  onChange={e => setGroupCodeInput(e.target.value.toUpperCase())}
+                  className="w-full text-center px-4 py-3 rounded-2xl bg-gray-50 dark:bg-dark-100 border border-gray-200 dark:border-gray-800 font-mono text-lg font-black tracking-widest text-primary-500 uppercase focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setJoinGroupModalOpen(false)}
+                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-dark-100 dark:hover:bg-dark-100/80 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-xs transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (groupCodeInput.trim().length !== 6) {
+                      toast.error('Mã phòng phải có độ dài đúng 6 ký tự!')
+                      return
+                    }
+                    setJoinGroupModalOpen(false)
+                    navigate(`/group-order/${groupCodeInput.toUpperCase().trim()}`)
+                    setGroupCodeInput('')
+                  }}
+                  className="flex-1 py-2.5 bg-gradient-primary hover:bg-primary-600 text-white font-bold rounded-xl text-xs shadow-md transition-all active:scale-95"
+                >
+                  Vào phòng
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

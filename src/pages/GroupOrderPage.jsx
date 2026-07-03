@@ -1,7 +1,8 @@
 import { API_BASE_URL } from '../config/api.js'
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
+import { openAuthModal } from '../store/slices/uiSlice'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiUsers, FiCopy, FiLock, FiUnlock, FiShoppingBag, FiCheckCircle, FiPlus, FiMinus, FiInfo, FiTrash2, FiMapPin, FiPhone, FiDollarSign } from 'react-icons/fi'
 import toast from 'react-hot-toast'
@@ -11,6 +12,7 @@ import { formatPrice } from '../data/mockData'
 export default function GroupOrderPage() {
   const { code } = useParams()
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const { user, isAuthenticated } = useSelector((s) => s.auth)
   
   const [session, setSession] = useState(null)
@@ -28,14 +30,6 @@ export default function GroupOrderPage() {
   const [splitBillData, setSplitBillData] = useState(null)
   
   const socketRef = useRef(null)
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      toast.error('Vui lòng đăng nhập để tham gia đặt chung!')
-      navigate('/')
-    }
-  }, [isAuthenticated, navigate])
 
   // 1. Fetch group order session and menu
   useEffect(() => {
@@ -249,6 +243,36 @@ export default function GroupOrderPage() {
     }
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-300 pt-24 px-4">
+        <div className="bg-white dark:bg-dark-200 border border-gray-100 dark:border-gray-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-glow">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary-500 to-amber-500 flex items-center justify-center text-white text-3xl shadow-lg mb-4">
+            <FiUsers />
+          </div>
+          <h2 className="text-xl font-black text-gray-900 dark:text-white">Đặt chung nhóm: {code?.toUpperCase()}</h2>
+          <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+            Bạn cần đăng nhập tài khoản FoodServe để có thể tham gia vào phòng và đặt món chung cùng bạn bè của mình.
+          </p>
+          <div className="space-y-3 mt-6">
+            <button
+              onClick={() => dispatch(openAuthModal('login'))}
+              className="w-full py-3 bg-gradient-primary hover:bg-primary-600 text-white font-bold rounded-xl text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              Đăng nhập ngay
+            </button>
+            <Link 
+              to="/" 
+              className="w-full block py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-dark-100 dark:hover:bg-dark-100/80 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-xs transition-colors"
+            >
+              Quay lại Trang chủ
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-300">
@@ -315,10 +339,6 @@ export default function GroupOrderPage() {
               {session.status === 'locked' && '🔒 Đã khóa'}
               {session.status === 'ordered' && '🎉 Đã đặt'}
             </div>
-            
-            <Link to={`/restaurant/${session.restaurantId}`} className="text-xs font-bold text-primary-500 hover:underline inline-flex items-center gap-1 mb-3">
-              ← Quay lại cửa hàng
-            </Link>
             
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">
               🍔 Đặt Chung: {session.restaurantName}
