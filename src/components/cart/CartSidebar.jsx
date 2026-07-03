@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 export default function CartSidebar() {
   const dispatch = useDispatch()
   const { items = [], isOpen, voucher, discount } = useSelector((s) => s.cart)
-  const { user } = useSelector((s) => s.auth)
+  const { user, isAuthenticated } = useSelector((s) => s.auth)
   const { healthyMode } = useSelector((s) => s.ui)
   const total = useSelector(selectCartTotal)
   const count = useSelector(selectCartCount)
