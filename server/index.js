@@ -25,6 +25,7 @@ import messageRoutes from './routes/messages.js'
 import paymentRoutes from './routes/payment.js'
 import chatbotRoutes from './routes/chatbot.js'
 import voucherRoutes from './routes/vouchers.js'
+import groupOrderRoutes from './routes/groupOrders.js'
 import { checkExpiringSubscriptions, checkOnStartup } from './utils/subscriptionChecker.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 import { requestLogger, cleanOldLogs } from './middleware/logger.js'
@@ -205,6 +206,7 @@ app.use('/api/reviews', reviewRoutes)
 app.use('/api/favorites', favoriteRoutes)
 app.use('/api/messages', messageRoutes)
 app.use('/api/payment', paymentRoutes)
+app.use('/api/group-orders', groupOrderRoutes)
 app.use('/api/chatbot', chatbotRoutes)
 app.use('/api/vouchers', voucherRoutes)
 app.use('/api/shipper', shipperRoutes)
@@ -245,6 +247,11 @@ io.on('connection', (socket) => {
 
   socket.on('join-order', (orderId) => {
     socket.join(`order-${orderId}`)
+  })
+
+  socket.on('join-group-order', (code) => {
+    socket.join(`group-order-${code}`)
+    console.log(`Socket ${socket.id} joined group-order-${code}`)
   })
 
   socket.on('update-order-status', (data) => {

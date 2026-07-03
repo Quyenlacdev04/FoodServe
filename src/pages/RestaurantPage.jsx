@@ -1,5 +1,6 @@
+import { API_BASE_URL } from '../config/api.js'
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiArrowLeft, FiStar, FiClock, FiMapPin, FiPlus, FiMinus, FiShoppingCart, FiAlertTriangle } from 'react-icons/fi'
@@ -7,14 +8,51 @@ import { fetchRestaurantDetails } from '../store/slices/restaurantSlice'
 import { addToCart, openCart, selectCartCount } from '../store/slices/cartSlice'
 import { formatPrice } from '../data/mockData'
 import ReviewList from '../components/reviews/ReviewList'
+import toast from 'react-hot-toast'
 
 export default function RestaurantPage() {
   const { id } = useParams()
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const { selectedRestaurant, menuItems, status } = useSelector((s) => s.restaurants)
+  const { user } = useSelector((s) => s.auth)
   const cartCount = useSelector(selectCartCount)
   const [activeCategory, setActiveCategory] = useState('all')
   const [quantities, setQuantities] = useState({})
+  const [groupLoading, setGroupLoading] = useState(false)
+
+  const handleStartGroupOrder = async () => {
+    if (!user) {
+      toast.error('Vui lòng đăng nhập để bắt đầu đặt nhóm!')
+      return
+    }
+    try {
+      setGroupLoading(true)
+      const res = await fetch(`${API_BASE_URL}/api/group-orders/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hostId: user._id,
+          hostName: user.name,
+          restaurantId: selectedRestaurant._id || selectedRestaurant.id,
+          restaurantName: selectedRestaurant.name
+        })
+      })
+
+      if (res.ok) {
+        const session = await res.json()
+        toast.success('Đã tạo phòng đặt chung thành công! 🎉')
+        navigate(`/group-order/${session.code}`)
+      } else {
+        const err = await res.json()
+        toast.error(err.message || 'Lỗi tạo phòng đặt nhóm')
+      }
+    } catch (e) {
+      toast.error('Không thể kết nối máy chủ')
+    } finally {
+      setGroupLoading(false)
+    }
+  }
 
   useEffect(() => {
     dispatch(fetchRestaurantDetails(id))
@@ -111,11 +149,23 @@ export default function RestaurantPage() {
               </span>
             )}
           </div>
-          {selectedRestaurant.promo && (
-            <div className="inline-flex mt-4 px-3.5 py-2 rounded-xl bg-red-500 text-white text-xs font-black shadow-lg">
-              🏷️ {selectedRestaurant.promo}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            {selectedRestaurant.promo && (
+              <div className="inline-flex px-3.5 py-2 rounded-xl bg-red-500 text-white text-xs font-black shadow-lg">
+                🏷️ {selectedRestaurant.promo}
+              </div>
+            )}
+            {!isExpired && (
+              <button
+                type="button"
+                onClick={handleStartGroupOrder}
+                disabled={groupLoading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-amber-500 text-white text-xs font-black shadow-lg hover:shadow-glow transition-all active:scale-95 disabled:opacity-60 cursor-pointer border border-white/10"
+              >
+                👥 {groupLoading ? 'Đang tạo...' : 'Đặt nhóm (Split Bill)'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -13,6 +13,7 @@ import MaintenanceBanner from './components/ui/MaintenanceBanner'
 import MaintenancePage from './pages/MaintenancePage'
 import HomePage from './pages/HomePage'
 import RestaurantPage from './pages/RestaurantPage'
+import GroupOrderPage from './pages/GroupOrderPage'
 import OrderTrackingPage from './pages/OrderTrackingPage'
 import CheckoutPage from './pages/CheckoutPage'
 import PaymentResultPage from './pages/PaymentResultPage'
@@ -100,6 +101,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/restaurant/:id" element={<RestaurantPage />} />
+                <Route path="/group-order/:code" element={<GroupOrderPage />} />
                 <Route path="/tracking" element={<OrderTrackingPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/payment/vnpay-return" element={<PaymentResultPage />} />
