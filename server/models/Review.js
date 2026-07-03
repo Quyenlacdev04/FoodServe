@@ -20,6 +20,15 @@ const reviewSchema = new mongoose.Schema({
   driverRating: { type: Number, min: 1, max: 5 },
   driverComment: { type: String },
   
+  // Phân tích cảm xúc AI
+  aiSentiment: { 
+    type: String, 
+    enum: ['positive', 'neutral', 'negative'],
+    default: 'neutral'
+  },
+  aiSentimentScore: { type: Number, default: 0 },
+  aiTags: [String],
+
   // Hình ảnh đính kèm
   images: [String],
   

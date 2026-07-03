@@ -43,6 +43,16 @@ export default function RestaurantManagePage() {
   const [selectedOrderId, setSelectedOrderId] = useState(null)
   const [socket, setSocket] = useState(null)
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
+  
+  // AI Sentiment Dashboard States
+  const [sentimentStats, setSentimentStats] = useState(null)
+  const [sentimentLoading, setSentimentLoading] = useState(false)
+  const [sentimentReviews, setSentimentReviews] = useState([])
+  const [sentimentFilter, setSentimentFilter] = useState('all') // all, positive, neutral, negative
+  const [selectedSentimentTag, setSelectedSentimentTag] = useState(null)
+  const [sentimentReplyId, setSentimentReplyId] = useState(null)
+  const [sentimentReplyText, setSentimentReplyText] = useState('')
+  const [sentimentReplySubmitting, setSentimentReplySubmitting] = useState(false)
 
   // Modals / forms state
   const [showItemModal, setShowItemModal] = useState(false)
@@ -170,6 +180,60 @@ export default function RestaurantManagePage() {
   }, [user, refreshTrigger])
 
   const triggerRefresh = () => setRefreshTrigger(prev => prev + 1)
+
+  // AI Sentiment Dashboard Fetch Function
+  useEffect(() => {
+    const fetchSentimentData = async () => {
+      if (activeTab !== 'sentiment' || !restaurant?._id) return;
+      try {
+        setSentimentLoading(true)
+        const statsRes = await fetch(`${API_BASE_URL}/api/reviews/restaurant/${restaurant._id}/sentiment`)
+        const reviewsRes = await fetch(`${API_BASE_URL}/api/reviews/restaurant/${restaurant._id}?limit=100`)
+        
+        if (statsRes.ok) {
+          const statsData = await statsRes.json()
+          setSentimentStats(statsData)
+        }
+        if (reviewsRes.ok) {
+          const reviewsData = await reviewsRes.json()
+          setSentimentReviews(reviewsData.reviews)
+        }
+      } catch (err) {
+        console.error('Fetch sentiment details error:', err)
+      } finally {
+        setSentimentLoading(false)
+      }
+    }
+    fetchSentimentData()
+  }, [activeTab, restaurant?._id, refreshTrigger])
+
+  const handleSentimentReplySubmit = async (e, reviewId) => {
+    e.preventDefault()
+    if (!sentimentReplyText.trim()) return
+    setSentimentReplySubmitting(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: sentimentReplyText,
+          restaurantId: restaurant._id
+        })
+      })
+      if (res.ok) {
+        toast.success('Phản hồi đánh giá thành công!')
+        setSentimentReplyId(null)
+        setSentimentReplyText('')
+        triggerRefresh()
+      } else {
+        toast.error('Lỗi khi gửi phản hồi')
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối')
+    } finally {
+      setSentimentReplySubmitting(false)
+    }
+  }
 
   // Socket.io real-time listener for new orders and status updates
   useEffect(() => {
@@ -874,6 +938,16 @@ export default function RestaurantManagePage() {
               <FiMap className="text-lg" /> Bản đồ nhiệt dự báo
             </button>
             <button 
+              onClick={() => setActiveTab('sentiment')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-bold transition-all ${
+                activeTab === 'sentiment' 
+                  ? 'bg-primary-500 text-white shadow-glow shadow-primary-500/20' 
+                  : 'bg-white dark:bg-dark-200 hover:bg-gray-100 dark:hover:bg-dark-100 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <FiMessageCircle className="text-lg" /> Phân tích Cảm xúc AI
+            </button>
+            <button 
               onClick={() => setActiveTab('menu')} 
               className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-bold transition-all ${
                 activeTab === 'menu' 
@@ -1038,6 +1112,280 @@ export default function RestaurantManagePage() {
                   restaurantId={restaurant._id} 
                   restaurantLocation={restaurant.location} 
                 />
+              </div>
+            )}
+
+            {/* PHÂN TÍCH CẢM XÚC AI TAB */}
+            {activeTab === 'sentiment' && (
+              <div className="space-y-6">
+                
+                {/* Dashboard Stats */}
+                <div className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-card border border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-bold text-xl dark:text-white">🧠 Thống kê cảm xúc bằng AI</h3>
+                      <p className="text-sm text-gray-400">AI tự động phân tích đánh giá của khách hàng thời gian thực</p>
+                    </div>
+                    <button 
+                      onClick={triggerRefresh}
+                      className="p-2 bg-gray-50 hover:bg-gray-100 dark:bg-dark-100 dark:hover:bg-dark-300 text-gray-600 dark:text-gray-300 rounded-xl transition-all"
+                    >
+                      <FiRefreshCw className={sentimentLoading ? 'animate-spin' : ''} />
+                    </button>
+                  </div>
+
+                  {sentimentLoading && !sentimentStats ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Percentages */}
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="bg-gray-50 dark:bg-dark-300/40 p-4 rounded-2xl text-center">
+                          <p className="text-2xl font-black text-gray-800 dark:text-white">
+                            {sentimentStats?.summary?.total || 0}
+                          </p>
+                          <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-wider">Tổng đánh giá</p>
+                        </div>
+                        <div className="bg-green-50/50 dark:bg-green-950/10 border border-green-100 dark:border-green-900/30 p-4 rounded-2xl text-center">
+                          <p className="text-2xl font-black text-green-600 dark:text-green-400">
+                            {sentimentStats?.summary?.total ? ((sentimentStats.summary.positive / sentimentStats.summary.total) * 100).toFixed(0) : 0}%
+                          </p>
+                          <p className="text-xs text-green-700 dark:text-green-400 font-bold mt-1 uppercase tracking-wider">🟢 Tích cực ({sentimentStats?.summary?.positive || 0})</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-dark-300 p-4 rounded-2xl text-center">
+                          <p className="text-2xl font-black text-gray-500">
+                            {sentimentStats?.summary?.total ? ((sentimentStats.summary.neutral / sentimentStats.summary.total) * 100).toFixed(0) : 0}%
+                          </p>
+                          <p className="text-xs text-gray-500 font-bold mt-1 uppercase tracking-wider">🟡 Trung lập ({sentimentStats?.summary?.neutral || 0})</p>
+                        </div>
+                        <div className="bg-red-50/50 dark:bg-red-950/10 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl text-center">
+                          <p className="text-2xl font-black text-red-600 dark:text-red-400">
+                            {sentimentStats?.summary?.total ? ((sentimentStats.summary.negative / sentimentStats.summary.total) * 100).toFixed(0) : 0}%
+                          </p>
+                          <p className="text-xs text-red-700 dark:text-red-400 font-bold mt-1 uppercase tracking-wider">🔴 Tiêu cực ({sentimentStats?.summary?.negative || 0})</p>
+                        </div>
+                      </div>
+
+                      {/* Tag Clouds */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                        {/* Positive tags */}
+                        <div className="space-y-3">
+                          <h4 className="font-bold text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
+                            <span>👍</span> Khách hàng đánh giá tốt nhất về:
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {sentimentStats?.topPositiveTags?.map((tag, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setSelectedSentimentTag(selectedSentimentTag === tag.name ? null : tag.name);
+                                  setSentimentFilter('all');
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                  selectedSentimentTag === tag.name
+                                    ? 'bg-green-500 text-white shadow-md'
+                                    : 'bg-green-50 hover:bg-green-100 text-green-700 dark:bg-green-950/20 dark:text-green-400'
+                                }`}
+                              >
+                                <span>#{tag.name}</span>
+                                <span className="opacity-60 text-[10px]">({tag.count})</span>
+                              </button>
+                            ))}
+                            {(!sentimentStats?.topPositiveTags || sentimentStats.topPositiveTags.length === 0) && (
+                              <p className="text-xs text-gray-400 italic">Chưa có tag đánh giá tích cực nào.</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Negative tags */}
+                        <div className="space-y-3">
+                          <h4 className="font-bold text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
+                            <span>👎</span> Phản hồi cần cải thiện nhất:
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {sentimentStats?.topNegativeTags?.map((tag, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setSelectedSentimentTag(selectedSentimentTag === tag.name ? null : tag.name);
+                                  setSentimentFilter('all');
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                  selectedSentimentTag === tag.name
+                                    ? 'bg-red-500 text-white shadow-md'
+                                    : 'bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/20 dark:text-red-400'
+                                }`}
+                              >
+                                <span>#{tag.name}</span>
+                                <span className="opacity-60 text-[10px]">({tag.count})</span>
+                              </button>
+                            ))}
+                            {(!sentimentStats?.topNegativeTags || sentimentStats.topNegativeTags.length === 0) && (
+                              <p className="text-xs text-gray-400 italic">Chưa có phàn hồi tiêu cực nào.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
+                {/* Filter and Reviews List */}
+                <div className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-card border border-gray-100 dark:border-gray-800">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <h3 className="font-bold text-lg dark:text-white">
+                      Danh sách đánh giá đã phân loại
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      {['all', 'positive', 'neutral', 'negative'].map(f => (
+                        <button
+                          key={f}
+                          onClick={() => {
+                            setSentimentFilter(f);
+                            setSelectedSentimentTag(null);
+                          }}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            sentimentFilter === f
+                              ? 'bg-primary-500 text-white shadow-md'
+                              : 'bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-dark-100 dark:text-gray-400'
+                          }`}
+                        >
+                          {f === 'all' ? 'Tất cả' :
+                           f === 'positive' ? '🟢 Tích cực' :
+                           f === 'neutral' ? '🟡 Trung lập' : '🔴 Tiêu cực'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Filter tags reset notice */}
+                  {selectedSentimentTag && (
+                    <div className="mb-4 bg-primary-50 dark:bg-primary-950/20 border border-primary-200 dark:border-primary-900 px-4 py-2 rounded-xl flex items-center justify-between text-xs text-primary-700 dark:text-primary-400">
+                      <span>Đang lọc theo tag: <strong>#{selectedSentimentTag}</strong></span>
+                      <button onClick={() => setSelectedSentimentTag(null)} className="font-black hover:underline">Xóa lọc</button>
+                    </div>
+                  )}
+
+                  {/* Review Cards */}
+                  <div className="space-y-4">
+                    {sentimentReviews
+                      .filter(r => {
+                        if (sentimentFilter !== 'all' && r.aiSentiment !== sentimentFilter) return false;
+                        if (selectedSentimentTag && !(r.aiTags || []).includes(selectedSentimentTag)) return false;
+                        return true;
+                      })
+                      .map((review) => (
+                        <div key={review._id} className="border border-gray-100 dark:border-gray-800 p-5 rounded-2xl bg-gray-50/50 dark:bg-dark-300/20 hover:shadow-sm transition-shadow">
+                          
+                          {/* Header */}
+                          <div className="flex justify-between items-start gap-4 mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm">
+                                {review.userId?.name?.charAt(0).toUpperCase() || 'U'}
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-sm dark:text-white">{review.userId?.name || 'Khách hàng'}</h4>
+                                <p className="text-[10px] text-gray-400">{new Date(review.createdAt).toLocaleString()}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 bg-amber-500/10 text-amber-500 text-xs font-black px-2 py-0.5 rounded-lg border border-amber-500/20">
+                              ⭐ {review.restaurantRating}
+                            </div>
+                          </div>
+
+                          {/* AI tags and score */}
+                          {review.aiSentiment && (
+                            <div className="flex flex-wrap gap-1 items-center mb-2.5">
+                              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                                review.aiSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/10 dark:text-green-400' :
+                                review.aiSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/10 dark:text-red-400' :
+                                'bg-gray-100 text-gray-500 dark:bg-dark-100'
+                              }`}>
+                                🧠 AI: {review.aiSentiment === 'positive' ? 'Tích cực' : review.aiSentiment === 'negative' ? 'Tiêu cực' : 'Trung lập'} ({review.aiSentimentScore})
+                              </span>
+                              {(review.aiTags || []).map((t, idx) => (
+                                <span key={idx} className="text-[8px] font-bold bg-white dark:bg-dark-100 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Content */}
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
+                            {review.restaurantComment || <span className="text-gray-400 italic">Không để lại lời bình luận.</span>}
+                          </p>
+
+                          {/* Store Reply if exists */}
+                          {review.restaurantReply ? (
+                            <div className="mt-3 bg-blue-50 dark:bg-blue-950/20 p-3 rounded-xl border-l-4 border-blue-500">
+                              <div className="text-xs font-bold text-blue-700 dark:text-blue-400 mb-1">
+                                Cửa hàng đã phản hồi:
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-300">
+                                {review.restaurantReply.text}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="mt-3">
+                              {sentimentReplyId === review._id ? (
+                                <form onSubmit={(e) => handleSentimentReplySubmit(e, review._id)} className="mt-2 space-y-2">
+                                  <textarea
+                                    value={sentimentReplyText}
+                                    onChange={(e) => setSentimentReplyText(e.target.value)}
+                                    placeholder="Viết phản hồi chu đáo tới khách hàng..."
+                                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-100 dark:text-white focus:ring-1 focus:ring-primary-500 outline-none resize-none"
+                                    rows={2}
+                                  />
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSentimentReplyId(null)}
+                                      className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                                    >
+                                      Hủy
+                                    </button>
+                                    <button
+                                      type="submit"
+                                      disabled={sentimentReplySubmitting}
+                                      className="px-4 py-1.5 text-xs bg-primary-500 text-white font-bold rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
+                                    >
+                                      Gửi phản hồi
+                                    </button>
+                                  </div>
+                                </form>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setSentimentReplyId(review._id);
+                                    setSentimentReplyText('');
+                                  }}
+                                  className="text-xs text-primary-500 hover:text-primary-600 font-bold flex items-center gap-1.5 mt-2 transition-colors"
+                                >
+                                  <FiMessageCircle size={13} /> Phản hồi khách hàng
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                        </div>
+                      ))}
+
+                    {sentimentReviews.filter(r => {
+                      if (sentimentFilter !== 'all' && r.aiSentiment !== sentimentFilter) return false;
+                      if (selectedSentimentTag && !(r.aiTags || []).includes(selectedSentimentTag)) return false;
+                      return true;
+                    }).length === 0 && (
+                      <div className="text-center py-8 text-gray-400 italic">
+                        Không có đánh giá nào phù hợp với bộ lọc.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
             )}
 

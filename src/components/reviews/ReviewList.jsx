@@ -291,6 +291,37 @@ export default function ReviewList({ restaurantId }) {
                 <StarDisplay rating={review.restaurantRating} />
               </div>
 
+              {/* AI Sentiment Analysis Badge */}
+              {review.aiSentiment && (
+                <div className="flex flex-wrap gap-1.5 items-center mb-3">
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    review.aiSentiment === 'positive' ? 'bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-400 border border-green-200/50' :
+                    review.aiSentiment === 'negative' ? 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border border-red-200/50' :
+                    'bg-gray-100 text-gray-700 dark:bg-dark-300 dark:text-gray-400'
+                  }`}>
+                    <span>🧠 AI:</span>
+                    <span>
+                      {review.aiSentiment === 'positive' ? 'Tích cực' :
+                       review.aiSentiment === 'negative' ? 'Tiêu cực' : 'Trung lập'}
+                    </span>
+                  </span>
+                  
+                  {/* AI Tags */}
+                  {(review.aiTags || []).map((tag, i) => (
+                    <span 
+                      key={i} 
+                      className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                        review.aiSentiment === 'positive'
+                          ? 'bg-green-100/60 text-green-800 dark:bg-green-900/10 dark:text-green-300'
+                          : 'bg-red-100/60 text-red-800 dark:bg-red-900/10 dark:text-red-300'
+                      }`}
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {/* Comment */}
               {review.restaurantComment && (
                 <p className="text-gray-700 dark:text-gray-300 mb-3">

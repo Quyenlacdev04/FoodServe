@@ -2,6 +2,7 @@ import express from 'express';
 import Review from '../models/Review.js';
 import Restaurant from '../models/Restaurant.js';
 import Order from '../models/Order.js';
+import { analyzeSentiment } from '../utils/sentiment.js';
 
 const router = express.Router();
 
@@ -36,6 +37,9 @@ router.post('/', async (req, res) => {
       }
     }
     
+    // Phân tích cảm xúc AI
+    const aiAnalysis = analyzeSentiment(restaurantComment, restaurantRating);
+
     // Tạo review
     const review = await Review.create({
       orderId: orderId || null,
@@ -46,7 +50,10 @@ router.post('/', async (req, res) => {
       itemReviews,
       driverRating,
       driverComment,
-      images: images || []
+      images: images || [],
+      aiSentiment: aiAnalysis.sentiment,
+      aiSentimentScore: aiAnalysis.score,
+      aiTags: aiAnalysis.tags
     });
     
     // Cập nhật rating trung bình của nhà hàng
@@ -89,6 +96,72 @@ router.get('/restaurant/:restaurantId', async (req, res) => {
   } catch (error) {
     console.error('Get reviews error:', error);
     res.status(500).json({ message: 'Lỗi khi lấy đánh giá' });
+  }
+});
+
+// Lấy thống kê cảm xúc AI của nhà hàng
+router.get('/restaurant/:restaurantId/sentiment', async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    
+    // Đếm tổng quan cảm xúc
+    const stats = await Review.aggregate([
+      { $match: { restaurantId, status: 'active' } },
+      {
+        $group: {
+          _id: '$aiSentiment',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const result = {
+      positive: 0,
+      neutral: 0,
+      negative: 0,
+      total: 0
+    };
+
+    stats.forEach(s => {
+      if (s._id) result[s._id] = s.count;
+    });
+    result.total = result.positive + result.neutral + result.negative;
+
+    // Tìm các tag xuất hiện nhiều nhất
+    const reviewsWithTags = await Review.find({ 
+      restaurantId, 
+      status: 'active',
+      aiTags: { $exists: true, $not: { $size: 0 } } 
+    }).lean();
+
+    const tagCounts = {
+      positive: {},
+      negative: {}
+    };
+
+    reviewsWithTags.forEach(r => {
+      const sentimentType = r.aiSentiment === 'positive' ? 'positive' : 'negative';
+      (r.aiTags || []).forEach(tag => {
+        tagCounts[sentimentType][tag] = (tagCounts[sentimentType][tag] || 0) + 1;
+      });
+    });
+
+    // Sắp xếp và lấy top 5 tags tích cực & tiêu cực
+    const formatTopTags = (counts) => {
+      return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({ name, count }));
+    };
+
+    res.json({
+      summary: result,
+      topPositiveTags: formatTopTags(tagCounts.positive),
+      topNegativeTags: formatTopTags(tagCounts.negative)
+    });
+  } catch (error) {
+    console.error('Get review sentiment stats error:', error);
+    res.status(500).json({ message: 'Lỗi server khi thống kê cảm xúc AI' });
   }
 });
 
