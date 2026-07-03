@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiSearch, FiShoppingCart, FiUser, FiSun, FiMoon, FiMenu, FiX, FiChevronDown, FiUsers } from 'react-icons/fi'
 import toast from 'react-hot-toast'
-import { toggleDarkMode, openAuthModal, toggleMobileMenu, closeMobileMenu } from '../../store/slices/uiSlice'
+import { toggleDarkMode, openAuthModal, toggleMobileMenu, closeMobileMenu, toggleHealthyMode } from '../../store/slices/uiSlice'
 import { toggleCart, selectCartCount } from '../../store/slices/cartSlice'
 import { logout } from '../../store/slices/authSlice'
 import { getUserRank } from '../../utils/rankUtils'
@@ -20,7 +20,7 @@ export default function Header() {
   const dispatch = useDispatch()
   const location = useLocation()
   const navigate = useNavigate()
-  const { darkMode, mobileMenuOpen } = useSelector((s) => s.ui)
+  const { darkMode, mobileMenuOpen, healthyMode } = useSelector((s) => s.ui)
   const { isAuthenticated, user } = useSelector((s) => s.auth)
   const cartCount = useSelector(selectCartCount)
   const [scrolled, setScrolled] = useState(false)
@@ -256,6 +256,26 @@ export default function Header() {
                   ? <FiSun className="text-xl text-amber-400" />
                   : <FiMoon className={`text-xl ${iconColor}`} />
                 }
+              </button>
+
+              <button 
+                type="button" 
+                onClick={() => {
+                  dispatch(toggleHealthyMode());
+                  toast.success(
+                    !healthyMode 
+                      ? '🥗 Đã BẬT Chế độ Ăn uống Lành mạnh! FoodServe sẽ ưu tiên hiển thị các món ăn dinh dưỡng tốt cho sức khỏe.'
+                      : 'ℹ️ Đã TẮT Chế độ Ăn uống Lành mạnh.',
+                    { duration: 4000 }
+                  );
+                }} 
+                className={`${iconBtnClass} relative flex items-center justify-center`}
+                title={healthyMode ? 'Tắt Chế độ Ăn uống Lành mạnh' : 'Bật Chế độ Ăn uống Lành mạnh'}
+              >
+                <span className={`text-xl transition-all duration-300 ${healthyMode ? 'scale-110 drop-shadow-[0_2px_8px_rgba(34,197,94,0.4)]' : 'opacity-40 grayscale scale-95 hover:grayscale-0 hover:opacity-80'}`}>🥗</span>
+                {healthyMode && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-dark-300" />
+                )}
               </button>
 
               {isAuthenticated && <NotificationBell />}

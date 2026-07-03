@@ -7,7 +7,15 @@ const menuItemSchema = new mongoose.Schema({
   image: String,
   description: String,
   popular: { type: Boolean, default: false },
-  category: String
+  category: String,
+  
+  // Dinh dưỡng & Ăn uống Lành mạnh
+  calories: { type: Number, default: 0 },
+  protein: { type: Number, default: 0 },
+  carbs: { type: Number, default: 0 },
+  fat: { type: Number, default: 0 },
+  isHealthy: { type: Boolean, default: false },
+  healthTags: { type: [String], default: [] }
 }, { timestamps: true });
 
 // Indexes để tăng hiệu suất truy vấn

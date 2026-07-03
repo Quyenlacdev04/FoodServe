@@ -11,6 +11,7 @@ import { addToCart } from '../../store/slices/cartSlice'
 export default function AIRecommendations() {
   const dispatch = useDispatch()
   const { user } = useSelector(state => state.auth)
+  const { healthyMode } = useSelector(state => state.ui)
   
   const [data, setData] = useState({ recommendedRestaurants: [], recommendedItems: [], context: {} })
   const [loading, setLoading] = useState(true)
@@ -176,17 +177,24 @@ export default function AIRecommendations() {
       {/* 2. RECOMMENDED FOOD ITEMS */}
       {recommendedItems.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-            🍕 Món ngon gợi ý riêng cho bữa nay
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+            <span>{healthyMode ? '🥗 Món ngon Healthy dành riêng cho bạn' : '🍕 Món ngon gợi ý riêng cho bữa nay'}</span>
+            {healthyMode && <span className="text-[10px] text-green-500 font-bold bg-green-50 px-2 py-0.5 rounded-lg border border-green-200">Đã tối ưu dinh dưỡng</span>}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {recommendedItems.map((item, index) => (
+            {[...recommendedItems]
+              .sort((a, b) => (healthyMode ? (b.isHealthy ? 1 : 0) - (a.isHealthy ? 1 : 0) : 0))
+              .map((item, index) => (
               <motion.div
                 key={item._id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
-                className="group relative bg-white dark:bg-dark-200 rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-card hover:shadow-glow hover:border-amber-500/30 transition-all duration-300 flex flex-col justify-between"
+                className={`group relative bg-white dark:bg-dark-200 rounded-3xl overflow-hidden border shadow-card hover:shadow-glow transition-all duration-300 flex flex-col justify-between ${
+                  healthyMode && item.isHealthy 
+                    ? 'border-green-500/35 hover:border-green-500/50 shadow-[0_2px_12px_-3px_rgba(34,197,94,0.15)]' 
+                    : 'border-gray-100 dark:border-gray-800 hover:border-amber-500/30'
+                }`}
               >
                 {/* Food Image */}
                 <div className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-dark-100">
@@ -201,6 +209,13 @@ export default function AIRecommendations() {
                   <span className="absolute top-2 left-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-black px-2.5 py-0.5 rounded-lg shadow-sm">
                     {item.badge}
                   </span>
+
+                  {/* Healthy Badge */}
+                  {healthyMode && item.isHealthy && (
+                    <span className="absolute top-2 right-2 bg-green-500 text-white text-[9px] font-black px-2.5 py-0.5 rounded-lg shadow-md">
+                      🥗 Healthy
+                    </span>
+                  )}
 
                   {/* Quick Add To Cart Button overlay */}
                   <button
@@ -221,6 +236,11 @@ export default function AIRecommendations() {
                     <p className="text-[10px] text-gray-400 mt-0.5 truncate">
                       🏪 {item.restaurantName}
                     </p>
+                    {healthyMode && item.calories > 0 && (
+                      <div className="mt-1.5 text-[9px] font-bold text-green-600 dark:text-green-400 bg-green-500/5 px-2 py-0.5 rounded border border-green-500/10 w-max">
+                        🔥 {item.calories} kcal
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center justify-between mt-2.5">
                     <span className="font-extrabold text-primary-500 text-sm">

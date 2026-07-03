@@ -12,12 +12,49 @@ export default function CartSidebar() {
   const dispatch = useDispatch()
   const { items, isOpen, voucher, discount } = useSelector((s) => s.cart)
   const { user } = useSelector((s) => s.auth)
+  const { healthyMode } = useSelector((s) => s.ui)
   const total = useSelector(selectCartTotal)
   const count = useSelector(selectCartCount)
   const navigate = useNavigate()
   const [voucherCode, setVoucherCode] = useState('')
   const [voucherLoading, setVoucherLoading] = useState(false)
   const [isMaintenance, setIsMaintenance] = useState(false)
+
+  // Tính toán tổng dinh dưỡng của các sản phẩm trong giỏ hàng
+  const cartNutrition = items.reduce((acc, item) => {
+    const cal = item.calories || 0;
+    const prot = item.protein || 0;
+    const carb = item.carbs || 0;
+    const f = item.fat || 0;
+    
+    acc.calories += cal * item.quantity;
+    acc.protein += prot * item.quantity;
+    acc.carbs += carb * item.quantity;
+    acc.fat += f * item.quantity;
+    if (item.isHealthy) acc.healthyCount += item.quantity;
+    
+    return acc;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0, healthyCount: 0 });
+
+  const calorieTarget = user?.dailyCalorieTarget || 2000;
+  const proteinTarget = user?.dailyProteinTarget || 130;
+  const carbsTarget = user?.dailyCarbsTarget || 220;
+  const fatTarget = user?.dailyFatTarget || 65;
+
+  let healthTip = "Hãy bổ sung thêm rau xanh hoặc giảm tinh bột để bữa ăn cân bằng hơn.";
+  let tipColor = "text-amber-600 dark:text-amber-400 bg-amber-500/5";
+  if (cartNutrition.calories === 0) {
+    healthTip = "Bật Chế độ Healthy để xem thông tin dinh dưỡng chi tiết.";
+  } else if (cartNutrition.healthyCount > 0 && cartNutrition.calories < 800 && cartNutrition.fat < 20) {
+    healthTip = "🌟 Lựa chọn tuyệt vời! Đơn hàng của bạn rất sạch, ít béo và giàu dinh dưỡng.";
+    tipColor = "text-green-600 dark:text-green-400 bg-green-500/5";
+  } else if (cartNutrition.calories > 1000) {
+    healthTip = "⚠️ Lượng Calo đơn hàng khá cao (vượt 50% nhu cầu ngày). Hãy cân nhắc chia nhỏ phần ăn nhé!";
+    tipColor = "text-red-500 dark:text-red-400 bg-red-500/5";
+  } else if (cartNutrition.protein > 35) {
+    healthTip = "💪 Bữa ăn giàu đạm cao cấp, rất phù hợp để phục hồi và phát triển cơ bắp!";
+    tipColor = "text-primary-600 dark:text-primary-400 bg-primary-500/5";
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -193,6 +230,67 @@ export default function CartSidebar() {
                     </motion.div>
                   ))}
                 </AnimatePresence>
+              )}
+
+              {/* BÁO CÁO DINH DƯỠNG GIỎ HÀNG (HEALTHY MODE) */}
+              {healthyMode && items.length > 0 && cartNutrition.calories > 0 && (
+                <div className="mt-6 p-4 rounded-3xl bg-green-500/5 dark:bg-green-500/10 border border-green-500/15 space-y-3.5 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-green-700 dark:text-green-400 flex items-center gap-1">
+                      🥗 Báo cáo Dinh dưỡng Giỏ hàng
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-bold">Mục tiêu ngày</span>
+                  </div>
+
+                  {/* Calories Progress bar */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs font-bold text-gray-750 dark:text-gray-300">
+                      <span>Năng lượng: <b className="text-green-600 font-sans">{cartNutrition.calories} / {calorieTarget} kcal</b></span>
+                      <span>{Math.round((cartNutrition.calories / calorieTarget) * 100)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          cartNutrition.calories > calorieTarget ? 'bg-red-500' : 'bg-green-500'
+                        }`} 
+                        style={{ width: `${Math.min(100, (cartNutrition.calories / calorieTarget) * 100)}%` }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Macros grid */}
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    {/* Protein */}
+                    <div className="bg-white/60 dark:bg-dark-200/50 p-2 border border-green-500/5 rounded-xl">
+                      <span className="text-[8px] text-gray-400 font-bold block uppercase leading-none">Đạm (Protein)</span>
+                      <span className="text-xs font-black text-gray-800 dark:text-white font-sans block mt-1">{cartNutrition.protein}g / {proteinTarget}g</span>
+                      <div className="w-full h-1 bg-gray-150 dark:bg-gray-800 rounded-full mt-1 overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (cartNutrition.protein / proteinTarget) * 100)}%` }} />
+                      </div>
+                    </div>
+                    {/* Carbs */}
+                    <div className="bg-white/60 dark:bg-dark-200/50 p-2 border border-green-500/5 rounded-xl">
+                      <span className="text-[8px] text-gray-400 font-bold block uppercase leading-none">Carb (Tinh bột)</span>
+                      <span className="text-xs font-black text-gray-800 dark:text-white font-sans block mt-1">{cartNutrition.carbs}g / {carbsTarget}g</span>
+                      <div className="w-full h-1 bg-gray-150 dark:bg-gray-800 rounded-full mt-1 overflow-hidden">
+                        <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, (cartNutrition.carbs / carbsTarget) * 100)}%` }} />
+                      </div>
+                    </div>
+                    {/* Fat */}
+                    <div className="bg-white/60 dark:bg-dark-200/50 p-2 border border-green-500/5 rounded-xl">
+                      <span className="text-[8px] text-gray-400 font-bold block uppercase leading-none">Béo (Fat)</span>
+                      <span className="text-xs font-black text-gray-800 dark:text-white font-sans block mt-1">{cartNutrition.fat}g / {fatTarget}g</span>
+                      <div className="w-full h-1 bg-gray-150 dark:bg-gray-800 rounded-full mt-1 overflow-hidden">
+                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(100, (cartNutrition.fat / fatTarget) * 100)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Health Advice Tip */}
+                  <div className={`p-2.5 rounded-xl border border-green-500/10 text-[10px] font-bold leading-normal ${tipColor}`}>
+                    {healthTip}
+                  </div>
+                </div>
               )}
             </div>
 

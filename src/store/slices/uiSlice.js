@@ -7,6 +7,7 @@ const initialState = {
   authModalOpen: false,
   authModalTab: 'login',
   loading: true,
+  healthyMode: localStorage.getItem('foodserve_healthy') === 'true',
 }
 
 const uiSlice = createSlice({
@@ -52,11 +53,20 @@ const uiSlice = createSlice({
     setLoading: (state, action) => {
       state.loading = action.payload
     },
+    toggleHealthyMode: (state) => {
+      state.healthyMode = !state.healthyMode
+      localStorage.setItem('foodserve_healthy', state.healthyMode ? 'true' : 'false')
+    },
+    setHealthyMode: (state, action) => {
+      state.healthyMode = action.payload
+      localStorage.setItem('foodserve_healthy', action.payload ? 'true' : 'false')
+    },
   },
 })
 
 export const {
   toggleDarkMode, setDarkMode, toggleMobileMenu, closeMobileMenu,
-  toggleSearch, openAuthModal, closeAuthModal, setLoading
+  toggleSearch, openAuthModal, closeAuthModal, setLoading,
+  toggleHealthyMode, setHealthyMode
 } = uiSlice.actions
 export default uiSlice.reducer

@@ -5,8 +5,27 @@ import User from '../models/User.js';
 import SystemSetting from '../models/SystemSetting.js';
 import Notification from '../models/Notification.js';
 import Order from '../models/Order.js';
+import { estimateNutrition } from '../utils/nutritionEstimator.js';
 
 const router = express.Router();
+
+function populateNutrition(item) {
+  if (!item) return item;
+  const obj = item.toObject ? item.toObject() : item;
+  if (!obj.calories || obj.calories === 0) {
+    const est = estimateNutrition(obj.name, obj.category);
+    return {
+      ...obj,
+      calories: est.calories,
+      protein: est.protein,
+      carbs: est.carbs,
+      fat: est.fat,
+      isHealthy: est.isHealthy,
+      healthTags: est.healthTags
+    };
+  }
+  return obj;
+}
 
 // Lấy tất cả nhà hàng với tìm kiếm, lọc, sắp xếp
 router.get('/', async (req, res) => {
@@ -270,7 +289,8 @@ router.get('/recommendations/user/:userId', async (req, res) => {
 
     const recommendedItems = scoredItems
       .sort((a, b) => b.score - a.score)
-      .slice(0, 8);
+      .slice(0, 8)
+      .map(item => populateNutrition(item));
 
     res.json({
       recommendedRestaurants,
@@ -322,7 +342,7 @@ router.get('/search/menu', async (req, res) => {
     const results = menuItems
       .filter(item => restaurantMap[item.restaurantId.toString()])
       .map(item => ({
-        ...item,
+        ...populateNutrition(item),
         restaurant: restaurantMap[item.restaurantId.toString()]
       }));
 
@@ -364,7 +384,7 @@ router.get('/menu/all', async (req, res) => {
     const results = menuItems
       .filter(item => restaurantMap[item.restaurantId.toString()])
       .map(item => ({
-        ...item,
+        ...populateNutrition(item),
         restaurant: restaurantMap[item.restaurantId.toString()]
       }));
 
@@ -581,8 +601,9 @@ router.get('/:id', async (req, res) => {
     if (!restaurant) return res.status(404).json({ message: 'Không tìm thấy nhà hàng' });
     
     const menuItems = await MenuItem.find({ restaurantId: req.params.id });
+    const populatedMenuItems = menuItems.map(item => populateNutrition(item));
     
-    res.json({ restaurant, menuItems });
+    res.json({ restaurant, menuItems: populatedMenuItems });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server' });
   }

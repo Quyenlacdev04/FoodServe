@@ -204,7 +204,10 @@ router.get('/capabilities', async (req, res) => {
 // API cập nhật thông tin cá nhân (Profile)
 router.put('/profile', async (req, res) => {
   try {
-    const { userId, name, phone, address, avatar, vehicleType, vehicleNumber } = req.body;
+    const { 
+      userId, name, phone, address, avatar, vehicleType, vehicleNumber,
+      healthyModeEnabled, dailyCalorieTarget, dailyProteinTarget, dailyCarbsTarget, dailyFatTarget 
+    } = req.body;
     const user = await User.findById(userId);
     
     if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
@@ -215,6 +218,13 @@ router.put('/profile', async (req, res) => {
     if (avatar !== undefined) user.avatar = avatar;
     if (vehicleType !== undefined) user.vehicleType = vehicleType;
     if (vehicleNumber !== undefined) user.vehicleNumber = vehicleNumber;
+    
+    // Cập nhật cấu hình Healthy Mode
+    if (healthyModeEnabled !== undefined) user.healthyModeEnabled = healthyModeEnabled;
+    if (dailyCalorieTarget !== undefined) user.dailyCalorieTarget = Number(dailyCalorieTarget);
+    if (dailyProteinTarget !== undefined) user.dailyProteinTarget = Number(dailyProteinTarget);
+    if (dailyCarbsTarget !== undefined) user.dailyCarbsTarget = Number(dailyCarbsTarget);
+    if (dailyFatTarget !== undefined) user.dailyFatTarget = Number(dailyFatTarget);
 
     await user.save();
 

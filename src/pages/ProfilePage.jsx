@@ -56,7 +56,11 @@ export default function ProfilePage() {
     name: '',
     phone: '',
     address: '',
-    avatar: ''
+    avatar: '',
+    dailyCalorieTarget: 2000,
+    dailyProteinTarget: 130,
+    dailyCarbsTarget: 220,
+    dailyFatTarget: 65
   })
 
   // State đổi mật khẩu
@@ -74,7 +78,11 @@ export default function ProfilePage() {
         name: user.name || '',
         phone: user.phone || '',
         address: user.address || '',
-        avatar: user.avatar || ''
+        avatar: user.avatar || '',
+        dailyCalorieTarget: user.dailyCalorieTarget || 2000,
+        dailyProteinTarget: user.dailyProteinTarget || 130,
+        dailyCarbsTarget: user.dailyCarbsTarget || 220,
+        dailyFatTarget: user.dailyFatTarget || 65
       })
     }
   }, [user, isAuthenticated, navigate])
@@ -280,6 +288,63 @@ export default function ProfilePage() {
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2">Định dạng hỗ trợ: JPG, PNG, GIF (Tối đa 2MB).</p>
+              </div>
+
+              {/* Healthy Target Config */}
+              <div className="border-t border-gray-100 dark:border-gray-800 pt-6 mt-6 space-y-4">
+                <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                  🥗 Thiết lập Mục tiêu Dinh dưỡng (Dành cho Healthy Mode)
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-normal">
+                  Tùy chỉnh mục tiêu năng lượng và chất dinh dưỡng hàng ngày của bạn. Báo cáo giỏ hàng sẽ đối chiếu dinh dưỡng món ăn với các mục tiêu này.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Mục tiêu Calo (kcal)</label>
+                    <input 
+                      type="number" 
+                      name="dailyCalorieTarget" 
+                      min="500"
+                      value={formData.dailyCalorieTarget} 
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-primary-500 text-sm font-sans" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Protein - Đạm (g)</label>
+                    <input 
+                      type="number" 
+                      name="dailyProteinTarget" 
+                      min="10"
+                      value={formData.dailyProteinTarget} 
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-primary-500 text-sm font-sans" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Carbs (g)</label>
+                    <input 
+                      type="number" 
+                      name="dailyCarbsTarget" 
+                      min="10"
+                      value={formData.dailyCarbsTarget} 
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-primary-500 text-sm font-sans" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Fat - Chất béo (g)</label>
+                    <input 
+                      type="number" 
+                      name="dailyFatTarget" 
+                      min="5"
+                      value={formData.dailyFatTarget} 
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-primary-500 text-sm font-sans" 
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="pt-4">

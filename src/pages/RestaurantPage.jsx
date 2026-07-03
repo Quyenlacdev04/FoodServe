@@ -16,6 +16,7 @@ export default function RestaurantPage() {
   const navigate = useNavigate()
   const { selectedRestaurant, menuItems, status } = useSelector((s) => s.restaurants)
   const { user } = useSelector((s) => s.auth)
+  const { healthyMode } = useSelector((s) => s.ui)
   const cartCount = useSelector(selectCartCount)
   const [activeCategory, setActiveCategory] = useState('all')
   const [quantities, setQuantities] = useState({})
@@ -88,6 +89,12 @@ export default function RestaurantPage() {
   const cats = ['all', ...new Set(items.map((i) => i.category || 'Khác'))]
 
   const filtered = activeCategory === 'all' ? items : items.filter((i) => i.category === activeCategory)
+  const displayItems = [...filtered].sort((a, b) => {
+    if (healthyMode) {
+      return (b.isHealthy ? 1 : 0) - (a.isHealthy ? 1 : 0);
+    }
+    return 0;
+  });
 
   const isExpired = selectedRestaurant.subscriptionExpiry && new Date(selectedRestaurant.subscriptionExpiry) < new Date()
 
@@ -212,7 +219,7 @@ export default function RestaurantPage() {
         {/* Menu item cards listing grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AnimatePresence mode="popLayout">
-            {filtered.map((item, i) => (
+            {displayItems.map((item, i) => (
               <motion.div
                 key={item.id}
                 layout
@@ -232,7 +239,12 @@ export default function RestaurantPage() {
                 <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
                   <div>
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-base text-gray-800 dark:text-white line-clamp-1">{item.name}</h4>
+                      <h4 className="font-bold text-base text-gray-850 dark:text-white line-clamp-1 flex items-center gap-1.5">
+                        {item.name}
+                        {healthyMode && item.isHealthy && (
+                          <span className="text-xs" title="Món ăn lành mạnh">🥗</span>
+                        )}
+                      </h4>
                       {item.popular && (
                         <span className="badge-hot text-[9px] px-2 py-0.5 rounded-lg shadow-sm">HOT</span>
                       )}
@@ -240,6 +252,19 @@ export default function RestaurantPage() {
                     <p className="text-gray-400 dark:text-gray-500 text-xs mt-1.5 line-clamp-2 font-medium">
                       {item.description}
                     </p>
+                    
+                    {/* Nutrition Macros Display */}
+                    {healthyMode && item.calories > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 text-[9px] font-bold text-green-600 dark:text-green-400 mt-2.5 bg-green-500/5 dark:bg-green-500/10 px-2.5 py-1 rounded-xl w-max border border-green-500/10 shadow-sm">
+                        <span className="flex items-center gap-0.5">🔥 {item.calories} kcal</span>
+                        <span className="opacity-30">•</span>
+                        <span>💪 P: {item.protein}g</span>
+                        <span className="opacity-30">•</span>
+                        <span>🍞 C: {item.carbs}g</span>
+                        <span className="opacity-30">•</span>
+                        <span>🥑 F: {item.fat}g</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between mt-3">

@@ -20,7 +20,14 @@ const userSchema = new mongoose.Schema({
   vehicleType: { type: String }, // 'bike', 'motorbike', 'car'
   vehicleNumber: { type: String },
   isOnline: { type: Boolean, default: false },
-  claimedRanks: { type: [String], default: [] } // Danh sách cấp bậc đã nhận thưởng
+  claimedRanks: { type: [String], default: [] }, // Danh sách cấp bậc đã nhận thưởng
+  
+  // Cài đặt Chế độ Ăn uống Lành mạnh & Tính Calo
+  healthyModeEnabled: { type: Boolean, default: false },
+  dailyCalorieTarget: { type: Number, default: 2000 },
+  dailyProteinTarget: { type: Number, default: 130 },
+  dailyCarbsTarget: { type: Number, default: 220 },
+  dailyFatTarget: { type: Number, default: 65 }
 }, { timestamps: true });
 
 // Indexes để tăng hiệu suất truy vấn
