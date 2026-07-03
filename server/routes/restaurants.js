@@ -82,6 +82,210 @@ router.get('/', async (req, res) => {
   }
 });
 
+// 8. Đề xuất món ăn thông minh bằng AI (AI Food Recommendation)
+router.get('/recommendations/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Lấy tất cả nhà hàng và món ăn hoạt động
+    const restaurants = await Restaurant.find({ isActive: { $ne: false } }).lean();
+    const menuItems = await MenuItem.find().lean();
+    
+    // Thống kê lịch sử đặt hàng của User
+    let userCategoryCounts = {};
+    if (userId && userId !== 'undefined' && userId !== 'null' && userId !== 'guest') {
+      const userOrders = await Order.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean();
+
+      if (userOrders.length > 0) {
+        const orderedMenuItemIds = [];
+        userOrders.forEach(order => {
+          order.items.forEach(item => {
+            if (item.menuItemId) {
+              orderedMenuItemIds.push(item.menuItemId.toString());
+            }
+          });
+        });
+
+        const orderedItemsDetails = await MenuItem.find({ _id: { $in: orderedMenuItemIds } }).lean();
+        const itemCategoryMap = {};
+        orderedItemsDetails.forEach(item => {
+          itemCategoryMap[item._id.toString()] = item.category;
+        });
+
+        userOrders.forEach(order => {
+          order.items.forEach(item => {
+            if (item.menuItemId) {
+              const category = itemCategoryMap[item.menuItemId.toString()];
+              if (category) {
+                userCategoryCounts[category] = (userCategoryCounts[category] || 0) + (item.quantity || 1);
+              }
+            }
+          });
+        });
+      }
+    }
+
+    // Thiết lập Time-Based Boost dựa trên giờ hiện tại của server (hoặc giờ Việt Nam GMT+7)
+    // Lấy giờ UTC + 7
+    const serverDate = new Date();
+    const localHour = (serverDate.getUTCHours() + 7) % 24;
+    
+    let boostedCategories = [];
+    let timeSlotTag = '';
+    let timeLabel = '';
+
+    if (localHour >= 5 && localHour < 10) {
+      boostedCategories = ['Breakfast', 'Sáng', 'Bánh mì', 'Phở', 'Bún', 'Cà phê', 'Coffee', 'Bún chả', 'Xôi'];
+      timeSlotTag = 'Nạp năng lượng sáng';
+      timeLabel = 'Bữa sáng';
+    } else if (localHour >= 10 && localHour < 14) {
+      boostedCategories = ['Cơm', 'Cơm văn phòng', 'Bún', 'Phở', 'Mỳ', 'Noodle', 'Rice', 'Trưa'];
+      timeSlotTag = 'Gợi ý bữa trưa';
+      timeLabel = 'Bữa trưa';
+    } else if (localHour >= 14 && localHour < 17) {
+      boostedCategories = ['Trà sữa', 'Ăn vặt', 'Snack', 'Sinh tố', 'Đồ ngọt', 'Bánh tráng', 'Dessert', 'Chiều'];
+      timeSlotTag = 'Ăn vặt xế chiều';
+      timeLabel = 'Ăn vặt chiều';
+    } else if (localHour >= 17 && localHour < 22) {
+      boostedCategories = ['Cơm', 'Mỳ', 'Nướng', 'Lẩu', 'Gà rán', 'Pizza', 'Fastfood', 'Tối'];
+      timeSlotTag = 'Gợi ý bữa tối';
+      timeLabel = 'Bữa tối';
+    } else {
+      boostedCategories = ['Ăn vặt', 'Cháo', 'Mỳ đêm', 'Noodle', 'Snack', 'Đêm'];
+      timeSlotTag = 'Ăn đêm ấm bụng';
+      timeLabel = 'Ăn đêm';
+    }
+
+    const matchesBoosted = (category) => {
+      if (!category) return false;
+      const catLower = category.toLowerCase();
+      return boostedCategories.some(boosted => catLower.includes(boosted.toLowerCase()));
+    };
+
+    // 1. Chấm điểm nhà hàng
+    const scoredRestaurants = restaurants.map(restaurant => {
+      let score = 0;
+
+      // BaseScore: rating * 10
+      const rating = restaurant.rating || 4.0;
+      score += rating * 10;
+
+      // PopularityBoost: orders & reviews count
+      const ordersCount = restaurant.orders || 0;
+      const reviewsCount = restaurant.reviews || 0;
+      score += Math.min(25, ordersCount * 0.05 + reviewsCount * 0.1);
+
+      // HistoryScore: tần suất danh mục được chọn * 15
+      let hasHistoryMatch = false;
+      if (Object.keys(userCategoryCounts).length > 0) {
+        const restaurantCats = restaurant.categories || [];
+        restaurantCats.forEach(cat => {
+          Object.keys(userCategoryCounts).forEach(favCat => {
+            if (cat.toLowerCase().includes(favCat.toLowerCase()) || favCat.toLowerCase().includes(cat.toLowerCase())) {
+              score += userCategoryCounts[favCat] * 15;
+              hasHistoryMatch = true;
+            }
+          });
+        });
+      }
+
+      // TimeBoost: 20đ
+      let hasTimeBoost = false;
+      const restaurantCats = restaurant.categories || [];
+      const matchesTime = restaurantCats.some(cat => matchesBoosted(cat));
+      if (matchesTime) {
+        score += 20;
+        hasTimeBoost = true;
+      }
+
+      // Determine Tag
+      let tag = '🔥 Phổ biến';
+      if (hasHistoryMatch) tag = '🍱 Hợp gu của bạn';
+      else if (hasTimeBoost) tag = `⏰ ${timeSlotTag}`;
+      else if (rating >= 4.6) tag = '⭐ Đánh giá cực tốt';
+
+      return {
+        ...restaurant,
+        score,
+        reasonTag: tag,
+        recommendationTag: tag
+      };
+    });
+
+    // 2. Chấm điểm món ăn (MenuItems)
+    const scoredItems = menuItems.map(item => {
+      let score = 0;
+      const restaurant = restaurants.find(r => r._id.toString() === item.restaurantId.toString());
+      if (!restaurant) return null;
+
+      // BaseScore: dựa trên rating nhà hàng
+      const rating = restaurant.rating || 4.0;
+      score += rating * 8;
+
+      // HistoryScore: trùng khớp category * 20
+      let hasHistoryMatch = false;
+      const itemCat = item.category || '';
+      if (Object.keys(userCategoryCounts).length > 0) {
+        Object.keys(userCategoryCounts).forEach(favCat => {
+          if (itemCat.toLowerCase().includes(favCat.toLowerCase()) || favCat.toLowerCase().includes(itemCat.toLowerCase())) {
+            score += userCategoryCounts[favCat] * 20;
+            hasHistoryMatch = true;
+          }
+        });
+      }
+
+      // TimeBoost: 25đ
+      let hasTimeBoost = false;
+      if (matchesBoosted(itemCat)) {
+        score += 25;
+        hasTimeBoost = true;
+      }
+
+      // Popularity
+      const popularity = item.orders || 0;
+      score += Math.min(15, popularity * 0.1);
+
+      // Determine Tag
+      let tag = '🔥 Bán chạy';
+      if (hasHistoryMatch) tag = '🍱 Đúng gu của bạn';
+      else if (hasTimeBoost) tag = `⏰ ${timeSlotTag}`;
+      else if (item.price < 40000) tag = '💰 Giá hạt dẻ';
+
+      return {
+        ...item,
+        score,
+        badge: tag,
+        recommendationTag: tag,
+        restaurantName: restaurant.name
+      };
+    }).filter(Boolean);
+
+    // Sắp xếp và giới hạn số lượng trả về
+    const recommendedRestaurants = scoredRestaurants
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+
+    const recommendedItems = scoredItems
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+
+    res.json({
+      recommendedRestaurants,
+      recommendedItems,
+      context: {
+        hasHistory: Object.keys(userCategoryCounts).length > 0,
+        timeLabel
+      }
+    });
+  } catch (error) {
+    console.error('Get recommendations error:', error);
+    res.status(500).json({ message: 'Lỗi server khi tính gợi ý AI' });
+  }
+});
+
 // Tìm kiếm món ăn theo tên
 router.get('/search/menu', async (req, res) => {
   try {
