@@ -4,6 +4,7 @@ import MenuItem from '../models/MenuItem.js';
 import User from '../models/User.js';
 import SystemSetting from '../models/SystemSetting.js';
 import Notification from '../models/Notification.js';
+import Order from '../models/Order.js';
 
 const router = express.Router();
 
@@ -174,6 +175,198 @@ router.get('/menu/all', async (req, res) => {
   } catch (error) {
     console.error('Get all menu items error:', error);
     res.status(500).json({ message: 'Lỗi khi lấy danh sách món ăn' });
+  }
+});
+
+// ===== SYSTEM DE XUAT AI: De xuat nha hang & mon an cho nguoi dung =====
+router.get('/recommendations/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentHour = new Date().getHours();
+
+    // 1. Dinh nghia cac danh muc theo khung gio
+    let timeSlot = 'lunch';
+    let timeLabel = 'Gợi ý bữa trưa';
+    let timeCategories = ['Cơm', 'Bún', 'Phở', 'Mỳ', 'Cơm văn phòng'];
+    if (currentHour >= 5 && currentHour < 10) {
+      timeSlot = 'breakfast';
+      timeLabel = 'Gợi ý bữa sáng';
+      timeCategories = ['Cà phê', 'Trà', 'Bánh mỳ', 'Bún', 'Phở', 'Ăn sáng'];
+    } else if (currentHour >= 10 && currentHour < 14) {
+      timeSlot = 'lunch';
+      timeLabel = 'Ăn trưa thôi';
+      timeCategories = ['Cơm', 'Bún', 'Phở', 'Mỳ', 'Cơm văn phòng'];
+    } else if (currentHour >= 14 && currentHour < 17) {
+      timeSlot = 'afternoon';
+      timeLabel = 'Ăn vặt chiều nha';
+      timeCategories = ['Trà sữa', 'Ăn vặt', 'Đồ ngọt', 'Tráng miệng', 'Sinh tố'];
+    } else if (currentHour >= 17 && currentHour < 22) {
+      timeSlot = 'dinner';
+      timeLabel = 'Gợi ý bữa tối';
+      timeCategories = ['Cơm', 'Mỳ', 'Nướng', 'Lẩu', 'Gà rán', 'Pizza'];
+    } else {
+      timeSlot = 'night';
+      timeLabel = 'Ăn đêm không đói';
+      timeCategories = ['Mỳ', 'Ăn vặt', 'Cháo', 'Đồ đêm'];
+    }
+
+    // 2. Lay lich su danh muc ua thich cua user
+    const preferredCategories = {};
+    let hasHistory = false;
+
+    if (userId && userId !== 'guest') {
+      const orders = await Order.find({ userId, status: 'completed' })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean();
+
+      if (orders.length > 0) {
+        hasHistory = true;
+        const menuItemIds = [...new Set(orders.flatMap(o => o.items.map(i => i.menuItemId).filter(id => id)))];
+        
+        if (menuItemIds.length > 0) {
+          const orderedItems = await MenuItem.find({ _id: { $in: menuItemIds } }).lean();
+          const itemCategoryMap = {};
+          orderedItems.forEach(item => {
+            if (item.category) {
+              itemCategoryMap[item._id.toString()] = item.category;
+            }
+          });
+
+          // Tinh tan suat danh muc
+          orders.forEach(order => {
+            order.items.forEach(item => {
+              const cat = itemCategoryMap[item.menuItemId?.toString()];
+              if (cat) {
+                preferredCategories[cat] = (preferredCategories[cat] || 0) + item.quantity;
+              }
+            });
+          });
+        }
+      }
+    }
+
+    // 3. Lay tat ca nha hang dang hoat dong va menu
+    const activeRestaurants = await Restaurant.find({ isActive: { $ne: false } }).lean();
+    const activeMenu = await MenuItem.find().lean();
+
+    // Group menu by restaurantId
+    const menuMap = {};
+    activeMenu.forEach(item => {
+      if (!menuMap[item.restaurantId]) menuMap[item.restaurantId] = [];
+      menuMap[item.restaurantId].push(item);
+    });
+
+    // 4. Tinh diem va de xuat nha hang
+    const scoredRestaurants = activeRestaurants.map(rest => {
+      let score = (rest.rating || 4.0) * 10; // Base score
+      score += Math.min(50, (rest.reviews || 0) * 0.2); // Reviews boost
+
+      // Kiem tra muc do phu hop voi so thich user (Content-based)
+      let matchCount = 0;
+      const restMenu = menuMap[rest._id.toString()] || [];
+      const restCategories = [...new Set(restMenu.map(m => m.category).filter(c => c))];
+
+      restCategories.forEach(cat => {
+        if (preferredCategories[cat]) {
+          score += preferredCategories[cat] * 15; // History score boost
+          matchCount++;
+        }
+      });
+
+      // Kiem tra muc do phu hop voi khung gio (Context-aware)
+      const matchesTime = restCategories.some(cat => timeCategories.includes(cat));
+      if (matchesTime) {
+        score += 25; // Time based boost
+      }
+
+      // Xac dinh nhan ly do de xuat
+      let reasonTag = '';
+      if (matchCount > 0) {
+        reasonTag = 'Hợp gu đặt hàng';
+      } else if (matchesTime) {
+        reasonTag = timeLabel;
+      } else if (rest.rating >= 4.5 && rest.orders >= 50) {
+        reasonTag = 'Được yêu thích nhất';
+      } else {
+        reasonTag = 'Gợi ý cho bạn';
+      }
+
+      return {
+        ...rest,
+        aiScore: score,
+        reasonTag
+      };
+    });
+
+    // Sap xep va lay top 6 nha hang de xuat
+    const recommendedRestaurants = scoredRestaurants
+      .sort((a, b) => b.aiScore - a.aiScore)
+      .slice(0, 6);
+
+    // 5. Tinh diem va de xuat mon an
+    // Chi lay mon an tu cac nha hang dang hoat dong
+    const activeRestIds = activeRestaurants.map(r => r._id.toString());
+    const filteredMenu = activeMenu.filter(item => activeRestIds.includes(item.restaurantId.toString()));
+
+    const scoredItems = filteredMenu.map(item => {
+      const rest = activeRestaurants.find(r => r._id.toString() === item.restaurantId.toString());
+      let score = 50; // Base score
+
+      if (rest) {
+        score += (rest.rating || 4.0) * 5;
+      }
+
+      if (item.popular) {
+        score += 15; // Mon noi tieng
+      }
+
+      // So thich nguoi dung
+      if (item.category && preferredCategories[item.category]) {
+        score += preferredCategories[item.category] * 20;
+      }
+
+      // Khung gio thuc te
+      const isTimeMatch = item.category && timeCategories.includes(item.category);
+      if (isTimeMatch) {
+        score += 30;
+      }
+
+      // Huy hieu ly do de xuat
+      let badge = 'Đề xuất';
+      if (item.category && preferredCategories[item.category]) {
+        badge = 'Theo gu bạn';
+      } else if (isTimeMatch) {
+        badge = timeLabel;
+      } else if (item.popular) {
+        badge = 'Bán chạy';
+      }
+
+      return {
+        ...item,
+        aiScore: score,
+        badge,
+        restaurantName: rest ? rest.name : ''
+      };
+    });
+
+    // Sap xep va lay top 8 mon de xuat
+    const recommendedItems = scoredItems
+      .sort((a, b) => b.aiScore - a.aiScore)
+      .slice(0, 8);
+
+    res.json({
+      recommendedRestaurants,
+      recommendedItems,
+      context: {
+        timeSlot,
+        timeLabel,
+        hasHistory
+      }
+    });
+  } catch (error) {
+    console.error('AI Recommendation endpoint error:', error);
+    res.status(500).json({ message: 'Lỗi server khi lấy đề xuất AI' });
   }
 });
 
