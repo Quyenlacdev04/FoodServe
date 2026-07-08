@@ -646,31 +646,125 @@ router.post('/coins/withdraw', async (req, res) => {
       coins: coinsToWithdraw,
       type: 'withdraw',
       paymentMethod: 'bank',
-      status: 'completed', // Cho phép hoàn tất trực tiếp ở bản demo
+      status: 'pending', // Yêu cầu ở trạng thái Chờ duyệt
       referenceId: `WITHDRAW_${Date.now()}`,
       description: `Rút tiền về ngân hàng ${bankName.toUpperCase()} - Số TK: ${accountNumber} (${accountName.toUpperCase()})`
     });
 
-    // Phát socket cập nhật số dư cho client real-time
+    // Phát socket cập nhật số dư cho client real-time (số dư tạm thời giảm đi vì đang giữ xu)
     const io = req.app.get('io');
     if (io) {
       io.to(`user-${user._id}`).emit('withdraw-success', {
         coins: user.coins,
         coinsSubtracted: coinsToWithdraw,
-        message: `Rút thành công ${coinsToWithdraw} Xu về ngân hàng!`
+        message: `Yêu cầu rút ${coinsToWithdraw} Xu đã được gửi và đang chờ Admin duyệt.`
       });
     }
 
     res.json({
       success: true,
       coins: user.coins,
-      message: `Đã xử lý yêu cầu rút ${coinsToWithdraw} Xu (${amountVnd.toLocaleString('vi-VN')} đ) thành công!`,
+      message: `Yêu cầu rút ${coinsToWithdraw} Xu (${amountVnd.toLocaleString('vi-VN')} đ) đã được gửi, đang chờ phê duyệt.`,
       transaction: coinTx
     });
 
   } catch (error) {
     console.error('Coins withdraw error:', error);
     res.status(500).json({ message: 'Lỗi hệ thống khi xử lý yêu cầu rút tiền' });
+  }
+});
+
+// ===== COINS: Lấy danh sách yêu cầu rút tiền đang chờ duyệt (Admin) =====
+router.get('/coins/pending-withdrawals', async (req, res) => {
+  try {
+    const withdrawals = await CoinTransaction.find({ type: 'withdraw', status: 'pending' }).sort({ createdAt: -1 });
+    const populatedWithdrawals = await Promise.all(withdrawals.map(async (tx) => {
+      const user = await User.findById(tx.userId);
+      return {
+        ...tx.toObject(),
+        userName: user ? user.name : 'Tài xế',
+        userPhone: user ? user.phone : '',
+        userRole: user ? user.role : 'shipper'
+      };
+    }));
+    res.json(populatedWithdrawals);
+  } catch (error) {
+    console.error('Get pending withdrawals error:', error);
+    res.status(500).json({ message: 'Lỗi khi lấy danh sách rút tiền' });
+  }
+});
+
+// ===== COINS: Admin duyệt rút tiền =====
+router.post('/coins/approve-withdrawal/:txId', async (req, res) => {
+  try {
+    const { txId } = req.params;
+    const tx = await CoinTransaction.findById(txId);
+    if (!tx) {
+      return res.status(404).json({ message: 'Không tìm thấy giao dịch này' });
+    }
+    if (tx.status !== 'pending') {
+      return res.status(400).json({ message: 'Giao dịch này đã được xử lý trước đó' });
+    }
+
+    tx.status = 'completed';
+    await tx.save();
+
+    const user = await User.findById(tx.userId);
+    
+    // Gửi socket thông báo rút thành công
+    const io = req.app.get('io');
+    if (io && user) {
+      io.to(`user-${user._id}`).emit('withdraw-approved', {
+        coins: user.coins,
+        coinsSubtracted: tx.coins,
+        message: `Yêu cầu rút ${tx.coins} Xu của bạn đã được duyệt thành công!`
+      });
+    }
+
+    res.json({ success: true, message: 'Duyệt yêu cầu rút tiền thành công!', transaction: tx });
+  } catch (error) {
+    console.error('Approve withdrawal error:', error);
+    res.status(500).json({ message: 'Lỗi hệ thống khi duyệt rút tiền' });
+  }
+});
+
+// ===== COINS: Admin từ chối rút tiền =====
+router.post('/coins/reject-withdrawal/:txId', async (req, res) => {
+  try {
+    const { txId } = req.params;
+    const { rejectReason } = req.body;
+    const tx = await CoinTransaction.findById(txId);
+    if (!tx) {
+      return res.status(404).json({ message: 'Không tìm thấy giao dịch này' });
+    }
+    if (tx.status !== 'pending') {
+      return res.status(400).json({ message: 'Giao dịch này đã được xử lý trước đó' });
+    }
+
+    tx.status = 'failed';
+    tx.description = `${tx.description} (Từ chối: ${rejectReason || 'Không có lý do'})`;
+    await tx.save();
+
+    // Hoàn lại xu cho user
+    const user = await User.findById(tx.userId);
+    if (user) {
+      user.coins += tx.coins;
+      await user.save();
+    }
+
+    // Gửi socket thông báo bị từ chối
+    const io = req.app.get('io');
+    if (io && user) {
+      io.to(`user-${user._id}`).emit('withdraw-rejected', {
+        coins: user.coins,
+        message: `Yêu cầu rút ${tx.coins} Xu của bạn đã bị từ chối. Xu đã được hoàn trả.`
+      });
+    }
+
+    res.json({ success: true, message: 'Đã từ chối yêu cầu rút tiền!', transaction: tx });
+  } catch (error) {
+    console.error('Reject withdrawal error:', error);
+    res.status(500).json({ message: 'Lỗi hệ thống khi từ chối rút tiền' });
   }
 });
 

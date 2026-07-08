@@ -40,6 +40,9 @@ export default function AdminPage() {
   const [driverRequestsLoading, setDriverRequestsLoading] = useState(false)
   const [paymentRequests, setPaymentRequests] = useState([])
   const [paymentRequestsLoading, setPaymentRequestsLoading] = useState(false)
+  const [withdrawRequests, setWithdrawRequests] = useState([])
+  const [withdrawRequestsLoading, setWithdrawRequestsLoading] = useState(false)
+  const [paymentSubTab, setPaymentSubTab] = useState('maintenance') // 'maintenance' | 'withdrawals'
   const [subscriptionRevenue, setSubscriptionRevenue] = useState(0)
   const [newOrderAlert, setNewOrderAlert] = useState(null) // popup thông báo đơn mới
   const [unreadOrders, setUnreadOrders] = useState(0) // số đơn chưa xem
@@ -207,14 +210,33 @@ export default function AdminPage() {
     }
   }
 
+  const fetchWithdrawRequests = async () => {
+    try {
+      setWithdrawRequestsLoading(true)
+      const res = await fetch(`${API_BASE_URL}/api/payment/coins/pending-withdrawals`)
+      if (res.ok) {
+        const data = await res.json()
+        setWithdrawRequests(data)
+      }
+    } catch (err) {
+      toast.error('Lỗi khi tải danh sách yêu cầu rút tiền')
+    } finally {
+      setWithdrawRequestsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'driver-requests') {
       fetchDriverRequests()
     }
     if (activeTab === 'payment-requests') {
-      fetchPaymentRequests()
+      if (paymentSubTab === 'maintenance') {
+        fetchPaymentRequests()
+      } else {
+        fetchWithdrawRequests()
+      }
     }
-  }, [activeTab])
+  }, [activeTab, paymentSubTab])
 
   const handleDriverRequestStatus = async (requestId, newStatus) => {
     try {
@@ -251,6 +273,26 @@ export default function AdminPage() {
       } else {
         const data = await res.json()
         toast.error(data.message || 'Lỗi khi xử lý yêu cầu thanh toán')
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối')
+    }
+  }
+
+  const handleWithdrawRequestStatus = async (txId, action, rejectReason = '') => {
+    try {
+      const endpoint = action === 'approve' ? 'approve-withdrawal' : 'reject-withdrawal'
+      const res = await fetch(`${API_BASE_URL}/api/payment/coins/${endpoint}/${txId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejectReason })
+      })
+      if (res.ok) {
+        toast.success(action === 'approve' ? 'Đã duyệt yêu cầu rút tiền thành công!' : 'Đã từ chối yêu cầu rút tiền')
+        fetchWithdrawRequests()
+      } else {
+        const data = await res.json()
+        toast.error(data.message || 'Lỗi khi xử lý yêu cầu rút tiền')
       }
     } catch (err) {
       toast.error('Lỗi kết nối')
@@ -946,103 +988,195 @@ export default function AdminPage() {
 
           {activeTab === 'payment-requests' && (
             <div className="bg-white dark:bg-dark-100 rounded-2xl shadow-card overflow-hidden">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h3 className="font-bold text-lg dark:text-white">Yêu cầu Thanh toán Phí duy trì</h3>
-                  <p className="text-sm text-gray-400">Duyệt các yêu cầu chuyển khoản từ nhà hàng</p>
+                  <h3 className="font-bold text-lg dark:text-white">Duyệt Giao dịch & Rút tiền</h3>
+                  <p className="text-sm text-gray-400">Xem và xử lý các giao dịch tài chính hệ thống</p>
                 </div>
-                <button onClick={fetchPaymentRequests} className="text-sm text-primary-500 font-semibold hover:underline">Làm mới</button>
+                
+                {/* Sub-tab selection */}
+                <div className="flex bg-gray-100 dark:bg-dark-200 p-1 rounded-xl">
+                  <button 
+                    onClick={() => setPaymentSubTab('maintenance')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      paymentSubTab === 'maintenance' 
+                        ? 'bg-white dark:bg-dark-100 text-gray-800 dark:text-white shadow-sm' 
+                        : 'text-gray-455 hover:text-gray-700'
+                    }`}
+                  >
+                    💳 Phí duy trì nhà hàng
+                  </button>
+                  <button 
+                    onClick={() => setPaymentSubTab('withdrawals')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      paymentSubTab === 'withdrawals' 
+                        ? 'bg-white dark:bg-dark-100 text-gray-800 dark:text-white shadow-sm' 
+                        : 'text-gray-455 hover:text-gray-700'
+                    }`}
+                  >
+                    💸 Rút tiền tài xế
+                  </button>
+                </div>
               </div>
               
               <div className="p-6">
-                {paymentRequestsLoading ? (
-                  <div className="py-10 text-center text-gray-400">Đang tải yêu cầu thanh toán...</div>
-                ) : paymentRequests.length === 0 ? (
-                  <div className="py-10 text-center text-gray-400">Không có yêu cầu thanh toán nào.</div>
+                {paymentSubTab === 'maintenance' ? (
+                  paymentRequestsLoading ? (
+                    <div className="py-10 text-center text-gray-400">Đang tải yêu cầu thanh toán...</div>
+                  ) : paymentRequests.length === 0 ? (
+                    <div className="py-10 text-center text-gray-400">Không có yêu cầu thanh toán nào.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6">
+                      {paymentRequests.map((req) => (
+                        <div key={req._id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-gray-50 dark:bg-dark-200 relative overflow-hidden transition-all hover:shadow-lg">
+                          {/* Header details */}
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                            <div>
+                              <span className="text-xs bg-green-100 dark:bg-green-950/40 text-green-500 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
+                                💳 Phí duy trì
+                              </span>
+                              <h4 className="font-bold text-xl dark:text-white mt-1.5">{req.restaurantName}</h4>
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">📅 {new Date(req.createdAt).toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                                req.status === 'approved' ? 'bg-green-500/10 text-green-500' :
+                                req.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
+                              }`}>
+                                {req.status === 'approved' ? 'Đã duyệt' : req.status === 'rejected' ? 'Từ chối' : 'Chờ duyệt'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Payment details */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-gray-200 dark:border-gray-700/50 py-4 my-4">
+                            <div>
+                              <p className="text-xs text-gray-400 font-medium">Thông tin thanh toán</p>
+                              <p className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">Số tiền: <span className="text-green-500">{(req.amount || 0).toLocaleString()}đ</span></p>
+                              <p className="text-sm text-gray-500 mt-0.5">Phương thức: {req.paymentMethod === 'bank_transfer' ? 'Chuyển khoản ngân hàng' : req.paymentMethod}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 font-medium">Trạng thái xử lý</p>
+                              {req.status === 'approved' && (
+                                <p className="text-sm text-green-600 mt-0.5">✅ Đã duyệt lúc: {new Date(req.approvedAt).toLocaleString()}</p>
+                              )}
+                              {req.status === 'rejected' && (
+                                <div className="mt-0.5">
+                                  <p className="text-sm text-red-600">❌ Từ chối lúc: {new Date(req.rejectedAt).toLocaleString()}</p>
+                                  {req.rejectReason && <p className="text-xs text-red-500 mt-1">Lý do: {req.rejectReason}</p>}
+                                </div>
+                              )}
+                              {req.status === 'pending' && (
+                                <p className="text-sm text-yellow-600 mt-0.5">⏳ Đang chờ admin xử lý</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Note */}
+                          <div className="mb-4">
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                              <span className="font-semibold text-gray-700 dark:text-gray-400">Ghi chú:</span> {req.note}
+                            </p>
+                          </div>
+
+                          {/* Action buttons */}
+                          {req.status === 'pending' && (
+                            <div className="flex justify-end gap-3 pt-2">
+                              <button
+                                onClick={() => {
+                                  const reason = prompt('Lý do từ chối (tùy chọn):')
+                                  if (reason !== null) {
+                                    handlePaymentRequestStatus(req._id, 'reject', reason)
+                                  }
+                                }}
+                                className="px-4 py-2 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-semibold rounded-xl text-sm transition-colors"
+                              >
+                                Từ chối
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Xác nhận duyệt thanh toán ${(req.amount || 0).toLocaleString()}đ cho ${req.restaurantName}?`)) {
+                                    handlePaymentRequestStatus(req._id, 'approve')
+                                  }
+                                }}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm shadow-md transition-all hover:scale-[1.02]"
+                              >
+                                ✅ Duyệt thanh toán & Gia hạn
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
                 ) : (
-                  <div className="grid grid-cols-1 gap-6">
-                    {paymentRequests.map((req) => (
-                      <div key={req._id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-gray-50 dark:bg-dark-200 relative overflow-hidden transition-all hover:shadow-lg">
-                        
-                        {/* Header details */}
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                          <div>
-                            <span className="text-xs bg-green-100 dark:bg-green-950/40 text-green-500 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
-                              💳 Phí duy trì
-                            </span>
-                            <h4 className="font-bold text-xl dark:text-white mt-1.5">{req.restaurantName}</h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">📅 {new Date(req.createdAt).toLocaleString()}</p>
+                  withdrawRequestsLoading ? (
+                    <div className="py-10 text-center text-gray-400">Đang tải danh sách rút tiền...</div>
+                  ) : withdrawRequests.length === 0 ? (
+                    <div className="py-10 text-center text-gray-400">Không có yêu cầu rút tiền nào cần duyệt.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6">
+                      {withdrawRequests.map((req) => (
+                        <div key={req._id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-gray-50 dark:bg-dark-200 relative overflow-hidden transition-all hover:shadow-lg">
+                          
+                          {/* Header details */}
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                            <div>
+                              <span className="text-xs bg-amber-100 dark:bg-amber-950/40 text-amber-600 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
+                                💸 Rút tiền tài xế
+                              </span>
+                              <h4 className="font-bold text-xl dark:text-white mt-1.5">{req.userName}</h4>
+                              <p className="text-xs text-gray-400 mt-1">📞 SĐT: {req.userPhone || '—'} · Vai trò: {req.userRole === 'shipper' ? 'Tài xế' : req.userRole}</p>
+                              <p className="text-[11px] text-gray-400 mt-0.5">📅 Ngày gửi: {new Date(req.createdAt).toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/10 text-yellow-600 uppercase tracking-wider">
+                                Chờ duyệt
+                              </span>
+                            </div>
                           </div>
-                          <div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                              req.status === 'approved' ? 'bg-green-500/10 text-green-500' :
-                              req.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
-                            }`}>
-                              {req.status === 'approved' ? 'Đã duyệt' : req.status === 'rejected' ? 'Từ chối' : 'Chờ duyệt'}
-                            </span>
-                          </div>
-                        </div>
 
-                        {/* Payment details */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-gray-200 dark:border-gray-700/50 py-4 my-4">
-                          <div>
-                            <p className="text-xs text-gray-400 font-medium">Thông tin thanh toán</p>
-                            <p className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">Số tiền: <span className="text-green-500">{(req.amount || 0).toLocaleString()}đ</span></p>
-                            <p className="text-sm text-gray-500 mt-0.5">Phương thức: {req.paymentMethod === 'bank_transfer' ? 'Chuyển khoản ngân hàng' : req.paymentMethod}</p>
+                          {/* Withdraw details */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-gray-200 dark:border-gray-700/50 py-4 my-4">
+                            <div>
+                              <p className="text-xs text-gray-400 font-medium">Chi tiết số tiền rút</p>
+                              <p className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">Số tiền VND: <span className="text-red-500 font-sans font-extrabold">{(req.amount || 0).toLocaleString()}đ</span></p>
+                              <p className="text-sm font-semibold text-yellow-600 mt-0.5">Quy đổi: <span className="font-sans font-black">{req.coins} Xu</span></p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 font-medium">Thông tin ngân hàng nhận</p>
+                              <p className="text-sm font-bold text-gray-800 dark:text-gray-200 mt-0.5">{req.description}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs text-gray-400 font-medium">Trạng thái xử lý</p>
-                            {req.status === 'approved' && (
-                              <p className="text-sm text-green-600 mt-0.5">✅ Đã duyệt lúc: {new Date(req.approvedAt).toLocaleString()}</p>
-                            )}
-                            {req.status === 'rejected' && (
-                              <div className="mt-0.5">
-                                <p className="text-sm text-red-600">❌ Từ chối lúc: {new Date(req.rejectedAt).toLocaleString()}</p>
-                                {req.rejectReason && <p className="text-xs text-red-500 mt-1">Lý do: {req.rejectReason}</p>}
-                              </div>
-                            )}
-                            {req.status === 'pending' && (
-                              <p className="text-sm text-yellow-600 mt-0.5">⏳ Đang chờ admin xử lý</p>
-                            )}
-                          </div>
-                        </div>
 
-                        {/* Note */}
-                        <div className="mb-4">
-                          <p className="text-sm text-gray-600 dark:text-gray-300">
-                            <span className="font-semibold text-gray-700 dark:text-gray-400">Ghi chú:</span> {req.note}
-                          </p>
-                        </div>
-
-                        {/* Action buttons */}
-                        {req.status === 'pending' && (
+                          {/* Action buttons */}
                           <div className="flex justify-end gap-3 pt-2">
                             <button
                               onClick={() => {
-                                const reason = prompt('Lý do từ chối (tùy chọn):')
+                                const reason = prompt('Lý do từ chối rút tiền (tùy chọn):')
                                 if (reason !== null) {
-                                  handlePaymentRequestStatus(req._id, 'reject', reason)
+                                  handleWithdrawRequestStatus(req._id, 'reject', reason)
                                 }
                               }}
                               className="px-4 py-2 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-semibold rounded-xl text-sm transition-colors"
                             >
-                              Từ chối
+                              Từ chối rút
                             </button>
                             <button
                               onClick={() => {
-                                if (confirm(`Xác nhận duyệt thanh toán ${(req.amount || 0).toLocaleString()}đ cho ${req.restaurantName}?`)) {
-                                  handlePaymentRequestStatus(req._id, 'approve')
+                                if (confirm(`Xác nhận đã chuyển khoản ${(req.amount || 0).toLocaleString()}đ cho tài xế ${req.userName}?`)) {
+                                  handleWithdrawRequestStatus(req._id, 'approve')
                                 }
                               }}
                               className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm shadow-md transition-all hover:scale-[1.02]"
                             >
-                              ✅ Duyệt thanh toán & Gia hạn
+                              ✅ Đã chuyển tiền & Duyệt rút
                             </button>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
                 )}
               </div>
             </div>
