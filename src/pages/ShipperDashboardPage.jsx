@@ -8,7 +8,7 @@ import {
   FiPhone, FiCamera, FiSave, FiLock, FiEye, FiEyeOff, FiClock,
   FiCheckCircle, FiMapPin, FiNavigation, FiChevronDown, FiChevronUp,
   FiAward, FiGift, FiChevronLeft, FiChevronRight, FiX, FiZap, FiBell,
-  FiMap
+  FiMap, FiAlertCircle
 } from 'react-icons/fi';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -409,10 +409,174 @@ function ShipperHistory({ shipperId }) {
   );
 }
 
+// ===== RÚT TIỀN TÀI XẾ =====
+function ShipperWithdraw({ user, onBack }) {
+  const dispatch = useDispatch();
+  const [coins, setCoins] = useState('');
+  const [bankName, setBankName] = useState(() => localStorage.getItem('foodserve_shipper_bank_name') || 'Vietcombank');
+  const [accountNumber, setAccountNumber] = useState(() => localStorage.getItem('foodserve_shipper_bank_acc') || '');
+  const [accountName, setAccountName] = useState(() => localStorage.getItem('foodserve_shipper_bank_holder') || '');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleWithdrawSubmit = async (e) => {
+    e.preventDefault();
+    if (!coins || !bankName || !accountNumber || !accountName) {
+      return toast.error('Vui lòng điền đầy đủ thông tin rút tiền');
+    }
+
+    const coinsVal = Number(coins);
+    if (isNaN(coinsVal) || coinsVal <= 0) {
+      return toast.error('Số Xu rút không hợp lệ');
+    }
+
+    if (coinsVal > (user?.coins || 0)) {
+      return toast.error(`Số dư Xu không đủ. Hiện bạn có ${user?.coins || 0} Xu.`);
+    }
+
+    if (coinsVal < 50) {
+      return toast.error('Số lượng rút tối thiểu là 50 Xu (50.000đ)');
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/payment/coins/withdraw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?._id || user?.id,
+          coins: coinsVal,
+          bankName,
+          accountNumber,
+          accountName
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || 'Gửi yêu cầu rút tiền thành công!');
+        dispatch(updateUser({ coins: data.coins }));
+        
+        // Lưu thông tin ngân hàng cho lần sau
+        localStorage.setItem('foodserve_shipper_bank_name', bankName);
+        localStorage.setItem('foodserve_shipper_bank_acc', accountNumber);
+        localStorage.setItem('foodserve_shipper_bank_holder', accountName);
+        
+        onBack();
+      } else {
+        toast.error(data.message || 'Lỗi khi rút tiền');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi kết nối máy chủ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Wallet info card */}
+      <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-3xl p-5 text-center">
+        <span className="text-3xl block mb-1">🪙</span>
+        <div className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Số dư Xu của bạn</div>
+        <div className="text-3xl font-black text-yellow-500 dark:text-yellow-400 mt-1 flex items-center justify-center gap-1.5 font-sans">
+          {user?.coins || 0} <span className="text-sm font-bold text-gray-400">Xu</span>
+        </div>
+        <div className="text-xs text-gray-400 mt-1">
+          Giá trị quy đổi: ~ {((user?.coins || 0) * 1000).toLocaleString('vi-VN')} đ
+        </div>
+      </div>
+
+      <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+        {/* Số xu muốn rút */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-150">
+          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block mb-1">Số Xu muốn rút</label>
+          <div className="flex items-center gap-2">
+            <input 
+              type="number" 
+              value={coins} 
+              onChange={e => setCoins(e.target.value)} 
+              placeholder="Tối thiểu 50 Xu"
+              className="flex-1 text-gray-800 text-base font-semibold outline-none bg-transparent"
+              min="50"
+              required
+            />
+            {coins && (
+              <span className="text-xs text-green-600 font-black bg-green-500/10 px-2 py-1 rounded-lg shrink-0">
+                ~ {(Number(coins) * 1000).toLocaleString('vi-VN')} đ
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Ngân hàng nhận tiền */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-155">
+          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block mb-2">Ngân hàng thụ hưởng</label>
+          <select 
+            value={bankName} 
+            onChange={e => setBankName(e.target.value)}
+            className="w-full bg-transparent outline-none text-gray-800 text-sm font-bold"
+          >
+            <option value="Vietcombank">Vietcombank (VCB)</option>
+            <option value="Techcombank">Techcombank (TCB)</option>
+            <option value="MBBank">MBBank (MB)</option>
+            <option value="VietinBank">VietinBank (CTG)</option>
+            <option value="BIDV">BIDV</option>
+            <option value="Agribank">Agribank (VBA)</option>
+            <option value="ACB">ACB</option>
+          </select>
+        </div>
+
+        {/* Số tài khoản */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-150">
+          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block mb-1">Số tài khoản</label>
+          <input 
+            type="text" 
+            value={accountNumber} 
+            onChange={e => setAccountNumber(e.target.value.replace(/\s+/g, ''))} 
+            placeholder="Ví dụ: 098765432101"
+            className="w-full text-gray-800 text-base font-mono font-bold outline-none bg-transparent"
+            required
+          />
+        </div>
+
+        {/* Tên chủ tài khoản */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-150">
+          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block mb-1">Tên chủ tài khoản</label>
+          <input 
+            type="text" 
+            value={accountName} 
+            onChange={e => setAccountName(e.target.value.toUpperCase())} 
+            placeholder="Ví dụ: NGUYEN VAN A"
+            className="w-full text-gray-800 text-base font-bold outline-none bg-transparent uppercase tracking-wider"
+            required
+          />
+        </div>
+
+        {/* Cảnh báo rút */}
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 flex items-start gap-2.5">
+          <FiAlertCircle className="text-blue-500 shrink-0 mt-0.5" size={15} />
+          <div className="text-[10px] text-blue-700 leading-normal font-bold">
+            Tiền sẽ được chuyển khoản nhanh 24/7 trực tiếp vào tài khoản ngân hàng thụ hưởng của bạn sau khi hoàn thành yêu cầu rút. Hạn mức rút tối thiểu: 50 Xu (50.000đ).
+          </div>
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={submitting || !coins || !accountNumber || !accountName}
+          className="w-full py-3.5 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-300 text-white font-bold rounded-2xl text-base shadow-lg shadow-yellow-500/20 transition-all hover:scale-[1.01]"
+        >
+          {submitting ? 'Đang gửi yêu cầu...' : 'Xác nhận rút tiền'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // ===== HỒ SƠ — Kiểu TADA Shipper =====
 function ShipperProfile({ user, onNavigate }) {
   const dispatch = useDispatch();
-  const [activeSection, setActiveSection] = useState(null); // null | 'edit' | 'password' | 'rank' | 'missions' | 'faq' | 'support'
+  const [activeSection, setActiveSection] = useState(null); // null | 'edit' | 'password' | 'rank' | 'missions' | 'faq' | 'support' | 'withdraw'
   const [loading, setLoading] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
@@ -686,6 +850,22 @@ function ShipperProfile({ user, onNavigate }) {
     );
   }
 
+  if (activeSection === 'withdraw') {
+    return (
+      <div className="pb-24">
+        <div className="flex items-center gap-3 px-4 py-4 bg-white border-b border-gray-100">
+          <button onClick={() => setActiveSection(null)} className="p-2 rounded-xl hover:bg-gray-100">
+            <FiChevronLeft size={20} className="text-gray-600" />
+          </button>
+          <h2 className="font-bold text-gray-800">Rút tiền về ngân hàng</h2>
+        </div>
+        <div className="px-4 pt-4">
+          <ShipperWithdraw user={user} onBack={() => setActiveSection(null)} />
+        </div>
+      </div>
+    );
+  }
+
   // ===== MAIN PROFILE SCREEN =====
   return (
     <div className="pb-24 bg-gray-50">
@@ -719,11 +899,11 @@ function ShipperProfile({ user, onNavigate }) {
       </div>
 
       {/* Số dư */}
-      <button onClick={() => toast('Xu = ' + (user?.coins || 0) + ' · ' + (coinsToVnd).toLocaleString('vi-VN') + ' VND')}
-        className="mx-4 mt-4 w-[calc(100%-2rem)] bg-yellow-400 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-lg shadow-yellow-200">
-        <span className="font-black text-gray-900 text-base">Số dư</span>
+      <button onClick={() => setActiveSection('withdraw')}
+        className="mx-4 mt-4 w-[calc(100%-2rem)] bg-yellow-450 hover:bg-yellow-500 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-lg shadow-yellow-200 transition-colors">
+        <span className="font-black text-gray-905 text-base">Số dư</span>
         <div className="flex items-center gap-2">
-          <span className="font-black text-gray-900 text-base">{coinsToVnd.toLocaleString('vi-VN')} VND</span>
+          <span className="font-black text-gray-905 text-base">{coinsToVnd.toLocaleString('vi-VN')} VND</span>
           <FiChevronRight className="text-gray-700" size={18} />
         </div>
       </button>
@@ -975,6 +1155,10 @@ export default function ShipperDashboardPage() {
     const socket = io(SOCKET_URL);
     socketRef.current = socket;
 
+    if (user?._id) {
+      socket.emit('join-user', user._id);
+    }
+
     socket.on('new-order', (order) => {
       if (!isOnline) return;
 
@@ -1010,10 +1194,18 @@ export default function ShipperDashboardPage() {
       setIncomingOrder(order);
     });
 
+    socket.on('withdraw-success', (data) => {
+      toast.success(data.message || `Rút thành công -${data.coinsSubtracted} Xu!`, {
+        icon: '💸',
+        duration: 5000
+      });
+      dispatch(updateUser({ coins: data.coins }));
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, [isOnline]);
+  }, [isOnline, user?._id]);
 
   // ===== Nhận đơn hàng =====
   const handleAcceptIncomingOrder = useCallback(async (orderId) => {

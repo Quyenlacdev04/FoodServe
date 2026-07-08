@@ -607,6 +607,73 @@ router.get('/coins/history/:userId', async (req, res) => {
   }
 });
 
+// ===== COINS: Rút xu về tài khoản ngân hàng (Payout) =====
+router.post('/coins/withdraw', async (req, res) => {
+  try {
+    const { userId, coins, bankName, accountNumber, accountName } = req.body;
+
+    if (!userId || !coins || !bankName || !accountNumber || !accountName) {
+      return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin yêu cầu rút tiền' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản người dùng' });
+    }
+
+    const coinsToWithdraw = Number(coins);
+    if (isNaN(coinsToWithdraw) || coinsToWithdraw <= 0) {
+      return res.status(400).json({ message: 'Số lượng xu không hợp lệ' });
+    }
+
+    if (user.coins < coinsToWithdraw) {
+      return res.status(400).json({ message: `Số dư Xu không đủ. Bạn chỉ có ${user.coins} Xu.` });
+    }
+
+    if (coinsToWithdraw < 50) {
+      return res.status(400).json({ message: 'Số lượng rút tối thiểu là 50 Xu (50.000đ).' });
+    }
+
+    // Trừ xu của người dùng
+    user.coins -= coinsToWithdraw;
+    await user.save();
+
+    // Tạo giao dịch rút tiền
+    const amountVnd = coinsToWithdraw * 1000;
+    const coinTx = await CoinTransaction.create({
+      userId,
+      amount: amountVnd,
+      coins: coinsToWithdraw,
+      type: 'withdraw',
+      paymentMethod: 'bank',
+      status: 'completed', // Cho phép hoàn tất trực tiếp ở bản demo
+      referenceId: `WITHDRAW_${Date.now()}`,
+      description: `Rút tiền về ngân hàng ${bankName.toUpperCase()} - Số TK: ${accountNumber} (${accountName.toUpperCase()})`
+    });
+
+    // Phát socket cập nhật số dư cho client real-time
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user-${user._id}`).emit('withdraw-success', {
+        coins: user.coins,
+        coinsSubtracted: coinsToWithdraw,
+        message: `Rút thành công ${coinsToWithdraw} Xu về ngân hàng!`
+      });
+    }
+
+    res.json({
+      success: true,
+      coins: user.coins,
+      message: `Đã xử lý yêu cầu rút ${coinsToWithdraw} Xu (${amountVnd.toLocaleString('vi-VN')} đ) thành công!`,
+      transaction: coinTx
+    });
+
+  } catch (error) {
+    console.error('Coins withdraw error:', error);
+    res.status(500).json({ message: 'Lỗi hệ thống khi xử lý yêu cầu rút tiền' });
+  }
+});
+
 // ===== COINS: Tạo link nạp xu (MoMo / PayOS) =====
 router.post('/coins/create-topup', async (req, res) => {
   try {

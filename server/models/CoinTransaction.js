@@ -6,12 +6,12 @@ const coinTransactionSchema = new mongoose.Schema({
   coins: { type: Number, required: true },  // Số xu quy đổi tương ứng
   type: { 
     type: String, 
-    enum: ['topup', 'spend', 'refund', 'reward'], 
+    enum: ['topup', 'spend', 'refund', 'reward', 'withdraw'], 
     required: true 
   },
   paymentMethod: { 
     type: String, 
-    enum: ['momo', 'payos', 'zalopay', 'vnpay', 'admin', 'system'] 
+    enum: ['momo', 'payos', 'zalopay', 'vnpay', 'bank', 'admin', 'system'] 
   },
   status: { 
     type: String, 
