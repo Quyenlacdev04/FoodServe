@@ -1,0 +1,75 @@
+@startuml
+' --- Tối ưu hóa giao diện sơ đồ gọn gàng ---
+skinparam handwritten false
+skinparam monochrome false
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName "Arial"
+skinparam ranksep 35
+skinparam nodesep 15
+
+' Màu sắc nhẹ nhàng hiện đại
+skinparam ArrowColor #5D6D7E
+skinparam ActorBorderColor #34495E
+skinparam ActorBackgroundColor #EBF5FB
+skinparam UseCaseBorderColor #2E86C1
+skinparam UseCaseBackgroundColor #FDFFFF
+skinparam UseCaseFontSize 12
+skinparam ActorFontSize 12
+
+left to right direction
+
+' --- Nhóm Actor bên TRÁI ---
+actor "Khách hàng\n(Customer)" as Customer #D6EAF8
+actor "Tài xế\n(Shipper)" as Shipper #FCF3CF
+
+' --- Hộp hệ thống chính ---
+rectangle "Hệ thống FoodServe" {
+  usecase "UC1: Quản lý tài khoản\n(Đăng nhập, Đăng ký, Hồ sơ)" as UC_Auth
+  usecase "UC2: Đăng ký đối tác\n(Nhà hàng / Tài xế)" as UC_RegPartner
+  usecase "UC3: Đặt hàng & Thanh toán\n(COD / VNPay)" as UC_Order
+  usecase "UC4: Xử lý đơn hàng\n(Tiếp nhận & Chuẩn bị)" as UC_ProcessOrder
+  usecase "UC5: Giao nhận & Định vị GPS" as UC_DeliverOrder
+  usecase "UC6: Theo dõi & Đánh giá" as UC_TrackReview
+  usecase "UC7: Chat & Nhận thông báo" as UC_Interaction
+  usecase "UC8: Giải trí & Săn voucher" as UC_Gamification
+  usecase "UC9: Phê duyệt đối tác mới" as UC_Approve
+  usecase "UC10: Quản trị hệ thống\n(User, Nhà hàng, Cấu hình)" as UC_ManageSystem
+  usecase "UC11: Xem thống kê & Doanh thu" as UC_Analytics
+}
+
+' --- Nhóm Actor bên PHẢI ---
+actor "Nhà hàng\n(Merchant)" as Merchant #D5F5E3
+actor "Quản trị viên\n(Admin)" as Admin #FADBD8
+
+' --- Mối liên kết bên TRÁI (Customer & Shipper) ---
+Customer --> UC_Auth
+Customer --> UC_Order
+Customer --> UC_TrackReview
+Customer --> UC_Interaction
+Customer --> UC_Gamification
+
+Shipper --> UC_Auth
+Shipper --> UC_RegPartner
+Shipper --> UC_DeliverOrder
+Shipper --> UC_Interaction
+
+' --- Mối liên kết bên PHẢI (Merchant & Admin) ---
+UC_Auth <-- Merchant
+UC_RegPartner <-- Merchant
+UC_ProcessOrder <-- Merchant
+UC_Interaction <-- Merchant
+UC_Analytics <-- Merchant
+
+UC_Auth <-- Admin
+UC_Approve <-- Admin
+UC_ManageSystem <-- Admin
+UC_Analytics <-- Admin
+
+' --- Mối quan hệ giữa các Use Cases ---
+UC_RegPartner ..> UC_Approve : <<cần duyệt>>
+UC_TrackReview ..> UC_Order : <<extend>>
+UC_ProcessOrder ..> UC_Order : <<include>>
+UC_DeliverOrder ..> UC_Order : <<include>>
+
+@endum

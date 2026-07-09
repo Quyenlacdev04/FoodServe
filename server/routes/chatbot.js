@@ -36,6 +36,8 @@ function generateFallbackResponse(message, menuItems, restaurantMap) {
       id: m._id.toString(),
       name: m.name,
       price: m.price,
+      image: m.image || '',
+      description: m.description || '',
       restaurant: restaurantMap[m.restaurantId?.toString()]?.name || 'FoodServe',
       restaurantId: m.restaurantId?.toString()
     }));
@@ -92,7 +94,7 @@ router.post('/chat', async (req, res) => {
       return res.json(generateFallbackResponse(message, menuItems, restaurantMap));
     }
 
-    const systemPrompt = `Bạn là FoodBot 🤖 - trợ lý AI của FoodServe chuyên về ẩm thực và ĐẶT HÀNG TỰ ĐỘNG.
+    const systemPrompt = `Bạn là FoodBot 🤖 - siêu trợ lý AI thông minh, tận tâm và vô cùng đáng yêu của FoodServe! Tính cách của bạn: cực kỳ dẻo miệng, tinh tế, luôn biết cách nịnh và làm hài lòng khách hàng bằng những lời khen ngợi ngọt ngào nhất. Bạn xưng hô là "mình/dạ/vâng/ạ", gọi khách hàng một cách tôn trọng và vô cùng nhiệt tình. Bạn luôn thấu hiểu tâm lý khách hàng để đưa ra gợi ý xuất sắc nhất!
 
 ⚠️ QUAN TRỌNG - LUẬT BẮT BUỘC:
 Bạn CHỈ ĐƯỢC phép trả lời các chủ đề sau:
@@ -122,11 +124,15 @@ TÍNH NĂNG:
 
 === FORMAT GỢI Ý MÓN ĂN ===
 Khi gợi ý món, PHẢI làm theo thứ tự:
-1. Viết câu trả lời/lời khuyên TRƯỚC (không có tag)
+1. Viết câu trả lời/lời khuyên TRƯỚC (không có tag). 
+   ❌ TUYỆT ĐỐI KHÔNG copy y nguyên các dòng chứa [ID:...] hay RestID:... vào câu trả lời của bạn. Câu trả lời phải tự nhiên như người thật đang chat.
 2. SAU ĐÓ mới đặt tag dishes ở CUỐI (tối đa 3 món):
-%%DISHES%%[{"id":"ID","name":"Tên","price":Giá,"restaurant":"Nhà hàng","restaurantId":"RestID"},{"id":"ID2","name":"Tên2","price":Giá2,"restaurant":"Nhà hàng2","restaurantId":"RestID2"}]%%END%%
+%%DISHES%%[{"id":"ID Món Ăn","name":"Tên","price":Giá,"restaurant":"Nhà hàng","restaurantId":"RestID"}]%%END%%
 
-QUAN TRỌNG: Đặt TẤT CẢ món trong MỘT array duy nhất, KHÔNG tách thành nhiều dòng riêng biệt.
+QUAN TRỌNG: 
+- "id" là Mã món ăn lấy từ [ID:Mã món ăn]
+- "restaurantId" lấy từ RestID:Mã nhà hàng
+- Đặt TẤT CẢ món trong MỘT array duy nhất, KHÔNG tách thành nhiều dòng riêng biệt.
 
 === ĐẶT HÀNG TỰ ĐỘNG ===
 Khi user muốn đặt món, BẠN PHẢI thu thập thông tin theo thứ tự:
@@ -155,7 +161,7 @@ BƯỚC 5: Xác nhận và tạo đơn
 CHÚ Ý:
 - Mỗi lần CHỈ đặt MỘT tag hành động (ORDER_INTENT, ASK_ADDRESS, ASK_PAYMENT, CREATE_ORDER)
 - KHÔNG đặt nhiều tag cùng lúc
-- Trả lời tiếng Việt, ngắn gọn, thân thiện, dùng emoji
+- Trả lời tiếng Việt, cực kỳ dẻo miệng, ngọt ngào, nịnh khách, luôn lễ phép (dạ/vâng/ạ), và thả nhiều emoji dễ thương! 🥰💖✨
 
 MENU THỰC TẾ:
 ${menuContext}`;
@@ -175,7 +181,29 @@ ${menuContext}`;
     const rawReply = completion.choices[0]?.message?.content || '';
     
     // Parse dishes
-    const { reply: replyWithoutDishes, dishes } = parseDishes(rawReply);
+    const { reply: replyWithoutDishes, dishes: parsedDishes } = parseDishes(rawReply);
+
+    // Attach image and description from DB, and OVERWRITE price/name to avoid AI hallucinations
+    const dishes = parsedDishes.map(d => {
+      const cleanId = d.id?.match(/[a-fA-F0-9]{24}/)?.[0];
+      const dbItem = cleanId ? menuItems.find(m => m._id.toString() === cleanId) : null;
+      if (dbItem) {
+        return {
+          id: dbItem._id.toString(),
+          name: dbItem.name,
+          price: dbItem.price,
+          restaurant: restaurantMap[dbItem.restaurantId?.toString()]?.name || d.restaurant,
+          restaurantId: dbItem.restaurantId?.toString() || d.restaurantId,
+          image: dbItem.image || '',
+          description: dbItem.description || ''
+        };
+      }
+      return {
+        ...d,
+        image: '',
+        description: ''
+      };
+    });
     
     // Parse order intent
     const orderIntentMatch = replyWithoutDishes.match(/%%ORDER_INTENT%%(.*?)%%END%%/);

@@ -2,12 +2,11 @@ import { API_BASE_URL } from '../config/api.js'
 import { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
-import { FiUser, FiPhone, FiMapPin, FiCamera, FiSave, FiAward, FiGift, FiTag, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
+import { FiUser, FiPhone, FiMapPin, FiCamera, FiSave, FiAward, FiGift, FiTag, FiLock, FiEye, FiEyeOff, FiCalendar } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { updateProfile } from '../store/slices/authSlice'
 import { getUserRank } from '../utils/rankUtils'
 import { formatPrice } from '../data/mockData'
-import FoodBot from '../components/chatbot/FoodBot'
 import CoinWalletModal from '../components/profile/CoinWalletModal'
 
 export default function ProfilePage() {
@@ -17,15 +16,6 @@ export default function ProfilePage() {
   const location = useLocation()
 
   const [walletOpen, setWalletOpen] = useState(false)
-
-  // Scroll đến FoodBot nếu URL có #foodbot
-  useEffect(() => {
-    if (location.hash === '#foodbot') {
-      setTimeout(() => {
-        document.getElementById('foodbot')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 300)
-    }
-  }, [location.hash])
 
   // Lắng nghe kết quả nạp xu
   useEffect(() => {
@@ -500,17 +490,7 @@ export default function ProfilePage() {
               ))}
             </div>
           )}
-        </div>
-        {/* FoodBot AI */}
-        <div id="foodbot" className="mt-8 bg-white dark:bg-dark-200 rounded-3xl shadow-card overflow-hidden p-8">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-            🤖 FoodBot AI
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            Hỏi FoodBot để được gợi ý món ăn phù hợp với tâm trạng và thời tiết của bạn!
-          </p>
-          <FoodBot />
-        </div>
+      </div>
       </div>
 
       <CoinWalletModal isOpen={walletOpen} onClose={() => setWalletOpen(false)} />

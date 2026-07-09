@@ -110,14 +110,24 @@ export default function OrderHistoryPage() {
                       <p className="text-sm text-gray-500 mb-1">Tổng cộng</p>
                       <p className="text-2xl font-bold text-primary-500 mb-4">{formatPrice(order.finalAmount || order.totalAmount)}</p>
                       
-                      <button 
-                        onClick={() => navigate('/tracking', { state: { orderId: order._id } })}
-                        className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors ${
-                          isTracking ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-glow' : 'bg-gray-100 dark:bg-dark-200 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {isTracking ? 'Theo dõi đơn' : 'Xem chi tiết'} <FiChevronRight />
-                      </button>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        {isTracking && (
+                          <button 
+                            onClick={() => navigate('/tracking', { state: { orderId: order._id } })}
+                            className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors bg-primary-500 text-white hover:bg-primary-600 shadow-glow"
+                          >
+                            Theo dõi <FiTruck />
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => navigate(`/order/${order._id}`)}
+                          className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors ${
+                            isTracking ? 'bg-gray-100 dark:bg-dark-200 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700' : 'bg-primary-500 text-white hover:bg-primary-600 shadow-glow'
+                          }`}
+                        >
+                          Chi tiết <FiChevronRight />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>

@@ -8,3 +8,27 @@ export const getUserRank = (totalSpent) => {
   
   return { name: 'Đồng', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-500/20', icon: '🥉' };
 };
+
+export const getNextRankInfo = (totalSpent) => {
+  const spent = totalSpent || 0;
+  
+  if (spent >= 10000000) return null; // Max rank reached
+  
+  let nextRankLimit = 0;
+  let nextRankName = '';
+  
+  if (spent >= 5000000) { nextRankLimit = 10000000; nextRankName = 'Chiến Thần Mua Hàng'; }
+  else if (spent >= 2000000) { nextRankLimit = 5000000; nextRankName = 'Kim Cương'; }
+  else if (spent >= 500000) { nextRankLimit = 2000000; nextRankName = 'Vàng'; }
+  else { nextRankLimit = 500000; nextRankName = 'Bạc'; }
+  
+  const progressPercent = Math.min(100, Math.floor((spent / nextRankLimit) * 100));
+  const remainingAmount = nextRankLimit - spent;
+  
+  return {
+    nextRankName,
+    nextRankLimit,
+    remainingAmount,
+    progressPercent
+  };
+};

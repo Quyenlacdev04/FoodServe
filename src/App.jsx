@@ -30,7 +30,10 @@ import MerchantOrdersPage from './pages/MerchantOrdersPage'
 import DriverRegisterPage from './pages/DriverRegisterPage'
 import ShipperDashboardPage from './pages/ShipperDashboardPage'
 import MealSubscriptionPage from './pages/MealSubscriptionPage'
+import OrderDetailPage from './pages/OrderDetailPage'
+import NotificationsPage from './pages/NotificationsPage'
 import NotFoundPage from './pages/NotFoundPage'
+import ChatbotPage from './pages/ChatbotPage'
 import { fetchRestaurants } from './store/slices/restaurantSlice'
 
 import Footer from './components/layout/Footer'
@@ -109,9 +112,12 @@ function App() {
                 <Route path="/payment/vnpay-return" element={<PaymentResultPage />} />
                 <Route path="/payment-result" element={<PaymentResultPage />} />
                 <Route path="/history" element={<OrderHistoryPage />} />
+                <Route path="/order/:id" element={<OrderDetailPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/games" element={<GamesPage />} />
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/chatbot" element={<ChatbotPage />} />
                 <Route path="/favorites" element={<FavoritesPage />} />
                 <Route path="/subscriptions" element={<MealSubscriptionPage />} />
                 <Route path="/admin" element={<AdminPage />} />

@@ -29,32 +29,86 @@ function renderText(text) {
   })
 }
 
-// Card món ăn gợi ý
-function DishCard({ dish, onOrder }) {
+// Card món ăn gợi ý dạng Cart Preview
+function FoodCartPreview({ dishes, onOrder }) {
+  const [quantities, setQuantities] = useState(
+    dishes.reduce((acc, dish) => ({ ...acc, [dish.id]: 1 }), {})
+  )
+
+  const handleQuantity = (id, delta) => {
+    setQuantities(prev => ({
+      ...prev,
+      [id]: Math.max(1, (prev[id] || 1) + delta)
+    }))
+  }
+
+  const subtotal = dishes.reduce((sum, dish) => sum + (dish.price * quantities[dish.id]), 0)
+  const deliveryFee = 15000 // Phí ship
+  const total = subtotal + deliveryFee
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex items-center justify-between gap-3 bg-white dark:bg-dark-200 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2.5 shadow-sm"
-    >
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold text-sm text-gray-800 dark:text-white truncate">{dish.name}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-primary-500 font-bold text-xs">{Number(dish.price).toLocaleString('vi-VN')}đ</span>
-          {dish.restaurant && (
-            <span className="text-gray-400 text-xs truncate">• {dish.restaurant}</span>
-          )}
+    <div className="bg-white dark:bg-dark-100 rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] dark:shadow-none dark:border dark:border-gray-800 p-4 w-full mt-2">
+      <h4 className="font-bold text-gray-900 dark:text-white mb-3 text-[15px]">Giỏ hàng tạm tính (Food Cart Preview)</h4>
+      <div className="space-y-3">
+        {dishes.map(dish => (
+          <div key={dish.id} className="flex gap-3 items-center">
+            <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-dark-200 overflow-hidden flex-shrink-0">
+               {dish.image ? (
+                 <img src={dish.image} alt={dish.name} className="w-full h-full object-cover" />
+               ) : (
+                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">🍽️</div>
+               )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0 flex-1">
+                   <p className="font-bold text-[14px] text-gray-900 dark:text-white leading-tight truncate">{dish.name}</p>
+                   <p className="text-[12px] text-gray-500 mt-0.5 truncate">{dish.description || dish.restaurant}</p>
+                </div>
+                <p className="font-bold text-[14px] whitespace-nowrap text-gray-900 dark:text-white">{(dish.price).toLocaleString()}đ</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1.5 text-[13px]">
+        <div className="flex justify-between text-gray-600 dark:text-gray-400">
+          <span>Tạm tính (Subtotal):</span>
+          <span>{subtotal.toLocaleString()}đ</span>
+        </div>
+        <div className="flex justify-between text-gray-600 dark:text-gray-400">
+          <span>Phí giao hàng (Delivery Fee):</span>
+          <span>{deliveryFee.toLocaleString()}đ</span>
+        </div>
+        <div className="flex justify-between font-bold text-gray-900 dark:text-white text-[15px] pt-1.5">
+          <span>Tổng cộng (Total):</span>
+          <span>{total.toLocaleString()}đ</span>
         </div>
       </div>
-      <motion.button
-        whileTap={{ scale: 0.92 }}
-        onClick={() => onOrder(dish)}
-        className="flex items-center gap-1.5 bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex-shrink-0 shadow-sm"
-      >
-        <FiShoppingCart size={12} />
-        Đặt ngay
-      </motion.button>
-    </motion.div>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        {dishes.length === 1 && (
+          <div className="flex items-center gap-3 bg-gray-50 dark:bg-dark-200 rounded-xl px-1.5 py-1.5 border border-gray-200 dark:border-gray-700">
+            <button onClick={() => handleQuantity(dishes[0].id, -1)} className="w-7 h-7 flex items-center justify-center font-bold text-gray-500 hover:text-[#ff5a00] transition-colors rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">−</button>
+            <span className="text-sm font-semibold w-4 text-center text-gray-800 dark:text-white">{quantities[dishes[0].id]}</span>
+            <button onClick={() => handleQuantity(dishes[0].id, 1)} className="w-7 h-7 flex items-center justify-center font-bold text-gray-500 hover:text-[#ff5a00] transition-colors rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">+</button>
+          </div>
+        )}
+        <button 
+          onClick={() => {
+            if (dishes.length === 1) {
+              onOrder({ ...dishes[0], quantity: quantities[dishes[0].id] })
+            } else {
+              dishes.forEach(d => onOrder({ ...d, quantity: quantities[d.id] }))
+            }
+          }}
+          className="flex-1 bg-[#ff5a00] hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition-colors text-[14px] shadow-sm flex items-center justify-center"
+        >
+          Đặt ngay (Checkout Now)
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -160,6 +214,7 @@ export default function FoodBot() {
         name: dish.name,
         price: dish.price,
         restaurantId: dish.restaurantId,
+        quantity: dish.quantity || 1,
         image: dish.image || ''
       }))
       toast.success(`Đã thêm "${dish.name}" vào giỏ hàng! 🛒`, {
@@ -319,23 +374,30 @@ export default function FoodBot() {
   }
 
   return (
-    <div className="flex flex-col h-[640px] bg-white dark:bg-dark-200 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-lg">
+    <div className="flex flex-col h-full w-full bg-gradient-to-b from-gray-50 to-[#e4e6eb] dark:from-dark-300 dark:to-dark-200 rounded-2xl relative overflow-hidden border border-gray-100 dark:border-gray-800 shadow-lg">
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-500 to-orange-400 px-5 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white/90 dark:bg-dark-200/90 backdrop-blur-md px-5 py-4 flex items-center justify-between flex-shrink-0 border-b border-gray-100 dark:border-gray-800 z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-2xl">🤖</div>
+          <div className="w-10 h-10 bg-[#ff5a00] rounded-2xl flex items-center justify-center text-white text-xl shadow-sm">🤖</div>
           <div>
-            <h3 className="font-bold text-white text-sm">FoodBot AI</h3>
+            <h3 className="font-bold text-gray-900 dark:text-white text-[15px]">FoodBot AI Assistant</h3>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 bg-green-300 rounded-full animate-pulse" />
-              <span className="text-white/80 text-xs">Gợi ý & đặt món ngay</span>
+              <span className="text-gray-500 dark:text-gray-400 text-[12px] font-medium">Live Support</span>
+              <span className="text-green-500 text-[12px] font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block" />
+                Online
+              </span>
             </div>
           </div>
         </div>
         <button onClick={resetChat} title="Cuộc trò chuyện mới"
-          className="p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-colors text-white">
-          <FiRefreshCw size={16} />
+          className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-dark-100 dark:hover:text-gray-300 transition-colors">
+          <div className="flex gap-1">
+             <div className="w-1 h-1 rounded-full bg-current"></div>
+             <div className="w-1 h-1 rounded-full bg-current"></div>
+             <div className="w-1 h-1 rounded-full bg-current"></div>
+          </div>
         </button>
       </div>
 
@@ -388,47 +450,49 @@ export default function FoodBot() {
           {messages.map((msg, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-2`}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-3 w-full`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-orange-400 flex items-center justify-center text-sm flex-shrink-0 mt-1 shadow-sm">
+                <div className="w-9 h-9 rounded-2xl bg-[#ff5a00] flex items-center justify-center text-white text-lg flex-shrink-0 mt-2 shadow-sm">
                   🤖
                 </div>
               )}
 
-              <div className={`max-w-[82%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+              <div className={`max-w-[85%] flex flex-col gap-1.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                {/* Name & Time */}
+                {msg.role === 'assistant' ? (
+                  <div className="flex items-center gap-2 pl-1 mb-0.5">
+                    <span className="text-[13px] font-bold text-gray-900 dark:text-white">AI Assistant</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 pr-1 mb-0.5 flex-row-reverse">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-orange-800 text-xs font-bold">
+                        {user?.name?.charAt(0).toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                    <span className="text-[13px] font-bold text-gray-900 dark:text-white mr-1">User</span>
+                  </div>
+                )}
+
                 {/* Bubble text */}
-                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                <div className={`px-4 py-3 rounded-2xl text-[14px] leading-relaxed shadow-sm ${
                   msg.role === 'user'
-                    ? 'bg-primary-500 text-white rounded-tr-sm'
-                    : 'bg-gray-100 dark:bg-dark-100 text-gray-800 dark:text-gray-200 rounded-tl-sm'
+                    ? 'bg-[#e4e6eb] dark:bg-dark-100 text-black dark:text-gray-100 rounded-tr-md'
+                    : 'bg-white dark:bg-dark-200 text-gray-900 dark:text-gray-100 rounded-tl-md border border-gray-100 dark:border-gray-800'
                 }`}>
                   {renderText(msg.content)}
                 </div>
 
-                {/* Dish cards */}
+                {/* Dish cards (Food Cart Preview) */}
                 {msg.dishes && msg.dishes.length > 0 && (
-                  <div className="w-full space-y-2">
-                    {msg.dishes.map((dish, di) => (
-                      <DishCard key={di} dish={dish} onOrder={handleOrder} />
-                    ))}
-                    <p className="text-xs text-gray-400 text-center pt-1">
-                      💡 Click "Đặt ngay" để thêm vào giỏ và xem nhà hàng
-                    </p>
-                  </div>
+                  <FoodCartPreview dishes={msg.dishes} onOrder={handleOrder} />
                 )}
 
-                <span className="text-xs text-gray-400 px-1">
+                <span className="text-[11px] text-gray-500 font-medium px-1 mt-1">
                   {msg.time.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                  {msg.source === 'groq' && ' • AI ✨'}
                 </span>
               </div>
-
-              {msg.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-1 shadow-sm">
-                  {user?.name?.charAt(0).toUpperCase() || 'U'}
-                </div>
-              )}
             </motion.div>
           ))}
         </AnimatePresence>

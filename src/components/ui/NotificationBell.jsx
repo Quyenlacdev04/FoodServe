@@ -491,6 +491,18 @@ export default function NotificationBell() {
                   ))
                 )}
               </div>
+
+              {/* View All Link */}
+              {notifications.length > 0 && (
+                <div className="p-3 border-t border-gray-200 dark:border-gray-800">
+                  <button
+                    onClick={() => { setShowDropdown(false); navigate('/notifications') }}
+                    className="w-full text-center text-sm font-semibold text-primary-500 hover:text-primary-600 py-2 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 transition-colors"
+                  >
+                    Xem tất cả thông báo →
+                  </button>
+                </div>
+              )}
             </motion.div>
           </>
         )}
