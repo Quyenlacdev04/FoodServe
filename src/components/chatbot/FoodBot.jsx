@@ -2,7 +2,7 @@ import { API_BASE_URL } from '../../config/api.js'
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSelector, useDispatch } from 'react-redux'
-import { FiSend, FiRefreshCw, FiShoppingCart } from 'react-icons/fi'
+import { FiSend, FiRefreshCw, FiShoppingCart, FiMessageSquare, FiPlus, FiTrash2, FiClock } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { addToCart } from '../../store/slices/cartSlice'
 import toast from 'react-hot-toast'
@@ -127,7 +127,7 @@ export default function FoodBot() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const messagesEndRef = useRef(null)
+  const scrollContainerRef = useRef(null)
   const inputRef = useRef(null)
 
   // Conversation state for auto-order flow
@@ -139,9 +139,81 @@ export default function FoodBot() {
     step: 'idle'           // idle, order_intent, ask_address, ask_phone, ask_payment, confirm
   })
 
+  // Session state
+  const [sessionId, setSessionId] = useState(Date.now().toString())
+  const [sessionsList, setSessionsList] = useState([])
+  const [showHistory, setShowHistory] = useState(false)
+
+  // Fetch list of sessions
+  const fetchSessions = async () => {
+    const userId = user?._id || user?.id;
+    if (!userId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/chatbot/sessions/${userId}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSessionsList(data);
+      } else {
+        setSessionsList([]);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách phiên:', error);
+    }
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    fetchSessions();
+  }, [user?._id, user?.id]);
+
+  const loadSession = async (sid) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/chatbot/session/${sid}`);
+      const data = await res.json();
+      
+      if (data && data.length > 0) {
+        const loadedMessages = data.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          dishes: msg.dishes || [],
+          source: msg.source || '',
+          time: new Date(msg.createdAt)
+        }));
+        setMessages(loadedMessages);
+        setSessionId(sid);
+        setShowHistory(false);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải phiên chat:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteSession = async (e, sid) => {
+    e.stopPropagation();
+    try {
+      await fetch(`${API_BASE_URL}/api/chatbot/session/${sid}`, { method: 'DELETE' });
+      setSessionsList(prev => prev.filter(s => s.sessionId !== sid));
+      if (sessionId === sid) {
+        resetChat();
+      }
+    } catch (error) {
+      console.error('Lỗi khi xóa phiên chat:', error);
+    }
+  };
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({
+          top: scrollContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        })
+      }
+    }, 100)
+    return () => clearTimeout(timeout)
+  }, [messages, loading])
 
   // Handle creating order via chatbot
   const handleCreateOrder = async (orderData) => {
@@ -150,7 +222,7 @@ export default function FoodBot() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user._id,
+          userId: user?._id || user?.id,
           dishId: orderData.dishId,
           quantity: orderData.quantity || 1,
           address: orderData.address,
@@ -250,12 +322,16 @@ export default function FoodBot() {
         body: JSON.stringify({ 
           message: msg, 
           history, 
-          userId: user?._id,
+          userId: user?._id || user?.id,
+          sessionId,
           conversationState // Send current conversation state
         })
       })
 
       const data = await res.json()
+
+      // Cập nhật lại list session sau khi gửi tin nhắn
+      fetchSessions();
 
       if (res.ok) {
         // Add bot response
@@ -357,6 +433,7 @@ export default function FoodBot() {
   }
 
   const resetChat = () => {
+    setSessionId(Date.now().toString());
     setMessages([{
       role: 'assistant',
       content: `Xin chào **${user?.name?.split(' ').pop() || 'bạn'}** 👋 Bắt đầu cuộc trò chuyện mới!\n\nBạn muốn ăn gì hôm nay? 🍽️`,
@@ -370,14 +447,17 @@ export default function FoodBot() {
       phone: null,
       paymentMethod: null,
       step: 'idle'
-    })
+    });
+    // Cập nhật lại danh sách lịch sử
+    fetchSessions();
+    if (window.innerWidth < 768) setShowHistory(false);
   }
 
   return (
     <div className="flex flex-col h-full w-full bg-gradient-to-b from-gray-50 to-[#e4e6eb] dark:from-dark-300 dark:to-dark-200 rounded-2xl relative overflow-hidden border border-gray-100 dark:border-gray-800 shadow-lg">
 
       {/* Header */}
-      <div className="bg-white/90 dark:bg-dark-200/90 backdrop-blur-md px-5 py-4 flex items-center justify-between flex-shrink-0 border-b border-gray-100 dark:border-gray-800 z-10">
+      <div className="bg-white/90 dark:bg-dark-200/90 backdrop-blur-md px-5 py-4 flex items-center justify-between flex-shrink-0 border-b border-gray-100 dark:border-gray-800 z-10 relative">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#ff5a00] rounded-2xl flex items-center justify-center text-white text-xl shadow-sm">🤖</div>
           <div>
@@ -391,7 +471,7 @@ export default function FoodBot() {
             </div>
           </div>
         </div>
-        <button onClick={resetChat} title="Cuộc trò chuyện mới"
+        <button onClick={() => setShowHistory(!showHistory)} title="Lịch sử chat"
           className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-dark-100 dark:hover:text-gray-300 transition-colors">
           <div className="flex gap-1">
              <div className="w-1 h-1 rounded-full bg-current"></div>
@@ -400,6 +480,53 @@ export default function FoodBot() {
           </div>
         </button>
       </div>
+
+      {/* History Sidebar overlay */}
+      <AnimatePresence>
+        {showHistory && (
+          <motion.div 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="absolute top-[72px] right-0 bottom-0 w-[280px] bg-white dark:bg-dark-200 border-l border-gray-100 dark:border-gray-800 shadow-2xl z-20 flex flex-col"
+          >
+            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+              <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                <FiClock /> Lịch sử chat
+              </h4>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+              {sessionsList.length === 0 ? (
+                <p className="text-sm text-center text-gray-400 mt-10">Chưa có lịch sử</p>
+              ) : (
+                sessionsList.map(s => (
+                  <div 
+                    key={s.sessionId}
+                    onClick={() => loadSession(s.sessionId)}
+                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors group ${
+                      s.sessionId === sessionId ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' : 'hover:bg-gray-50 dark:hover:bg-dark-100 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate mb-0.5">{s.title}</p>
+                      <p className="text-[10px] opacity-70">
+                        {new Date(s.updatedAt).toLocaleDateString('vi-VN')} {new Date(s.updatedAt).toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'})}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={(e) => deleteSession(e, s.sessionId)}
+                      className="p-1.5 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 rounded-lg hover:bg-white dark:hover:bg-dark-200 transition-all"
+                    >
+                      <FiTrash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Order Progress Bar */}
       {conversationState.step !== 'idle' && conversationState.orderIntent && (
@@ -445,7 +572,10 @@ export default function FoodBot() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"
+      >
         <AnimatePresence initial={false}>
           {messages.map((msg, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -514,7 +644,6 @@ export default function FoodBot() {
           </motion.div>
         )}
 
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Quick questions */}
@@ -597,6 +726,14 @@ export default function FoodBot() {
       {/* Input */}
       <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
         <div className="flex gap-2 items-end">
+          <button 
+            onClick={resetChat}
+            title="Tạo cuộc trò chuyện mới"
+            className="w-11 h-11 bg-white dark:bg-dark-200 hover:bg-gray-50 dark:hover:bg-dark-100 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl flex items-center justify-center transition-colors flex-shrink-0"
+          >
+            <FiPlus size={20} />
+          </button>
+          
           <textarea
             ref={inputRef}
             value={input}

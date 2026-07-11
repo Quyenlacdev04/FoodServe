@@ -8,7 +8,7 @@ import {
   FiPhone, FiCamera, FiSave, FiLock, FiEye, FiEyeOff, FiClock,
   FiCheckCircle, FiMapPin, FiNavigation, FiChevronDown, FiChevronUp,
   FiAward, FiGift, FiChevronLeft, FiChevronRight, FiX, FiZap, FiBell,
-  FiMap, FiAlertCircle
+  FiMap, FiAlertCircle, FiSend
 } from 'react-icons/fi';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -19,7 +19,7 @@ import { io } from 'socket.io-client';
 import AvailableOrders from '../components/shipper/AvailableOrders';
 import ActiveDelivery from '../components/shipper/ActiveDelivery';
 import ChatButton from '../components/chat/ChatButton';
-import { updateUser } from '../store/slices/authSlice';
+import { updateUser, logout } from '../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { formatPrice } from '../data/mockData';
 import DemandHeatmap from '../components/analytics/DemandHeatmap';
@@ -417,6 +417,27 @@ function ShipperWithdraw({ user, onBack }) {
   const [accountNumber, setAccountNumber] = useState(() => localStorage.getItem('foodserve_shipper_bank_acc') || '');
   const [accountName, setAccountName] = useState(() => localStorage.getItem('foodserve_shipper_bank_holder') || '');
   const [submitting, setSubmitting] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const fetchHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const res = await fetch(`${API_BASE_URL}/api/payment/coins/history/${user?._id || user?.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, [user?._id, user?.id]);
 
   const handleWithdrawSubmit = async (e) => {
     e.preventDefault();
@@ -461,7 +482,9 @@ function ShipperWithdraw({ user, onBack }) {
         localStorage.setItem('foodserve_shipper_bank_acc', accountNumber);
         localStorage.setItem('foodserve_shipper_bank_holder', accountName);
         
-        onBack();
+        // Tải lại lịch sử thay vì quay lại ngay
+        setCoins('');
+        fetchHistory();
       } else {
         toast.error(data.message || 'Lỗi khi rút tiền');
       }
@@ -569,6 +592,92 @@ function ShipperWithdraw({ user, onBack }) {
           {submitting ? 'Đang gửi yêu cầu...' : 'Xác nhận rút tiền'}
         </button>
       </form>
+
+      {/* Lịch sử giao dịch */}
+      <div className="mt-8 pt-6 border-t border-gray-150 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-extrabold text-sm text-gray-800 dark:text-white uppercase tracking-wider">Lịch sử rút xu & giao dịch</h3>
+          <button 
+            type="button"
+            onClick={fetchHistory}
+            className="text-xs text-primary-500 font-semibold hover:underline"
+          >
+            🔄 Làm mới
+          </button>
+        </div>
+
+        {loadingHistory ? (
+          <div className="py-8 text-center text-xs text-gray-400">Đang tải lịch sử...</div>
+        ) : history.length === 0 ? (
+          <div className="py-8 text-center text-xs text-gray-400">Không có giao dịch nào được ghi nhận.</div>
+        ) : (
+          <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1 no-scrollbar">
+            {history.map((tx) => {
+              const dateStr = new Date(tx.createdAt).toLocaleString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+              });
+
+              // Decorate based on type
+              let typeIcon = '🪙';
+              let amountColor = 'text-gray-800 dark:text-white';
+              let amountPrefix = '';
+              let statusBadge = null;
+
+              if (tx.type === 'withdraw') {
+                typeIcon = '💸';
+                amountColor = 'text-red-500 font-bold';
+                amountPrefix = '-';
+                
+                // Status mapping for withdrawals
+                const statusMap = {
+                  pending: { label: '⏳ Chờ duyệt', bg: 'bg-yellow-50 text-yellow-600 border border-yellow-100' },
+                  completed: { label: '✅ Thành công', bg: 'bg-green-50 text-green-600 border border-green-100' },
+                  failed: { label: '❌ Bị từ chối', bg: 'bg-red-50 text-red-600 border border-red-100' }
+                };
+                const currentStatus = statusMap[tx.status] || { label: tx.status, bg: 'bg-gray-100 text-gray-600' };
+                statusBadge = (
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${currentStatus.bg}`}>
+                    {currentStatus.label}
+                  </span>
+                );
+              } else if (tx.type === 'topup') {
+                typeIcon = '📥';
+                amountColor = 'text-green-600 font-bold';
+                amountPrefix = '+';
+              } else if (tx.type === 'order_payout') {
+                typeIcon = '🚴';
+                amountColor = 'text-green-600 font-bold';
+                amountPrefix = '+';
+              }
+
+              return (
+                <div 
+                  key={tx._id || tx.id}
+                  className="bg-white rounded-2xl p-4 shadow-sm border border-gray-150 hover:shadow-md transition-shadow flex items-start justify-between gap-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl p-2 bg-gray-50 rounded-xl shrink-0">{typeIcon}</span>
+                    <div className="text-left">
+                      <p className="text-xs font-bold text-gray-800 dark:text-white">{tx.description || 'Giao dịch xu'}</p>
+                      <p className="text-[10px] text-gray-400 mt-1">{dateStr}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex flex-col items-end gap-1.5 shrink-0">
+                    <span className={`text-sm font-black ${amountColor}`}>
+                      {amountPrefix}{tx.coins} Xu
+                    </span>
+                    {statusBadge}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -576,6 +685,7 @@ function ShipperWithdraw({ user, onBack }) {
 // ===== HỒ SƠ — Kiểu TADA Shipper =====
 function ShipperProfile({ user, onNavigate }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(null); // null | 'edit' | 'password' | 'rank' | 'missions' | 'faq' | 'support' | 'withdraw'
   const [loading, setLoading] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
@@ -831,7 +941,7 @@ function ShipperProfile({ user, onNavigate }) {
           </div>
           {[
             { icon: '📞', title: 'Hotline', desc: '1900 xxxx', sub: 'Miễn phí · 24/7', color: 'bg-green-50 text-green-600', action: () => toast.success('Gọi: 1900 xxxx') },
-            { icon: '💬', title: 'Chat hỗ trợ', desc: 'Phản hồi trong 5 phút', sub: 'Online ngay', color: 'bg-blue-50 text-blue-600', action: () => toast('Tính năng đang phát triển') },
+            { icon: '💬', title: 'Chat hỗ trợ', desc: 'Phản hồi trong 5 phút', sub: 'Online ngay', color: 'bg-blue-50 text-blue-600', action: () => setActiveSection('chat-support') },
             { icon: '📧', title: 'Email', desc: 'support@foodserve.vn', sub: 'Phản hồi trong 24h', color: 'bg-purple-50 text-purple-600', action: () => toast.success('Email: support@foodserve.vn') },
           ].map((s, i) => (
             <button key={i} onClick={s.action}
@@ -845,6 +955,22 @@ function ShipperProfile({ user, onNavigate }) {
               <FiChevronRight className="text-gray-300" size={18} />
             </button>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (activeSection === 'chat-support') {
+    return (
+      <div className="pb-24 flex flex-col h-screen">
+        <div className="flex items-center gap-3 px-4 py-4 bg-white border-b border-gray-100 flex-shrink-0">
+          <button onClick={() => setActiveSection('support')} className="p-2 rounded-xl hover:bg-gray-100">
+            <FiChevronLeft size={20} className="text-gray-600" />
+          </button>
+          <h2 className="font-bold text-gray-800">Chat hỗ trợ tài xế</h2>
+        </div>
+        <div className="flex-1 p-4 bg-gray-50 overflow-hidden">
+          <ShipperSupportChat user={user} />
         </div>
       </div>
     );
@@ -900,11 +1026,11 @@ function ShipperProfile({ user, onNavigate }) {
 
       {/* Số dư */}
       <button onClick={() => setActiveSection('withdraw')}
-        className="mx-4 mt-4 w-[calc(100%-2rem)] bg-yellow-450 hover:bg-yellow-500 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-lg shadow-yellow-200 transition-colors">
-        <span className="font-black text-gray-905 text-base">Số dư</span>
+        className="mx-4 mt-4 w-[calc(100%-2rem)] bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 rounded-2xl px-5 py-4 flex items-center justify-between shadow-lg shadow-yellow-500/20 transition-all duration-300 hover:scale-[1.01]">
+        <span className="font-bold text-white text-base">Số dư</span>
         <div className="flex items-center gap-2">
-          <span className="font-black text-gray-905 text-base">{coinsToVnd.toLocaleString('vi-VN')} VND</span>
-          <FiChevronRight className="text-gray-700" size={18} />
+          <span className="font-extrabold text-white text-lg">{coinsToVnd.toLocaleString('vi-VN')} VND</span>
+          <FiChevronRight className="text-white" size={18} />
         </div>
       </button>
 
@@ -918,6 +1044,18 @@ function ShipperProfile({ user, onNavigate }) {
           { icon: '🔒', iconBg: 'bg-gray-100', label: 'Đổi mật khẩu', badge: null, action: () => setActiveSection('password') },
           { icon: '❓', iconBg: 'bg-blue-100', label: 'Câu hỏi thường gặp', badge: null, action: () => setActiveSection('faq') },
           { icon: '🎧', iconBg: 'bg-green-100', label: 'Đội hỗ trợ FoodServe', badge: null, action: () => setActiveSection('support') },
+          { 
+            icon: '🚪', 
+            iconBg: 'bg-red-50 text-red-500', 
+            label: 'Đăng xuất tài khoản', 
+            badge: null, 
+            action: () => {
+              if (window.confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
+                dispatch(logout());
+                navigate('/');
+              }
+            } 
+          },
         ].map((item, i) => (
           <button key={i} onClick={item.action}
             className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left">
@@ -946,8 +1084,39 @@ function ShipperProfile({ user, onNavigate }) {
         <button onClick={() => setActiveSection('edit')} className="text-xs text-primary-500 font-semibold">Sửa</button>
       </div>
 
-      {/* Version */}
-      <div className="text-center mt-6 text-xs text-gray-400">FoodServe Shipper v1.0.0</div>
+      {/* Version & Hủy tài khoản */}
+      <div className="text-center mt-6 space-y-3 pb-8">
+        <p className="text-xs text-gray-400">FoodServe Shipper v1.0.0</p>
+        <button
+          type="button"
+          onClick={async () => {
+            const confirmation = window.prompt(
+              '⚠️ CẢNH BÁO NGUY HIỂM:\nHành động này sẽ XÓA VĨNH VIỄN tài khoản tài xế của bạn, bao gồm số dư ví, lịch sử chạy đơn và mọi dữ liệu liên quan.\n\nVui lòng gõ chính xác chữ "XAC NHAN KHAI TU" để xóa tài khoản:'
+            );
+            if (confirmation === 'XAC NHAN KHAI TU') {
+              try {
+                const res = await fetch(`${API_BASE_URL}/api/auth/users/${user?._id || user?.id}`, {
+                  method: 'DELETE',
+                });
+                if (res.ok) {
+                  toast.success('Đã xóa và hủy kích hoạt tài khoản thành công! Hẹn gặp lại bác tài.');
+                  dispatch(logout());
+                  navigate('/');
+                } else {
+                  toast.error('Lỗi hệ thống khi yêu cầu xóa tài khoản');
+                }
+              } catch (err) {
+                toast.error('Lỗi kết nối máy chủ');
+              }
+            } else if (confirmation !== null) {
+              toast.error('Mã xác nhận không khớp. Lệnh hủy tài khoản đã được ngăn chặn!');
+            }
+          }}
+          className="text-xs text-red-500 font-extrabold hover:underline"
+        >
+          🚨 Yêu cầu Hủy/Xóa tài khoản vĩnh viễn
+        </button>
+      </div>
     </div>
   );
 }
@@ -1200,6 +1369,43 @@ export default function ShipperDashboardPage() {
         duration: 5000
       });
       dispatch(updateUser({ coins: data.coins }));
+    });
+
+    socket.on('withdraw-approved', (data) => {
+      // Phát âm thanh thông báo
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq4FINjRXjMPgspVbMzNPgLzduZxhMzNKdLTYtqFmMzNGaKzTsqZqMzNDXqXOraprMzNBVZ/JqKxuMzM/TZnEo65yMzM9RZO/n7B2MzM7PY26mrJ6MzM5NomzmrR+MzM3L4Wum7aAMzM1KIGqnLiCMzMzIX2nnbqEMzMxGnmknryGMzMvE3Whn76IMzMtDXGeoMCKMzMrB22boMKMMzMpAWmYocSOMzMnAGWVosaPMzMlAGGSo8iRMzMjAF2PpMqTMzMhAFmMpc2VMzMfAFWJps+XMzMdAFGGp9GZMzMbAE2DqNObMzMZAEmAqdWdMzMXAEV9qt+fMzMVAEF6q+GhMzMTAD13rOOjMzMRADl0reWlMzMPADVxruenMzMNADFusPmpMzMLAC1rsfurMzMJAClosvWtMzMHACVls/evMzMFACFis/mxMzMDACBgs/uzMzMBACBgs/uzMzM=');
+        audio.volume = 0.5;
+        audio.play().catch(() => {});
+      } catch {}
+
+      toast.success(data.message || 'Yêu cầu rút tiền của bạn đã được duyệt thành công! 🎉', {
+        icon: '💸',
+        duration: 6000
+      });
+      dispatch(updateUser({ coins: data.coins }));
+
+      showBrowserNotification({
+        title: '💸 Rút tiền thành công!',
+        body: data.message || 'Yêu cầu rút xu về tài khoản ngân hàng của bạn đã được duyệt.',
+        type: 'payment',
+        onClick: () => window.focus()
+      });
+    });
+
+    socket.on('withdraw-rejected', (data) => {
+      toast.error(data.message || 'Yêu cầu rút tiền của bạn đã bị từ chối và xu được hoàn lại. ❌', {
+        icon: '❌',
+        duration: 6000
+      });
+      dispatch(updateUser({ coins: data.coins }));
+
+      showBrowserNotification({
+        title: '❌ Yêu cầu rút tiền bị từ chối',
+        body: data.message || 'Yêu cầu rút xu của bạn đã bị từ chối và được hoàn trả.',
+        type: 'payment',
+        onClick: () => window.focus()
+      });
     });
 
     return () => {
@@ -1538,6 +1744,174 @@ export default function ShipperDashboardPage() {
       </AnimatePresence>
 
       {activeTab === 'active' && activeOrderId && <ChatButton orderId={activeOrderId} />}
+    </div>
+  );
+}
+
+// ===== SHIPPER SUPPORT CHAT COMPONENT =====
+function ShipperSupportChat({ user }) {
+  const [messages, setMessages] = useState([
+    {
+      role: 'assistant',
+      content: `Dạ em chào anh/chị **${user?.name?.split(' ').pop() || 'bác tài'}** 🛵 Em là **ShipperBot** - trợ lý hỗ trợ cung đường FoodServe của mình!\n\nAnh/chị đang gặp vấn đề gì trên đường giao hàng ạ? (VD: Khách bùng đơn, hỏng xe, hoặc cần hỗ trợ rút xu...)`,
+      time: new Date()
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const sessionId = `shipper-support-${user?._id || user?.id}`;
+
+  const fetchChatHistory = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/chatbot/session/${sessionId}`);
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setMessages(data.map(m => ({
+          role: m.role,
+          content: m.content,
+          time: new Date(m.createdAt)
+        })));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchChatHistory();
+  }, []);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return;
+    const userMsgText = input.trim();
+    setInput('');
+    
+    const userMsg = { role: 'user', content: userMsgText, time: new Date() };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
+    setLoading(true);
+
+    try {
+      const history = nextMessages.slice(1).map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      const res = await fetch(`${API_BASE_URL}/api/chatbot/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMsgText,
+          history,
+          userId: user?._id || user?.id,
+          sessionId,
+          userRole: 'shipper'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: data.reply,
+          time: new Date()
+        }]);
+      } else {
+        toast.error('Gửi tin thất bại');
+      }
+    } catch {
+      toast.error('Lỗi kết nối');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (window.confirm('Anh/chị có chắc muốn làm mới cuộc trò chuyện hỗ trợ này?')) {
+      try {
+        await fetch(`${API_BASE_URL}/api/chatbot/session/${sessionId}`, { method: 'DELETE' });
+        setMessages([
+          {
+            role: 'assistant',
+            content: `Dạ em chào anh/chị **${user?.name?.split(' ').pop() || 'bác tài'}** 🛵 Em là **ShipperBot** - trợ lý hỗ trợ cung đường FoodServe của mình!\n\nAnh/chị đang gặp vấn đề gì trên đường giao hàng ạ? (VD: Khách bùng đơn, hỏng xe, hoặc cần hỗ trợ rút xu...)`,
+            time: new Date()
+          }
+        ]);
+      } catch (err) {
+        toast.error('Lỗi khi xóa lịch sử');
+      }
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-180px)] bg-white dark:bg-dark-200 rounded-3xl border border-gray-150 dark:border-gray-800 overflow-hidden shadow-sm">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-500 text-white px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🛵</span>
+          <div>
+            <div className="font-bold text-sm">Trợ lý tài xế AI</div>
+            <div className="text-[10px] text-white/80">Trả lời tự động · Hoạt động 24/7</div>
+          </div>
+        </div>
+        <button onClick={handleReset} className="p-1.5 hover:bg-white/10 rounded-xl transition-colors text-white/95 text-xs font-bold font-sans">
+          Làm mới
+        </button>
+      </div>
+
+      {/* Messages list */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        {messages.map((m, idx) => (
+          <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+              m.role === 'user'
+                ? 'bg-blue-600 text-white rounded-br-none'
+                : 'bg-white dark:bg-dark-100 text-gray-800 dark:text-gray-200 rounded-bl-none border border-gray-100 dark:border-gray-800'
+            }`}>
+              <p className="whitespace-pre-line leading-relaxed">{m.content}</p>
+              <div className={`text-[10px] mt-1 ${m.role === 'user' ? 'text-white/60 text-right' : 'text-gray-400'}`}>
+                {new Date(m.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-white dark:bg-dark-100 rounded-2xl rounded-bl-none border border-gray-100 dark:border-gray-800 px-4 py-3 text-sm shadow-sm flex items-center gap-1.5 text-gray-500">
+              <span className="animate-bounce">●</span>
+              <span className="animate-bounce [animation-delay:0.2s]">●</span>
+              <span className="animate-bounce [animation-delay:0.4s]">●</span>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input panel */}
+      <div className="p-3 bg-white dark:bg-dark-100 border-t border-gray-100 dark:border-gray-800 flex gap-2 items-center">
+        <input
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          placeholder="Nhập câu hỏi của bác tài tại đây..."
+          className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-dark-200 border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-blue-500 focus:bg-white transition-all text-gray-800 dark:text-gray-250 font-medium"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || loading}
+          className="w-10 h-10 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 text-white disabled:text-gray-400 rounded-xl flex items-center justify-center transition-colors flex-shrink-0"
+        >
+          <FiSend size={16} />
+        </button>
+      </div>
     </div>
   );
 }

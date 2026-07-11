@@ -713,12 +713,28 @@ router.post('/coins/approve-withdrawal/:txId', async (req, res) => {
     
     // Gửi socket thông báo rút thành công
     const io = req.app.get('io');
-    if (io && user) {
-      io.to(`user-${user._id}`).emit('withdraw-approved', {
-        coins: user.coins,
+    
+    // Tạo Notification lưu vào database để shipper xem lại
+    const Notification = (await import('../models/Notification.js')).default;
+    const notification = new Notification({
+      userId: tx.userId,
+      type: 'system',
+      title: '💸 Rút tiền thành công!',
+      message: `Yêu cầu rút ${tx.coins} Xu (${tx.amount.toLocaleString('vi-VN')} đ) của bạn đã được duyệt thành công!`,
+      data: { txId: tx._id.toString() },
+      read: false
+    });
+    await notification.save();
+
+    if (io) {
+      // 1. Thông báo sự kiện duyệt tiền
+      io.to(`user-${tx.userId.toString()}`).emit('withdraw-approved', {
+        coins: user ? user.coins : 0,
         coinsSubtracted: tx.coins,
         message: `Yêu cầu rút ${tx.coins} Xu của bạn đã được duyệt thành công!`
       });
+      // 2. Gửi thông báo Notification chung (cho chuông thông báo)
+      io.to(`user-${tx.userId.toString()}`).emit('new-notification', notification);
     }
 
     res.json({ success: true, message: 'Duyệt yêu cầu rút tiền thành công!', transaction: tx });
@@ -754,11 +770,27 @@ router.post('/coins/reject-withdrawal/:txId', async (req, res) => {
 
     // Gửi socket thông báo bị từ chối
     const io = req.app.get('io');
-    if (io && user) {
-      io.to(`user-${user._id}`).emit('withdraw-rejected', {
-        coins: user.coins,
+    
+    // Tạo Notification từ chối lưu vào DB
+    const Notification = (await import('../models/Notification.js')).default;
+    const notification = new Notification({
+      userId: tx.userId,
+      type: 'system',
+      title: '❌ Yêu cầu rút tiền bị từ chối',
+      message: `Yêu cầu rút ${tx.coins} Xu (${tx.amount.toLocaleString('vi-VN')} đ) của bạn đã bị từ chối. Lý do: ${rejectReason || 'Không có lý do'}. Xu đã được hoàn lại.`,
+      data: { txId: tx._id.toString() },
+      read: false
+    });
+    await notification.save();
+
+    if (io) {
+      // 1. Thông báo sự kiện từ chối
+      io.to(`user-${tx.userId.toString()}`).emit('withdraw-rejected', {
+        coins: user ? user.coins : 0,
         message: `Yêu cầu rút ${tx.coins} Xu của bạn đã bị từ chối. Xu đã được hoàn trả.`
       });
+      // 2. Gửi thông báo Notification chung (cho chuông thông báo)
+      io.to(`user-${tx.userId.toString()}`).emit('new-notification', notification);
     }
 
     res.json({ success: true, message: 'Đã từ chối yêu cầu rút tiền!', transaction: tx });

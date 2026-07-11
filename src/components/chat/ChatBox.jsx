@@ -25,7 +25,7 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
   const [sending, setSending] = useState(false);
   const [socket, setSocket] = useState(null);
   const { user } = useSelector((s) => s.auth);
-  const bottomRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -46,7 +46,6 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
         if (prev.find(m => m._id === msg._id)) return prev;
         return [...prev, msg];
       });
-      scrollToBottom();
     });
 
     fetchMessages();
@@ -60,7 +59,6 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
       const res = await fetch(`${API_BASE_URL}/api/messages/order/${orderId}`);
       const data = await res.json();
       setMessages(data.messages || []);
-      scrollToBottom(true);
 
       // Mark all as read
       if (user?._id) {
@@ -76,9 +74,19 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
 
   const scrollToBottom = (instant = false) => {
     setTimeout(() => {
-      bottomRef.current?.scrollIntoView({ behavior: instant ? 'instant' : 'smooth' });
-    }, 80);
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({
+          top: scrollContainerRef.current.scrollHeight,
+          behavior: instant ? 'instant' : 'smooth'
+        });
+      }
+    }, 150);
   };
+
+  // Tự động cuộn xuống khi có tin nhắn mới
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const handleSend = async (e) => {
     e?.preventDefault();
@@ -163,7 +171,10 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 bg-gray-50 space-y-1">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-3 py-3 bg-gray-50 space-y-1"
+      >
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
@@ -234,7 +245,6 @@ export default function ChatBox({ orderId, orderInfo, onClose }) {
             })}
           </>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {/* Input */}

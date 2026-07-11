@@ -545,7 +545,7 @@ export default function MealSubscriptionPage() {
             <div className="space-y-6">
               
               <div className="bg-white dark:bg-dark-200 border border-gray-150 dark:border-gray-800 rounded-3xl p-6 shadow-sm space-y-5">
-                <h3 className="font-bold text-gray-905 dark:text-white text-base flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                <h3 className="font-bold text-gray-800 dark:text-white text-base flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
                   <FiShoppingBag className="text-primary-500" /> Chi tiết Gói Đăng Ký
                 </h3>
 

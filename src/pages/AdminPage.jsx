@@ -46,6 +46,8 @@ export default function AdminPage() {
   const [subscriptionRevenue, setSubscriptionRevenue] = useState(0)
   const [newOrderAlert, setNewOrderAlert] = useState(null) // popup thông báo đơn mới
   const [unreadOrders, setUnreadOrders] = useState(0) // số đơn chưa xem
+  const [selectedDetail, setSelectedDetail] = useState(null) // Chi tiết yêu cầu được chọn
+  const [detailType, setDetailType] = useState(null) // Loại chi tiết: 'partner', 'driver', 'withdrawal'
   const audioRef = useRef(null)
 
   // Kiểm tra quyền admin
@@ -59,6 +61,7 @@ export default function AdminPage() {
   useEffect(() => {
     fetchOrders()
     fetchSubscriptionRevenue()
+    fetchWithdrawRequests() // Tải danh sách yêu cầu rút tiền của tài xế để hiển thị badge
     
     // Listen for real-time changes
     const socket = io(SOCKET_URL)
@@ -230,13 +233,12 @@ export default function AdminPage() {
       fetchDriverRequests()
     }
     if (activeTab === 'payment-requests') {
-      if (paymentSubTab === 'maintenance') {
-        fetchPaymentRequests()
-      } else {
-        fetchWithdrawRequests()
-      }
+      fetchPaymentRequests()
     }
-  }, [activeTab, paymentSubTab])
+    if (activeTab === 'withdrawals') {
+      fetchWithdrawRequests()
+    }
+  }, [activeTab])
 
   const handleDriverRequestStatus = async (requestId, newStatus) => {
     try {
@@ -551,7 +553,15 @@ export default function AdminPage() {
             <FiClipboard /> Yêu cầu đối tác
           </button>
           <button onClick={() => setActiveTab('payment-requests')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'payment-requests' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
-            <FiDollarSign /> Yêu cầu thanh toán
+            <FiDollarSign /> Phí duy trì nhà hàng
+          </button>
+          <button onClick={() => setActiveTab('withdrawals')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'withdrawals' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
+            <FiDollarSign /> Duyệt rút tiền tài xế
+            {withdrawRequests.length > 0 && (
+              <span className="ml-auto bg-amber-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                {withdrawRequests.length}
+              </span>
+            )}
           </button>
           <button onClick={() => setActiveTab('driver-requests')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'driver-requests' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiTruck /> Yêu cầu tài xế
@@ -876,6 +886,12 @@ export default function AdminPage() {
                         {req.status === 'pending' && (
                           <div className="flex justify-end gap-3 pt-2">
                             <button
+                              onClick={() => { setSelectedDetail(req); setDetailType('partner') }}
+                              className="px-4 py-2 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-semibold rounded-xl text-sm hover:bg-blue-100 transition-colors"
+                            >
+                              Xem chi tiết
+                            </button>
+                            <button
                               onClick={() => handlePartnerRequestStatus(req._id, 'rejected')}
                               className="px-4 py-2 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-semibold rounded-xl text-sm transition-colors"
                             >
@@ -965,6 +981,12 @@ export default function AdminPage() {
                         {req.status === 'pending' && (
                           <div className="flex justify-end gap-3 pt-2">
                             <button
+                              onClick={() => { setSelectedDetail(req); setDetailType('driver') }}
+                              className="px-4 py-2 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-semibold rounded-xl text-sm hover:bg-blue-100 transition-colors"
+                            >
+                              Xem chi tiết
+                            </button>
+                            <button
                               onClick={() => handleDriverRequestStatus(req._id, 'rejected')}
                               className="px-4 py-2 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-semibold rounded-xl text-sm transition-colors"
                             >
@@ -988,195 +1010,190 @@ export default function AdminPage() {
 
           {activeTab === 'payment-requests' && (
             <div className="bg-white dark:bg-dark-100 rounded-2xl shadow-card overflow-hidden">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-lg dark:text-white">Duyệt Giao dịch & Rút tiền</h3>
-                  <p className="text-sm text-gray-400">Xem và xử lý các giao dịch tài chính hệ thống</p>
+                  <h3 className="font-bold text-lg dark:text-white">Duyệt Phí Duy Trì Nhà Hàng</h3>
+                  <p className="text-sm text-gray-400">Xem và xử lý các yêu cầu đóng phí gia hạn của nhà hàng đối tác</p>
                 </div>
-                
-                {/* Sub-tab selection */}
-                <div className="flex bg-gray-100 dark:bg-dark-200 p-1 rounded-xl">
-                  <button 
-                    onClick={() => setPaymentSubTab('maintenance')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                      paymentSubTab === 'maintenance' 
-                        ? 'bg-white dark:bg-dark-100 text-gray-800 dark:text-white shadow-sm' 
-                        : 'text-gray-455 hover:text-gray-700'
-                    }`}
-                  >
-                    💳 Phí duy trì nhà hàng
-                  </button>
-                  <button 
-                    onClick={() => setPaymentSubTab('withdrawals')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                      paymentSubTab === 'withdrawals' 
-                        ? 'bg-white dark:bg-dark-100 text-gray-800 dark:text-white shadow-sm' 
-                        : 'text-gray-455 hover:text-gray-700'
-                    }`}
-                  >
-                    💸 Rút tiền tài xế
-                  </button>
-                </div>
+                <button onClick={fetchPaymentRequests} className="text-sm text-primary-500 font-semibold hover:underline">Làm mới</button>
               </div>
               
               <div className="p-6">
-                {paymentSubTab === 'maintenance' ? (
-                  paymentRequestsLoading ? (
-                    <div className="py-10 text-center text-gray-400">Đang tải yêu cầu thanh toán...</div>
-                  ) : paymentRequests.length === 0 ? (
-                    <div className="py-10 text-center text-gray-400">Không có yêu cầu thanh toán nào.</div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-6">
-                      {paymentRequests.map((req) => (
-                        <div key={req._id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-gray-50 dark:bg-dark-200 relative overflow-hidden transition-all hover:shadow-lg">
-                          {/* Header details */}
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                            <div>
-                              <span className="text-xs bg-green-100 dark:bg-green-950/40 text-green-500 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
-                                💳 Phí duy trì
-                              </span>
-                              <h4 className="font-bold text-xl dark:text-white mt-1.5">{req.restaurantName}</h4>
-                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">📅 {new Date(req.createdAt).toLocaleString()}</p>
-                            </div>
-                            <div>
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                                req.status === 'approved' ? 'bg-green-500/10 text-green-500' :
-                                req.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
-                              }`}>
-                                {req.status === 'approved' ? 'Đã duyệt' : req.status === 'rejected' ? 'Từ chối' : 'Chờ duyệt'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Payment details */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-gray-200 dark:border-gray-700/50 py-4 my-4">
-                            <div>
-                              <p className="text-xs text-gray-400 font-medium">Thông tin thanh toán</p>
-                              <p className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">Số tiền: <span className="text-green-500">{(req.amount || 0).toLocaleString()}đ</span></p>
-                              <p className="text-sm text-gray-500 mt-0.5">Phương thức: {req.paymentMethod === 'bank_transfer' ? 'Chuyển khoản ngân hàng' : req.paymentMethod}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-400 font-medium">Trạng thái xử lý</p>
-                              {req.status === 'approved' && (
-                                <p className="text-sm text-green-600 mt-0.5">✅ Đã duyệt lúc: {new Date(req.approvedAt).toLocaleString()}</p>
-                              )}
-                              {req.status === 'rejected' && (
-                                <div className="mt-0.5">
-                                  <p className="text-sm text-red-600">❌ Từ chối lúc: {new Date(req.rejectedAt).toLocaleString()}</p>
-                                  {req.rejectReason && <p className="text-xs text-red-500 mt-1">Lý do: {req.rejectReason}</p>}
-                                </div>
-                              )}
-                              {req.status === 'pending' && (
-                                <p className="text-sm text-yellow-600 mt-0.5">⏳ Đang chờ admin xử lý</p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Note */}
-                          <div className="mb-4">
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              <span className="font-semibold text-gray-700 dark:text-gray-400">Ghi chú:</span> {req.note}
-                            </p>
-                          </div>
-
-                          {/* Action buttons */}
-                          {req.status === 'pending' && (
-                            <div className="flex justify-end gap-3 pt-2">
-                              <button
-                                onClick={() => {
-                                  const reason = prompt('Lý do từ chối (tùy chọn):')
-                                  if (reason !== null) {
-                                    handlePaymentRequestStatus(req._id, 'reject', reason)
-                                  }
-                                }}
-                                className="px-4 py-2 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-semibold rounded-xl text-sm transition-colors"
-                              >
-                                Từ chối
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Xác nhận duyệt thanh toán ${(req.amount || 0).toLocaleString()}đ cho ${req.restaurantName}?`)) {
-                                    handlePaymentRequestStatus(req._id, 'approve')
-                                  }
-                                }}
-                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm shadow-md transition-all hover:scale-[1.02]"
-                              >
-                                ✅ Duyệt thanh toán & Gia hạn
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )
+                {paymentRequestsLoading ? (
+                  <div className="py-10 text-center text-gray-400">Đang tải yêu cầu thanh toán...</div>
+                ) : paymentRequests.length === 0 ? (
+                  <div className="py-10 text-center text-gray-400">Không có yêu cầu thanh toán nào.</div>
                 ) : (
-                  withdrawRequestsLoading ? (
-                    <div className="py-10 text-center text-gray-400">Đang tải danh sách rút tiền...</div>
-                  ) : withdrawRequests.length === 0 ? (
-                    <div className="py-10 text-center text-gray-400">Không có yêu cầu rút tiền nào cần duyệt.</div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-6">
-                      {withdrawRequests.map((req) => (
-                        <div key={req._id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-gray-50 dark:bg-dark-200 relative overflow-hidden transition-all hover:shadow-lg">
-                          
-                          {/* Header details */}
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                            <div>
-                              <span className="text-xs bg-amber-100 dark:bg-amber-950/40 text-amber-600 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
-                                💸 Rút tiền tài xế
-                              </span>
-                              <h4 className="font-bold text-xl dark:text-white mt-1.5">{req.userName}</h4>
-                              <p className="text-xs text-gray-400 mt-1">📞 SĐT: {req.userPhone || '—'} · Vai trò: {req.userRole === 'shipper' ? 'Tài xế' : req.userRole}</p>
-                              <p className="text-[11px] text-gray-400 mt-0.5">📅 Ngày gửi: {new Date(req.createdAt).toLocaleString()}</p>
-                            </div>
-                            <div>
-                              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/10 text-yellow-600 uppercase tracking-wider">
-                                Chờ duyệt
-                              </span>
-                            </div>
+                  <div className="grid grid-cols-1 gap-6">
+                    {paymentRequests.map((req) => (
+                      <div key={req._id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-gray-50 dark:bg-dark-200 relative overflow-hidden transition-all hover:shadow-lg">
+                        {/* Header details */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                          <div>
+                            <span className="text-xs bg-green-100 dark:bg-green-950/40 text-green-500 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
+                              💳 Phí duy trì
+                            </span>
+                            <h4 className="font-bold text-xl dark:text-white mt-1.5">{req.restaurantName}</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">📅 {new Date(req.createdAt).toLocaleString()}</p>
                           </div>
-
-                          {/* Withdraw details */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-gray-200 dark:border-gray-700/50 py-4 my-4">
-                            <div>
-                              <p className="text-xs text-gray-400 font-medium">Chi tiết số tiền rút</p>
-                              <p className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">Số tiền VND: <span className="text-red-500 font-sans font-extrabold">{(req.amount || 0).toLocaleString()}đ</span></p>
-                              <p className="text-sm font-semibold text-yellow-600 mt-0.5">Quy đổi: <span className="font-sans font-black">{req.coins} Xu</span></p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-400 font-medium">Thông tin ngân hàng nhận</p>
-                              <p className="text-sm font-bold text-gray-800 dark:text-gray-200 mt-0.5">{req.description}</p>
-                            </div>
+                          <div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                              req.status === 'approved' ? 'bg-green-500/10 text-green-500' :
+                              req.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
+                            }`}>
+                              {req.status === 'approved' ? 'Đã duyệt' : req.status === 'rejected' ? 'Từ chối' : 'Chờ duyệt'}
+                            </span>
                           </div>
+                        </div>
 
-                          {/* Action buttons */}
+                        {/* Payment details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-gray-200 dark:border-gray-700/50 py-4 my-4">
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium">Thông tin thanh toán</p>
+                            <p className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">Số tiền: <span className="text-green-500">{(req.amount || 0).toLocaleString()}đ</span></p>
+                            <p className="text-sm text-gray-500 mt-0.5">Phương thức: {req.paymentMethod === 'bank_transfer' ? 'Chuyển khoản ngân hàng' : req.paymentMethod}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium">Trạng thái xử lý</p>
+                            {req.status === 'approved' && (
+                              <p className="text-sm text-green-600 mt-0.5">✅ Đã duyệt lúc: {new Date(req.approvedAt).toLocaleString()}</p>
+                            )}
+                            {req.status === 'rejected' && (
+                              <div className="mt-0.5">
+                                <p className="text-sm text-red-600">❌ Từ chối lúc: {new Date(req.rejectedAt).toLocaleString()}</p>
+                                {req.rejectReason && <p className="text-xs text-red-500 mt-1">Lý do: {req.rejectReason}</p>}
+                              </div>
+                            )}
+                            {req.status === 'pending' && (
+                              <p className="text-sm text-yellow-600 mt-0.5">⏳ Đang chờ admin xử lý</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Note */}
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                            <span className="font-semibold text-gray-700 dark:text-gray-400">Ghi chú:</span> {req.note}
+                          </p>
+                        </div>
+
+                        {/* Action buttons */}
+                        {req.status === 'pending' && (
                           <div className="flex justify-end gap-3 pt-2">
                             <button
                               onClick={() => {
-                                const reason = prompt('Lý do từ chối rút tiền (tùy chọn):')
+                                const reason = prompt('Lý do từ chối (tùy chọn):')
                                 if (reason !== null) {
-                                  handleWithdrawRequestStatus(req._id, 'reject', reason)
+                                  handlePaymentRequestStatus(req._id, 'reject', reason)
                                 }
                               }}
                               className="px-4 py-2 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-semibold rounded-xl text-sm transition-colors"
                             >
-                              Từ chối rút
+                              Từ chối
                             </button>
                             <button
                               onClick={() => {
-                                if (confirm(`Xác nhận đã chuyển khoản ${(req.amount || 0).toLocaleString()}đ cho tài xế ${req.userName}?`)) {
-                                  handleWithdrawRequestStatus(req._id, 'approve')
+                                if (confirm(`Xác nhận duyệt thanh toán ${(req.amount || 0).toLocaleString()}đ cho ${req.restaurantName}?`)) {
+                                  handlePaymentRequestStatus(req._id, 'approve')
                                 }
                               }}
                               className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm shadow-md transition-all hover:scale-[1.02]"
                             >
-                              ✅ Đã chuyển tiền & Duyệt rút
+                              ✅ Duyệt thanh toán & Gia hạn
                             </button>
                           </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'withdrawals' && (
+            <div className="bg-white dark:bg-dark-100 rounded-2xl shadow-card overflow-hidden">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-lg dark:text-white">Duyệt Yêu cầu Rút tiền Tài xế</h3>
+                  <p className="text-sm text-gray-400">Xem và xử lý các yêu cầu rút tiền mặt của tài xế</p>
+                </div>
+                <button onClick={fetchWithdrawRequests} className="text-sm text-primary-500 font-semibold hover:underline">🔄 Làm mới</button>
+              </div>
+              
+              <div className="p-6">
+                {withdrawRequestsLoading ? (
+                  <div className="py-10 text-center text-gray-400">Đang tải danh sách rút tiền...</div>
+                ) : withdrawRequests.length === 0 ? (
+                  <div className="py-10 text-center text-gray-400">Không có yêu cầu rút tiền nào cần duyệt.</div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-6">
+                    {withdrawRequests.map((req) => (
+                      <div key={req._id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-gray-50 dark:bg-dark-200 relative overflow-hidden transition-all hover:shadow-lg">
+                        
+                        {/* Header details */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                          <div>
+                            <span className="text-xs bg-amber-100 dark:bg-amber-950/40 text-amber-600 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider animate-pulse">
+                              💸 Chờ duyệt rút tiền
+                            </span>
+                            <h4 className="font-bold text-xl dark:text-white mt-1.5">{req.userName}</h4>
+                            <p className="text-xs text-gray-400 mt-1">📞 SĐT: {req.userPhone || '—'} · Vai trò: {req.userRole === 'shipper' ? 'Tài xế' : req.userRole}</p>
+                            <p className="text-[11px] text-gray-400 mt-0.5">📅 Ngày gửi: {new Date(req.createdAt).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/10 text-yellow-600 uppercase tracking-wider animate-pulse">
+                              Chờ duyệt
+                            </span>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )
+
+                        {/* Withdraw details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-gray-200 dark:border-gray-700/50 py-4 my-4">
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium">Chi tiết số tiền rút</p>
+                            <p className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">Số tiền VND: <span className="text-red-500 font-sans font-extrabold">{(req.amount || 0).toLocaleString()}đ</span></p>
+                            <p className="text-sm font-semibold text-yellow-600 mt-0.5">Quy đổi: <span className="font-sans font-black">{req.coins} Xu</span></p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium">Thông tin ngân hàng nhận</p>
+                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200 mt-0.5">{req.description}</p>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex justify-end gap-3 pt-2">
+                          <button
+                            onClick={() => { setSelectedDetail(req); setDetailType('withdrawal') }}
+                            className="px-4 py-2 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-semibold rounded-xl text-sm hover:bg-blue-100 transition-colors"
+                          >
+                            Xem chi tiết
+                          </button>
+                          <button
+                            onClick={() => {
+                              const reason = prompt('Lý do từ chối rút tiền (tùy chọn):')
+                              if (reason !== null) {
+                                handleWithdrawRequestStatus(req._id, 'reject', reason)
+                              }
+                            }}
+                            className="px-4 py-2 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-semibold rounded-xl text-sm transition-colors"
+                          >
+                            Từ chối rút
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Xác nhận đã chuyển khoản ${(req.amount || 0).toLocaleString()}đ cho tài xế ${req.userName}?`)) {
+                                handleWithdrawRequestStatus(req._id, 'approve')
+                              }
+                            }}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm shadow-md transition-all hover:scale-[1.02]"
+                          >
+                            ✅ Đã chuyển tiền & Duyệt rút
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -1188,6 +1205,142 @@ export default function AdminPage() {
         </div>
       </div>
       </div>
+
+      {/* Dynamic Details Modal Popup */}
+      {selectedDetail && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300">
+          <div className="bg-white dark:bg-dark-100 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-gray-150 dark:border-gray-800 flex flex-col max-h-[85vh] animate-scaleUp">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-dark-200/50">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-primary-500 bg-primary-500/5 border border-primary-500/10 px-2.5 py-1 rounded-md">
+                  {detailType === 'partner' ? 'Hồ sơ Đối tác Nhà hàng' : detailType === 'driver' ? 'Hồ sơ Đăng ký Tài xế' : 'Yêu cầu Rút tiền'}
+                </span>
+                <h3 className="font-black text-gray-900 dark:text-white text-lg mt-2">
+                  {selectedDetail.restaurantName || selectedDetail.name || selectedDetail.userName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedDetail(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-200 hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 overflow-y-auto space-y-5 text-sm leading-relaxed dark:text-gray-300">
+              {detailType === 'partner' && (
+                <>
+                  <div className="space-y-2.5">
+                    <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">Thông tin cửa hàng</h4>
+                    <p>📍 <strong>Địa chỉ:</strong> {selectedDetail.restaurantAddress}</p>
+                    <p>📞 <strong>SĐT quán:</strong> {selectedDetail.restaurantPhone}</p>
+                    <p>🍲 <strong>Loại hình ẩm thực:</strong> {selectedDetail.cuisineTypes?.join(', ')}</p>
+                    <p>💰 <strong>Giá trung bình:</strong> {selectedDetail.averagePrice}</p>
+                    {selectedDetail.description && <p>📝 <strong>Giới thiệu:</strong> {selectedDetail.description}</p>}
+                    {selectedDetail.specialDishes && <p>✨ <strong>Món đặc sắc:</strong> {selectedDetail.specialDishes}</p>}
+                  </div>
+                  <div className="h-px bg-gray-100 dark:bg-gray-800" />
+                  <div className="space-y-2.5">
+                    <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">Thông tin người đại diện</h4>
+                    <p>👤 <strong>Họ tên:</strong> {selectedDetail.ownerName}</p>
+                    <p>📞 <strong>Số điện thoại:</strong> {selectedDetail.ownerPhone}</p>
+                    <p>📧 <strong>Email:</strong> {selectedDetail.ownerEmail}</p>
+                  </div>
+                  <div className="h-px bg-gray-100 dark:bg-gray-800" />
+                  <div className="space-y-2.5">
+                    <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">Giấy tờ pháp lý</h4>
+                    <p>📜 <strong>Giấy phép kinh doanh:</strong> {selectedDetail.businessLicense || 'Chưa cung cấp'}</p>
+                    <p>🛡️ <strong>Chứng nhận ATTP:</strong> {selectedDetail.foodSafetyCert || 'Chưa cung cấp'}</p>
+                  </div>
+                </>
+              )}
+
+              {detailType === 'driver' && (
+                <>
+                  <div className="space-y-2.5">
+                    <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">Thông tin cá nhân</h4>
+                    <p>📞 <strong>Số điện thoại:</strong> {selectedDetail.phone}</p>
+                    <p>📧 <strong>Email:</strong> {selectedDetail.email}</p>
+                    <p>🆔 <strong>Số CCCD:</strong> {selectedDetail.idCard}</p>
+                    <p>📍 <strong>Khu vực hoạt động:</strong> {selectedDetail.operationArea}</p>
+                    {selectedDetail.referrer && <p>👤 <strong>Người giới thiệu:</strong> {selectedDetail.referrer}</p>}
+                    {selectedDetail.experience && <p>📝 <strong>Kinh nghiệm:</strong> {selectedDetail.experience}</p>}
+                  </div>
+                  <div className="h-px bg-gray-100 dark:bg-gray-800" />
+                  <div className="space-y-2.5">
+                    <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">Thông tin phương tiện & bằng lái</h4>
+                    <p>🛵 <strong>Loại xe:</strong> {selectedDetail.vehicleType || 'Xe máy'}</p>
+                    <p>🔢 <strong>Biển số xe:</strong> {selectedDetail.licensePlate}</p>
+                    <p>💳 <strong>Số GPLX:</strong> {selectedDetail.driverLicense}</p>
+                  </div>
+                </>
+              )}
+
+              {detailType === 'withdrawal' && (
+                <>
+                  <div className="space-y-2.5">
+                    <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">Thông tin tài xế</h4>
+                    <p>👤 <strong>Họ tên:</strong> {selectedDetail.userName}</p>
+                    <p>📞 <strong>Số điện thoại:</strong> {selectedDetail.userPhone || '—'}</p>
+                    <p>💼 <strong>Vai trò:</strong> {selectedDetail.userRole === 'shipper' ? 'Tài xế' : selectedDetail.userRole}</p>
+                    <p>📅 <strong>Ngày gửi yêu cầu:</strong> {new Date(selectedDetail.createdAt).toLocaleString()}</p>
+                  </div>
+                  <div className="h-px bg-gray-100 dark:bg-gray-800" />
+                  <div className="space-y-2.5">
+                    <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">Chi tiết giao dịch</h4>
+                    <p>💰 <strong>Số tiền rút:</strong> <span className="text-red-500 font-extrabold text-base">{(selectedDetail.amount || 0).toLocaleString()}đ</span></p>
+                    <p>🪙 <strong>Số xu quy đổi:</strong> <span className="text-yellow-600 font-extrabold">{selectedDetail.coins} Xu</span></p>
+                    <p>🏦 <strong>Ngân hàng nhận:</strong> {selectedDetail.description}</p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer actions for pending items */}
+            {selectedDetail.status === 'pending' && (
+              <div className="p-6 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-gray-50/50 dark:bg-dark-200/50">
+                <button
+                  onClick={() => {
+                    if (detailType === 'partner') {
+                      handlePartnerRequestStatus(selectedDetail._id, 'rejected');
+                    } else if (detailType === 'driver') {
+                      handleDriverRequestStatus(selectedDetail._id, 'rejected');
+                    } else if (detailType === 'withdrawal') {
+                      const reason = prompt('Lý do từ chối rút tiền (tùy chọn):');
+                      if (reason !== null) {
+                        handleWithdrawRequestStatus(selectedDetail._id, 'reject', reason);
+                      }
+                    }
+                    setSelectedDetail(null);
+                  }}
+                  className="px-5 py-2.5 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 font-bold rounded-2xl text-xs transition-colors"
+                >
+                  Từ chối
+                </button>
+                <button
+                  onClick={() => {
+                    if (detailType === 'partner') {
+                      handlePartnerRequestStatus(selectedDetail._id, 'approved');
+                    } else if (detailType === 'driver') {
+                      handleDriverRequestStatus(selectedDetail._id, 'approved');
+                    } else if (detailType === 'withdrawal') {
+                      if (confirm(`Xác nhận đã chuyển khoản ${(selectedDetail.amount || 0).toLocaleString()}đ cho tài xế ${selectedDetail.userName}?`)) {
+                        handleWithdrawRequestStatus(selectedDetail._id, 'approve');
+                      }
+                    }
+                    setSelectedDetail(null);
+                  }}
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl text-xs shadow-md transition-all hover:scale-[1.02]"
+                >
+                  Phê duyệt
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
