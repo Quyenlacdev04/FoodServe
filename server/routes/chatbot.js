@@ -342,15 +342,28 @@ ${menuContext}`;
     }
 
     const groq = new Groq({ apiKey: GROQ_API_KEY });
+    const cleanedHistory = history.slice(-6).map(m => {
+      let content = m.content || '';
+      // Loại bỏ các tag JSON hành động cồng kềnh để tối ưu hóa tốc độ và giảm token
+      content = content
+        .replace(/%%DISHES%%[\s\S]*?%%END%%/g, '')
+        .replace(/%%ORDER_INTENT%%[\s\S]*?%%END%%/g, '')
+        .replace(/%%ASK_ADDRESS%%[\s\S]*?%%END%%/g, '')
+        .replace(/%%ASK_PHONE%%[\s\S]*?%%END%%/g, '')
+        .replace(/%%ASK_PAYMENT%%[\s\S]*?%%END%%/g, '')
+        .replace(/%%CREATE_ORDER%%[\s\S]*?%%END%%/g, '');
+      return { role: m.role === 'user' ? 'user' : 'assistant', content: content.trim() };
+    }).filter(m => m.content.length > 0);
+
     const completion = await groq.chat.completions.create({
       model: 'llama-3.1-8b-instant',
       messages: [
         { role: 'system', content: systemPrompt },
-        ...history.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })),
+        ...cleanedHistory,
         { role: 'user', content: message }
       ],
-      temperature: 0.75,
-      max_tokens: 1200,
+      temperature: 0.7,
+      max_tokens: 600,
     });
 
     const rawReply = completion.choices[0]?.message?.content || '';
