@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoodServe - Slide Presentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow: hidden;
+      background: #0b0f19;
+      color: #f3f4f6;
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translateX(50px) scale(0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+    }
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0) scale(1);
+    }
+    .slide.prev {
+      opacity: 0;
+      transform: translateX(-50px) scale(0.95);
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #ef4444 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Slide Wrapper -->
+  <div class="relative w-screen h-screen">
+
+    <!-- Slide 1: Welcome -->
+    <div class="slide active" id="slide-1">
+      <div class="max-w-4xl w-full glass-card p-12 rounded-[2.5rem] text-center space-y-6 relative overflow-hidden">
+        <div class="absolute -top-10 -left-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-red-500/10 rounded-full blur-3xl"></div>
+        <span class="text-xs font-bold uppercase tracking-widest text-orange-500 bg-orange-500/10 px-4 py-1.5 rounded-full border border-orange-500/20">Dự án Đồ án tốt nghiệp</span>
+        <h1 class="text-6xl font-black tracking-tight"><span class="gradient-text">FoodServe</span> 🍔</h1>
+        <p class="text-xl text-gray-400 font-medium max-w-2xl mx-auto">
+          Hệ thống đặt đồ ăn trực tuyến thông minh tích hợp trợ lý ảo AI Chatbot & Quy trình vận hành tài xế ShipperBot toàn diện.
+        </p>
+        <div class="pt-6 flex justify-center gap-4 text-xs font-bold text-gray-400">
+          <span>🎯 AI Chatbot</span>
+          <span>•</span>
+          <span>⚡ Socket.io Real-time</span>
+          <span>•</span>
+          <span>🛡️ Admin Panel</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 2: Tech Stack -->
+    <div class="slide" id="slide-2">
+      <div class="max-w-4xl w-full glass-card p-12 rounded-[2.5rem] space-y-8">
+        <h2 class="text-4xl font-extrabold text-white text-center">💻 <span class="gradient-text">Kiến Trúc & Công Nghệ</span></h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 space-y-3">
+            <div class="text-3xl">⚛️</div>
+            <h3 class="font-extrabold text-lg text-white">Frontend</h3>
+            <p class="text-sm text-gray-400">React + Vite, Tailwind CSS, Redux Toolkit, Framer Motion, Leaflet Map.</p>
+          </div>
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 space-y-3">
+            <div class="text-3xl">🟢</div>
+            <h3 class="font-extrabold text-lg text-white">Backend</h3>
+            <p class="text-sm text-gray-400">Node.js + Express, Socket.io (Real-time), JWT, Nodemailer, Cloudinary API.</p>
+          </div>
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 space-y-3">
+            <div class="text-3xl">🍃</div>
+            <h3 class="font-extrabold text-lg text-white">Database & AI</h3>
+            <p class="text-sm text-gray-400">MongoDB Mongoose, Groq Llama 3.1 AI (Trợ lý đặt món & ShipperBot).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 3: AI Chatbot Features -->
+    <div class="slide" id="slide-3">
+      <div class="max-w-4xl w-full glass-card p-12 rounded-[2.5rem] space-y-8">
+        <h2 class="text-4xl font-extrabold text-white text-center">🤖 <span class="gradient-text">Siêu Trợ Lý AI Chatbot</span></h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div class="space-y-4">
+            <div class="flex items-start gap-3">
+              <span class="text-xl mt-0.5">💬</span>
+              <div>
+                <h4 class="font-bold text-base text-white">Gợi ý món ăn thông minh</h4>
+                <p class="text-sm text-gray-400">Tự động đề xuất món ngon dựa theo sở thích, thời tiết và thực đơn nhà hàng.</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="text-xl mt-0.5">🛒</span>
+              <div>
+                <h4 class="font-bold text-base text-white">Đặt hàng tự động qua chat</h4>
+                <p class="text-sm text-gray-400">AI tự dẫn dắt hỏi địa chỉ, số điện thoại, phương thức thanh toán và tạo đơn hàng ngay trong khung chat.</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="text-xl mt-0.5">⚡</span>
+              <div>
+                <h4 class="font-bold text-base text-white">Tối ưu phản hồi tức thì</h4>
+                <p class="text-sm text-gray-400">Cơ chế làm sạch token lịch sử giúp giảm độ trễ, AI trả lời chỉ trong 0.5 giây.</p>
+              </div>
+            </div>
+          </div>
+          <div class="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 p-6 rounded-3xl text-center space-y-4">
+            <span class="text-4xl">🍕</span>
+            <div class="text-xs text-yellow-500 font-bold uppercase tracking-wider">Trải nghiệm khách hàng mới</div>
+            <p class="text-xs text-gray-400">Giao diện ChatBox giống Messenger, lưu lịch sử phiên trò chuyện (ChatGPT style), chuyển đổi mượt mà.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 4: Shipper Features -->
+    <div class="slide" id="slide-4">
+      <div class="max-w-4xl w-full glass-card p-12 rounded-[2.5rem] space-y-8">
+        <h2 class="text-4xl font-extrabold text-white text-center">🛵 <span class="gradient-text">Hệ Sinh Thái Cho Tài Xế</span></h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 space-y-2">
+            <span class="text-3xl">💸</span>
+            <h4 class="font-bold text-white text-base">Ví Xu & Rút Tiền</h4>
+            <p class="text-xs text-gray-400">Tích lũy xu từ đơn hàng, lập yêu cầu rút tiền về ngân hàng 24/7 cực kỳ tiện lợi.</p>
+          </div>
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 space-y-2">
+            <span class="text-3xl">📋</span>
+            <h4 class="font-bold text-white text-base">Lịch Sử Giao Dịch</h4>
+            <p class="text-xs text-gray-400">Tra cứu chi tiết toàn bộ lịch sử biến động xu, trạng thái duyệt (Chờ duyệt, Thành công, Từ chối kèm lý do).</p>
+          </div>
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 space-y-2">
+            <span class="text-3xl">🎧</span>
+            <h4 class="font-bold text-white text-base">ShipperBot Hỗ Trợ</h4>
+            <p class="text-xs text-gray-400">Trợ lý AI hỗ trợ xử lý nhanh các sự cố: Bom đơn, hỏng xe, tai nạn, nhà hàng làm món chậm trễ.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 5: Admin Panel -->
+    <div class="slide" id="slide-5">
+      <div class="max-w-4xl w-full glass-card p-12 rounded-[2.5rem] space-y-8">
+        <h2 class="text-4xl font-extrabold text-white text-center">👑 <span class="gradient-text">Bảng Điều Khiển Quản Trị</span></h2>
+        <div class="space-y-4">
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 flex items-start gap-4">
+            <span class="text-3xl">🎛️</span>
+            <div>
+              <h4 class="font-bold text-white text-base">Quản lý duyệt tập trung</h4>
+              <p class="text-sm text-gray-400">Tách biệt rõ ràng các khu vực phê duyệt: Yêu cầu đăng ký quán ăn, Đăng ký shipper mới, và Duyệt rút tiền mặt.</p>
+            </div>
+          </div>
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 flex items-start gap-4">
+            <span class="text-3xl">🔍</span>
+            <div>
+              <h4 class="font-bold text-white text-base">Popup chi tiết nâng cao (Modal)</h4>
+              <p class="text-sm text-gray-400">Xem nhanh chi tiết toàn bộ hồ sơ đăng ký và thông tin ngân hàng ngay trên Modal phủ mờ, giúp phê duyệt chỉ với 1 click.</p>
+            </div>
+          </div>
+          <div class="bg-gray-900/50 p-6 rounded-3xl border border-white/5 flex items-start gap-4">
+            <span class="text-3xl">🔊</span>
+            <div>
+              <h4 class="font-bold text-white text-base">Thông báo đa kênh Real-time</h4>
+              <p class="text-sm text-gray-400">Duyệt rút tiền tự động gửi thông báo đẩy trình duyệt, âm thanh cảnh báo và cập nhật số dư ví shipper tức thì qua WebSockets.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 6: Thank you -->
+    <div class="slide" id="slide-6">
+      <div class="max-w-4xl w-full glass-card p-12 rounded-[2.5rem] text-center space-y-6 relative overflow-hidden">
+        <div class="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl"></div>
+        <h2 class="text-5xl font-black"><span class="gradient-text">Xin Cảm Ơn!</span> 🎉</h2>
+        <p class="text-lg text-gray-300 max-w-md mx-auto">
+          Cảm ơn bạn đã theo dõi bài thuyết trình về dự án FoodServe.
+        </p>
+        <div class="pt-8 text-xs text-gray-500">
+          Nhấn phím <kbd class="px-2 py-1 bg-gray-800 rounded text-gray-300 font-mono">←</kbd> và <kbd class="px-2 py-1 bg-gray-800 rounded text-gray-300 font-mono">→</kbd> hoặc nút điều hướng bên dưới để chuyển slide.
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide Navigation Controllers -->
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 z-50">
+      <button onclick="prevSlide()" class="w-12 h-12 rounded-full border border-white/10 bg-gray-950/60 hover:bg-gray-900 flex items-center justify-center text-white font-bold transition-all hover:scale-105 active:scale-95">
+        ←
+      </button>
+      <span id="slide-indicator" class="text-sm font-bold text-gray-400 bg-gray-900/60 px-4 py-2 rounded-full border border-white/5">
+        Slide 1 / 6
+      </span>
+      <button onclick="nextSlide()" class="w-12 h-12 rounded-full border border-white/10 bg-gray-950/60 hover:bg-gray-900 flex items-center justify-center text-white font-bold transition-all hover:scale-105 active:scale-95">
+        →
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 6;
+
+    function showSlide(slideIndex) {
+      if (slideIndex < 1 || slideIndex > totalSlides) return;
+      
+      // Update state classes
+      for (let i = 1; i <= totalSlides; i++) {
+        const slide = document.getElementById(`slide-${i}`);
+        if (i === slideIndex) {
+          slide.className = 'slide active';
+        } else if (i < slideIndex) {
+          slide.className = 'slide prev';
+        } else {
+          slide.className = 'slide';
+        }
+      }
+      
+      currentSlide = slideIndex;
+      document.getElementById('slide-indicator').innerText = `Slide ${currentSlide} / ${totalSlides}`;
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        showSlide(currentSlide + 1);
+      } else {
+        showSlide(1); // loop back to first slide
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        showSlide(currentSlide - 1);
+      } else {
+        showSlide(totalSlides); // loop back to last slide
+      }
+    }
+
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft') {
+        prevSlide();
+      }
+    });
+  </script>
+
+</body>
+</html>
