@@ -650,7 +650,10 @@ router.get('/owned/:ownerId', async (req, res) => {
 // Thêm món ăn mới vào nhà hàng
 router.post('/:id/menu', async (req, res) => {
   try {
-    const { name, price, image, description, category, popular } = req.body;
+    const { name, price, image, description, category, popular, inventory, isAvailable } = req.body;
+    const itemInventory = inventory !== undefined ? Number(inventory) : 99;
+    const itemAvailable = itemInventory <= 0 ? false : (isAvailable !== undefined ? !!isAvailable : true);
+
     const newItem = new MenuItem({
       restaurantId: req.params.id,
       name,
@@ -658,7 +661,9 @@ router.post('/:id/menu', async (req, res) => {
       image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200',
       description,
       category: category || 'Món khác',
-      popular: !!popular
+      popular: !!popular,
+      inventory: itemInventory,
+      isAvailable: itemAvailable
     });
     await newItem.save();
     res.status(201).json(newItem);
@@ -670,7 +675,14 @@ router.post('/:id/menu', async (req, res) => {
 // Sửa thông tin món ăn
 router.put('/menu/:itemId', async (req, res) => {
   try {
-    const updated = await MenuItem.findByIdAndUpdate(req.params.itemId, req.body, { new: true });
+    const updateData = { ...req.body };
+    if (updateData.inventory !== undefined) {
+      updateData.inventory = Number(updateData.inventory);
+      if (updateData.inventory <= 0) {
+        updateData.isAvailable = false;
+      }
+    }
+    const updated = await MenuItem.findByIdAndUpdate(req.params.itemId, updateData, { new: true });
     res.json(updated);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi khi sửa món ăn' });

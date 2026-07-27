@@ -18,8 +18,16 @@ const cartSlice = createSlice({
         (i) => i.id === item.id && i.restaurantId === item.restaurantId
       )
       if (existing) {
+        if (item.inventory !== undefined && existing.quantity >= item.inventory) {
+          toast.error(`Chỉ còn ${item.inventory} suất sẵn có!`, { id: 'out-of-stock-toast' })
+          return
+        }
         existing.quantity += 1
       } else {
+        if (item.inventory !== undefined && item.inventory <= 0) {
+          toast.error('Món ăn đã hết hàng!', { id: 'out-of-stock-toast' })
+          return
+        }
         state.items.push({ ...item, quantity: 1 })
       }
       localStorage.setItem('foodserve_cart', JSON.stringify(state.items))
@@ -36,6 +44,10 @@ const cartSlice = createSlice({
         if (quantity <= 0) {
           state.items = state.items.filter((i) => i.id !== id)
         } else {
+          if (item.inventory !== undefined && quantity > item.inventory) {
+            toast.error(`Chỉ còn ${item.inventory} suất sẵn có!`, { id: 'out-of-stock-toast' })
+            return
+          }
           item.quantity = quantity
         }
       }

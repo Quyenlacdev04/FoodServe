@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
 // Middleware xác thực JWT token
-export const authenticate = async (req, res, next) => {
+export const authenticateToken = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1]; // Bearer TOKEN
     
@@ -18,7 +18,7 @@ export const authenticate = async (req, res, next) => {
     }
     
     req.user = user;
-    req.userId = user._id;
+    req.user.userId = user._id; // Add userId to user object for compatibility
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
@@ -30,6 +30,9 @@ export const authenticate = async (req, res, next) => {
     return res.status(500).json({ message: 'Lỗi xác thực' });
   }
 };
+
+// Legacy support - alias
+export const authenticate = authenticateToken;
 
 // Middleware kiểm tra quyền admin
 export const requireAdmin = (req, res, next) => {

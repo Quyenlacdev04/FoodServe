@@ -288,14 +288,14 @@ export default function CheckoutPage() {
                   <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type="text" name="name" value={formData.name} onChange={handleInputChange}
                     placeholder="Tên người nhận"
-                    className="input-search pl-11 w-full bg-dark-200" required />
+                    className="input-search pl-11 w-full bg-white dark:bg-dark-200" required />
                 </div>
                 {/* SĐT */}
                 <div className="relative">
                   <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange}
                     placeholder="Số điện thoại"
-                    className="input-search pl-11 w-full bg-dark-200" required />
+                    className="input-search pl-11 w-full bg-white dark:bg-dark-200" required />
                 </div>
 
                 {/* ĐỊA CHỈ — nút mở map picker */}
@@ -344,7 +344,7 @@ export default function CheckoutPage() {
                 <div className="relative md:col-span-2">
                   <input type="text" name="note" value={formData.note} onChange={handleInputChange}
                     placeholder="💬 Ghi chú cho tài xế (cổng sau, tầng 3, gọi trước...)"
-                    className="input-search px-4 w-full bg-dark-200" />
+                    className="input-search px-4 w-full bg-white dark:bg-dark-200" />
                 </div>
               </div>
             </motion.div>

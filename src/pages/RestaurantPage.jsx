@@ -100,14 +100,25 @@ export default function RestaurantPage() {
 
   const updateQty = (itemId, delta) => {
     if (isExpired) return
+    const menuItem = items.find(i => i.id === itemId)
+    const currentQty = quantities[itemId] || 0
+    const newQty = currentQty + delta
+    if (menuItem && menuItem.inventory !== undefined && newQty > menuItem.inventory) {
+      toast.error(`Chỉ còn ${menuItem.inventory} suất ${menuItem.name} sẵn có!`)
+      return
+    }
     setQuantities((prev) => ({
       ...prev,
-      [itemId]: Math.max(0, (prev[itemId] || 0) + delta),
+      [itemId]: Math.max(0, newQty),
     }))
   }
 
   const handleAdd = (item) => {
     if (isExpired) return
+    if (!item.isAvailable || (item.inventory !== undefined && item.inventory <= 0)) {
+      toast.error('Món ăn đã hết hàng!')
+      return
+    }
     dispatch(addToCart(item))
     setQuantities((prev) => ({ ...prev, [item.id]: 0 }))
   }
@@ -227,101 +238,121 @@ export default function RestaurantPage() {
         {/* Menu item cards listing grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AnimatePresence mode="popLayout">
-            {displayItems.map((item, i) => (
-              <motion.div
-                key={item.id}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ delay: i * 0.03 }}
-                className="bg-white dark:bg-dark-100 rounded-3xl overflow-hidden shadow-card hover:shadow-card-hover border border-gray-100 dark:border-white/5 transition-all duration-300 flex"
-              >
-                <img 
-                  src={item.image} 
-                  alt={item.name} 
-                  className="w-28 h-28 md:w-32 md:h-32 object-cover flex-shrink-0" 
-                  loading="lazy" 
-                />
-                
-                <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-base text-gray-850 dark:text-white line-clamp-1 flex items-center gap-1.5">
-                        {item.name}
-                        {healthyMode && item.isHealthy && (
-                          <span className="text-xs" title="Món ăn lành mạnh">🥗</span>
-                        )}
-                      </h4>
-                      {item.popular && (
-                        <span className="badge-hot text-[9px] px-2 py-0.5 rounded-lg shadow-sm">HOT</span>
-                      )}
-                    </div>
-                    <p className="text-gray-400 dark:text-gray-500 text-xs mt-1.5 line-clamp-2 font-medium">
-                      {item.description}
-                    </p>
-                    
-                    {/* Nutrition Macros Display */}
-                    {healthyMode && item.calories > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 text-[9px] font-bold text-green-600 dark:text-green-400 mt-2.5 bg-green-500/5 dark:bg-green-500/10 px-2.5 py-1 rounded-xl w-max border border-green-500/10 shadow-sm">
-                        <span className="flex items-center gap-0.5">🔥 {item.calories} kcal</span>
-                        <span className="opacity-30">•</span>
-                        <span>💪 P: {item.protein}g</span>
-                        <span className="opacity-30">•</span>
-                        <span>🍞 C: {item.carbs}g</span>
-                        <span className="opacity-30">•</span>
-                        <span>🥑 F: {item.fat}g</span>
+            {displayItems.map((item, i) => {
+              const isOutOfStock = !item.isAvailable || (item.inventory !== undefined && item.inventory <= 0);
+              return (
+                <motion.div
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ delay: i * 0.03 }}
+                  className={`bg-white dark:bg-dark-100 rounded-3xl overflow-hidden shadow-card hover:shadow-card-hover border border-gray-100 dark:border-white/5 transition-all duration-300 flex ${isOutOfStock ? 'opacity-65' : ''}`}
+                >
+                  <div className="relative flex-shrink-0">
+                    <img 
+                      src={item.image} 
+                      alt={item.name} 
+                      className={`w-28 h-28 md:w-32 md:h-32 object-cover ${isOutOfStock ? 'grayscale' : ''}`} 
+                      loading="lazy" 
+                    />
+                    {isOutOfStock && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Hết hàng</span>
                       </div>
                     )}
                   </div>
-
-                  <div className="flex items-center justify-between mt-3">
-                    <span className="text-primary-500 font-sans font-black text-base">{formatPrice(item.price)}</span>
-                    
-                    <div className="flex items-center gap-2">
-                      {isExpired ? (
-                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 px-3 py-1.5 bg-gray-50 dark:bg-dark-200 border border-gray-100 dark:border-white/5 rounded-xl select-none">
-                          Tạm khóa
-                        </span>
-                      ) : (
-                        <>
-                          {(quantities[item.id] || 0) > 0 && (
-                            <>
-                              <motion.button
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                onClick={() => updateQty(item.id, -1)}
-                                className="w-8 h-8 rounded-xl border border-gray-200 dark:border-white/10 flex items-center justify-center bg-white dark:bg-dark-200 hover:border-primary-500 transition-colors shadow-sm"
-                              >
-                                <FiMinus className="text-xs text-gray-600 dark:text-white" />
-                              </motion.button>
-                              <motion.span
-                                key={quantities[item.id]}
-                                initial={{ scale: 1.3 }}
-                                animate={{ scale: 1 }}
-                                className="text-sm font-black w-6 text-center text-gray-800 dark:text-white"
-                              >
-                                {quantities[item.id]}
-                              </motion.span>
-                            </>
+                  
+                  <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-bold text-base text-gray-850 dark:text-white line-clamp-1 flex items-center gap-1.5">
+                          {item.name}
+                          {healthyMode && item.isHealthy && (
+                            <span className="text-xs" title="Món ăn lành mạnh">🥗</span>
                           )}
-                          <motion.button
-                            whileTap={{ scale: 0.85 }}
-                            onClick={() => {
-                              if ((quantities[item.id] || 0) === 0) updateQty(item.id, 1)
-                              else handleAdd({ ...item, quantity: quantities[item.id] })
-                            }}
-                            className="w-9 h-9 rounded-xl bg-primary-500 text-white flex items-center justify-center hover:bg-primary-600 hover:shadow-glow transition-all shadow-md"
-                          >
-                            {(quantities[item.id] || 0) === 0 ? <FiPlus className="text-base" /> : <FiShoppingCart className="text-base" />}
-                          </motion.button>
-                        </>
+                        </h4>
+                        {item.popular && (
+                          <span className="badge-hot text-[9px] px-2 py-0.5 rounded-lg shadow-sm">HOT</span>
+                        )}
+                      </div>
+                      <p className="text-gray-400 dark:text-gray-500 text-xs mt-1.5 line-clamp-2 font-medium">
+                        {item.description}
+                      </p>
+                      
+                      {/* Nutrition Macros Display */}
+                      {healthyMode && item.calories > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-[9px] font-bold text-green-600 dark:text-green-400 mt-2.5 bg-green-500/5 dark:bg-green-500/10 px-2.5 py-1 rounded-xl w-max border border-green-500/10 shadow-sm">
+                          <span className="flex items-center gap-0.5">🔥 {item.calories} kcal</span>
+                          <span className="opacity-30">•</span>
+                          <span>💪 P: {item.protein}g</span>
+                          <span className="opacity-30">•</span>
+                          <span>🍞 C: {item.carbs}g</span>
+                          <span className="opacity-30">•</span>
+                          <span>🥑 F: {item.fat}g</span>
+                        </div>
                       )}
                     </div>
+
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-primary-500 font-sans font-black text-base">{formatPrice(item.price)}</span>
+                      
+                      <div className="flex items-center gap-2">
+                        {isExpired ? (
+                          <span className="text-xs font-bold text-gray-400 dark:text-gray-500 px-3 py-1.5 bg-gray-50 dark:bg-dark-200 border border-gray-100 dark:border-white/5 rounded-xl select-none">
+                            Tạm khóa
+                          </span>
+                        ) : isOutOfStock ? (
+                          <span className="text-xs font-bold text-red-500 dark:text-red-400 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-xl select-none">
+                            Hết hàng
+                          </span>
+                        ) : (
+                          <>
+                            {(quantities[item.id] || 0) > 0 && (
+                              <>
+                                <motion.button
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  onClick={() => updateQty(item.id, -1)}
+                                  className="w-8 h-8 rounded-xl border border-gray-200 dark:border-white/10 flex items-center justify-center bg-white dark:bg-dark-200 hover:border-primary-500 transition-colors shadow-sm"
+                                >
+                                  <FiMinus className="text-xs text-gray-600 dark:text-white" />
+                                </motion.button>
+                                <motion.span
+                                  key={quantities[item.id]}
+                                  initial={{ scale: 1.3 }}
+                                  animate={{ scale: 1 }}
+                                  className="text-sm font-black w-6 text-center text-gray-800 dark:text-white"
+                                >
+                                  {quantities[item.id]}
+                                </motion.span>
+                              </>
+                            )}
+                            <motion.button
+                              whileTap={{ scale: 0.85 }}
+                              onClick={() => {
+                                if ((quantities[item.id] || 0) === 0) {
+                                  if (item.inventory !== undefined && item.inventory < 1) {
+                                    toast.error('Món ăn đã hết hàng!')
+                                    return
+                                  }
+                                  updateQty(item.id, 1)
+                                }
+                                else handleAdd({ ...item, quantity: quantities[item.id] })
+                              }}
+                              className="w-9 h-9 rounded-xl bg-primary-500 text-white flex items-center justify-center hover:bg-primary-600 hover:shadow-glow transition-all shadow-md"
+                            >
+                              {(quantities[item.id] || 0) === 0 ? <FiPlus className="text-base" /> : <FiShoppingCart className="text-base" />}
+                            </motion.button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
 

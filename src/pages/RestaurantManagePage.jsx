@@ -63,7 +63,9 @@ export default function RestaurantManagePage() {
     image: '',
     description: '',
     category: 'Món chính',
-    popular: false
+    popular: false,
+    inventory: 99,
+    isAvailable: true
   })
 
   // Store settings form
@@ -300,8 +302,8 @@ export default function RestaurantManagePage() {
   // Create or Update Menu Item
   const handleItemSubmit = async (e) => {
     e.preventDefault()
-    if (!formData.name || !formData.price) {
-      toast.error('Vui lòng nhập tên và giá món ăn')
+    if (!formData.name || !formData.price || formData.inventory === '') {
+      toast.error('Vui lòng nhập tên, giá và số lượng tồn kho của món ăn')
       return
     }
 
@@ -317,7 +319,8 @@ export default function RestaurantManagePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          price: Number(formData.price)
+          price: Number(formData.price),
+          inventory: Number(formData.inventory)
         })
       })
 
@@ -331,7 +334,9 @@ export default function RestaurantManagePage() {
           image: '',
           description: '',
           category: 'Món chính',
-          popular: false
+          popular: false,
+          inventory: 99,
+          isAvailable: true
         })
         triggerRefresh()
       } else {
@@ -607,7 +612,9 @@ export default function RestaurantManagePage() {
       image: '',
       description: '',
       category: 'Món chính',
-      popular: false
+      popular: false,
+      inventory: 99,
+      isAvailable: true
     })
     setShowItemModal(true)
   }
@@ -620,7 +627,9 @@ export default function RestaurantManagePage() {
       image: item.image || '',
       description: item.description || '',
       category: item.category || 'Món chính',
-      popular: !!item.popular
+      popular: !!item.popular,
+      inventory: item.inventory !== undefined ? item.inventory : 99,
+      isAvailable: item.isAvailable !== undefined ? !!item.isAvailable : true
     })
     setShowItemModal(true)
   }
@@ -1417,9 +1426,18 @@ export default function RestaurantManagePage() {
                         <div>
                           <div className="flex justify-between items-start gap-2">
                             <h4 className="font-bold dark:text-white group-hover:text-primary-500 transition-colors">{item.name}</h4>
-                            <span className="text-xs bg-primary-100 dark:bg-primary-950/40 text-primary-500 font-bold px-2 py-0.5 rounded-md">
-                              {item.category}
-                            </span>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-xs bg-primary-100 dark:bg-primary-950/40 text-primary-500 font-bold px-2 py-0.5 rounded-md">
+                                {item.category}
+                              </span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                                item.isAvailable && item.inventory > 0 
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400' 
+                                  : 'bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400'
+                              }`}>
+                                {item.isAvailable && item.inventory > 0 ? `Kho: ${item.inventory}` : 'Hết hàng'}
+                              </span>
+                            </div>
                           </div>
                           <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description || 'Chưa có mô tả chi tiết cho món ăn này.'}</p>
                         </div>
@@ -1829,6 +1847,35 @@ export default function RestaurantManagePage() {
                       <option value="Đồ uống">Đồ uống</option>
                       <option value="Tráng miệng">Tráng miệng</option>
                       <option value="Món khác">Món khác</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Hàng tồn kho (Số lượng) <span className="text-red-500">*</span>
+                    </label>
+                    <input 
+                      type="number" 
+                      value={formData.inventory} 
+                      onChange={e => setFormData({ ...formData, inventory: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" 
+                      placeholder="VD: 50"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Trạng thái phục vụ
+                    </label>
+                    <select 
+                      value={formData.isAvailable ? "true" : "false"} 
+                      onChange={e => setFormData({ ...formData, isAvailable: e.target.value === "true" })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-dark-300 text-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                    >
+                      <option value="true">Còn hàng (Phục vụ)</option>
+                      <option value="false">Hết hàng (Tạm ngưng)</option>
                     </select>
                   </div>
                 </div>

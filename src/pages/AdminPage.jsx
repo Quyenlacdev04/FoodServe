@@ -12,6 +12,7 @@ import AdminUsers from '../components/admin/AdminUsers'
 import AdminSettings from '../components/admin/AdminSettings'
 import AdminDrivers from '../components/admin/AdminDrivers'
 import AdminVouchers from '../components/admin/AdminVouchers'
+import SecurityMonitor from '../components/admin/SecurityMonitor'
 import NotificationBell from '../components/ui/NotificationBell'
 import { logout } from '../store/slices/authSlice'
 import { toggleDarkMode } from '../store/slices/uiSlice'
@@ -48,6 +49,7 @@ export default function AdminPage() {
   const [unreadOrders, setUnreadOrders] = useState(0) // số đơn chưa xem
   const [selectedDetail, setSelectedDetail] = useState(null) // Chi tiết yêu cầu được chọn
   const [detailType, setDetailType] = useState(null) // Loại chi tiết: 'partner', 'driver', 'withdrawal'
+  const [securityAlerts, setSecurityAlerts] = useState(0) // số cảnh báo bảo mật chưa xem
   const audioRef = useRef(null)
 
   // Kiểm tra quyền admin
@@ -100,6 +102,22 @@ export default function AdminPage() {
         style: { fontWeight: 'bold' }
       });
       fetchOrders(); // Refresh bảng đơn hàng
+    });
+    
+    // Lắng nghe cảnh báo bảo mật
+    socket.on('security-alert', (data) => {
+      setSecurityAlerts(prev => prev + 1);
+      toast.error(`🚨 Cảnh báo bảo mật: ${data.incident.description}`, {
+        duration: 8000,
+        style: { fontWeight: 'bold' }
+      });
+      
+      // Phát âm thanh cảnh báo
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq4');
+        audio.volume = 0.7;
+        audio.play().catch(() => {});
+      } catch (e) {}
     });
     
     return () => socket.disconnect()
@@ -574,6 +592,18 @@ export default function AdminPage() {
           </button>
           <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'users' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiUsers /> Quản lý Users
+          </button>
+          <button onClick={() => { setActiveTab('security'); setSecurityAlerts(0); }} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'security' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
+            🛡️ AI Security Monitor
+            {securityAlerts > 0 && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="ml-auto bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse"
+              >
+                {securityAlerts}
+              </motion.span>
+            )}
           </button>
           <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${activeTab === 'settings' ? 'bg-primary-500 text-white shadow-glow' : 'hover:bg-white dark:hover:bg-dark-100 text-gray-500 dark:text-gray-400'}`}>
             <FiSettings /> Cài đặt hệ thống
@@ -1200,6 +1230,7 @@ export default function AdminPage() {
           )}
           
           {activeTab === 'users' && <AdminUsers />}
+          {activeTab === 'security' && <SecurityMonitor />}
           {activeTab === 'settings' && <AdminSettings />}
 
         </div>

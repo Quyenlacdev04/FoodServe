@@ -41,7 +41,8 @@ export default defineConfig(({ mode }) => {
         input: {
           main: resolve(__dirname, 'index.html'),
           admin: resolve(__dirname, 'admin.html'),
-          adminLogin: resolve(__dirname, 'admin-login.html')
+          adminLogin: resolve(__dirname, 'admin-login.html'),
+          presentation: resolve(__dirname, 'FoodServe_Presentation.html')
         }
       }
     },

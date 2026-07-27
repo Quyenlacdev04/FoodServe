@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import Notification from '../models/Notification.js';
 import SystemSetting from '../models/SystemSetting.js';
 import Restaurant from '../models/Restaurant.js';
+import MenuItem from '../models/MenuItem.js';
 
 const router = express.Router();
 
@@ -16,6 +17,37 @@ router.post('/', async (req, res) => {
       return res.status(503).json({ 
         message: '🔧 Hệ thống đang bảo trì. Vui lòng quay lại sau ít phút. Xin lỗi vì sự bất tiện!' 
       });
+    }
+
+    // Kiểm tra hàng tồn kho của các món ăn
+    const orderItems = req.body.items || [];
+    for (const item of orderItems) {
+      if (!item.menuItemId) continue;
+      const menuItem = await MenuItem.findById(item.menuItemId);
+      if (!menuItem) {
+        return res.status(404).json({ message: `Không tìm thấy món ăn: ${item.name}` });
+      }
+      if (!menuItem.isAvailable || (menuItem.inventory !== undefined && menuItem.inventory <= 0)) {
+        return res.status(400).json({ message: `Món "${item.name}" đã hết hàng, không thể đặt!` });
+      }
+      if (menuItem.inventory !== undefined && menuItem.inventory < item.quantity) {
+        return res.status(400).json({ 
+          message: `Món "${item.name}" chỉ còn lại ${menuItem.inventory} suất trong kho, không đủ số lượng ${item.quantity} bạn yêu cầu!` 
+        });
+      }
+    }
+
+    // Trừ hàng tồn kho của các món ăn
+    for (const item of orderItems) {
+      if (!item.menuItemId) continue;
+      const menuItem = await MenuItem.findById(item.menuItemId);
+      if (menuItem && menuItem.inventory !== undefined) {
+        menuItem.inventory = Math.max(0, menuItem.inventory - item.quantity);
+        if (menuItem.inventory <= 0) {
+          menuItem.isAvailable = false;
+        }
+        await menuItem.save();
+      }
     }
 
     const restaurant = await Restaurant.findById(req.body.restaurantId);
@@ -306,6 +338,30 @@ router.patch('/:id/status', async (req, res) => {
       order.cancelledBy = req.body.cancelledBy || 'merchant';
       order.cancellationReason = req.body.reason || 'Nhà hàng hết món hoặc gặp sự cố';
       order.cancelledAt = new Date();
+
+      // Hoàn lại hàng tồn kho của các món ăn trong đơn
+      if (order.items && order.items.length > 0) {
+        for (const item of order.items) {
+          if (item.menuItemId) {
+            try {
+              const menuItem = await MenuItem.findById(item.menuItemId);
+              if (menuItem) {
+                if (menuItem.inventory !== undefined) {
+                  const wasOutOfStock = menuItem.inventory <= 0;
+                  menuItem.inventory += item.quantity;
+                  // Nếu trước đó hết hàng, nay hoàn kho > 0 thì tự động kích hoạt lại
+                  if (wasOutOfStock && menuItem.inventory > 0) {
+                    menuItem.isAvailable = true;
+                  }
+                  await menuItem.save();
+                }
+              }
+            } catch (err) {
+              console.error(`Error restoring inventory for item ${item.menuItemId}:`, err);
+            }
+          }
+        }
+      }
 
       // Xử lý hoàn tiền nếu đã thanh toán online
       if (order.paymentStatus === 'paid' && order.paymentMethod !== 'cash') {

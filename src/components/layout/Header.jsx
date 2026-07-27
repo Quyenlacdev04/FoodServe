@@ -31,6 +31,7 @@ export default function Header() {
   const [groupCodeInput, setGroupCodeInput] = useState('')
   const menuRef = useRef(null)
   const { caps } = useUserCapabilities()
+  const isSolid = scrolled || location.pathname !== '/'
 
   const handleRestaurantsClick = (e) => {
     setMenuOpen(false)
@@ -78,12 +79,12 @@ export default function Header() {
   }
 
   const iconBtnClass = `p-2.5 rounded-2xl transition-all duration-300 ${
-    scrolled
+    isSolid
       ? 'hover:bg-gray-100/80 dark:hover:bg-white/5'
       : 'hover:bg-white/10'
   }`
 
-  const iconColor = scrolled ? 'text-gray-700 dark:text-gray-200' : 'text-white'
+  const iconColor = isSolid ? 'text-gray-700 dark:text-gray-200' : 'text-white'
 
   const renderUserMenu = () => (
     <AnimatePresence>
@@ -202,11 +203,11 @@ export default function Header() {
     <>
       <motion.header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          scrolled
+          isSolid
             ? 'py-2'
             : 'py-3 md:py-4'
         }`}
-        style={scrolled ? {
+        style={isSolid ? {
           background: darkMode ? 'rgba(28,25,23,0.92)' : 'rgba(255,255,255,0.85)',
           backdropFilter: 'blur(24px) saturate(180%)',
           WebkitBackdropFilter: 'blur(24px) saturate(180%)',
@@ -303,7 +304,7 @@ export default function Header() {
                   type="button"
                   onClick={() => setMenuOpen(!menuOpen)}
                   className={`flex items-center gap-1.5 p-1 rounded-full transition-all ${
-                    scrolled ? 'hover:bg-gray-100/80 dark:hover:bg-white/5' : 'hover:bg-white/10'
+                    isSolid ? 'hover:bg-gray-100/80 dark:hover:bg-white/5' : 'hover:bg-white/10'
                   } ${menuOpen ? 'ring-2 ring-primary-500/30' : ''}`}
                   aria-label="Menu tài khoản"
                   aria-expanded={menuOpen}
@@ -318,7 +319,7 @@ export default function Header() {
                     )}
                   </div>
                   <FiChevronDown className={`text-sm transition-transform duration-300 ${menuOpen ? 'rotate-180' : ''} ${
-                    scrolled ? 'text-gray-500 dark:text-gray-400' : 'text-white/70'
+                    isSolid ? 'text-gray-500 dark:text-gray-400' : 'text-white/70'
                   }`} />
                 </button>
                 {renderUserMenu()}

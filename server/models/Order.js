@@ -51,7 +51,7 @@ const orderSchema = new mongoose.Schema({
   // Thông tin thanh toán
   paymentMethod: { 
     type: String, 
-    enum: ['cash', 'vnpay', 'momo', 'zalopay', 'coins'], 
+    enum: ['cash', 'vnpay', 'momo', 'zalopay', 'coins', 'payos'], 
     default: 'cash' 
   },
   paymentStatus: { 

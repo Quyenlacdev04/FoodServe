@@ -15,7 +15,11 @@ const menuItemSchema = new mongoose.Schema({
   carbs: { type: Number, default: 0 },
   fat: { type: Number, default: 0 },
   isHealthy: { type: Boolean, default: false },
-  healthTags: { type: [String], default: [] }
+  healthTags: { type: [String], default: [] },
+  
+  // Quản lý kho hàng & Trạng thái phục vụ
+  inventory: { type: Number, default: 99 },
+  isAvailable: { type: Boolean, default: true }
 }, { timestamps: true });
 
 // Indexes để tăng hiệu suất truy vấn
